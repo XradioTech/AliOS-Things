@@ -18,7 +18,8 @@ $(NAME)_SOURCES := aos.c \
                    hal/wifi_port.c \
                    hal/wifi.c \
                    hal/hal.c \
+                   hal/fota_port.c \
                    cli_ext/cli_ext.c \
                    cli_ext/cli_mem.c \
                    cli_ext/cli_upgrade.c \
-                   hal/fota_port.c \
+

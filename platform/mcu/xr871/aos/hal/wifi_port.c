@@ -52,6 +52,7 @@
 extern struct netif *g_wlan_netif;
 
 static wlan_monitor_rx_cb g_monitor_cb;
+static monitor_data_cb_t g_mgnt_cb = NULL;
 static int g_network_up = 0;
 
 static enum scan_type {
@@ -127,6 +128,50 @@ void xr871_wlan_get_mac_addr(uint8_t *mac)
 			mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
+static void recv_mgnt_rawframe(uint8_t *data, uint32_t len, void *info)
+{
+	if (len < sizeof(struct ieee80211_frame)) {
+		WIFI_DEBUG("%s():%d, len %u\n", __func__, __LINE__, len);
+		return;
+	}
+
+     if(NULL == g_mgnt_cb) {
+        return;
+    }
+
+#if 0
+#if 0
+	struct ieee80211_frame *frame = (struct ieee80211_frame *)data;
+	if (frame)
+		printf("fc:%04x,du:%04x,addr1:%02x:%02x:%02x:%02x:%02x:%02x addr2:%02x:%02x:%02x:%02x:%02x:%02x"
+		"addr3:%02x:%02x:%02x:%02x:%02x:%02x  seq:%d\n",frame->i_fc[0]|(frame->i_fc[1] << 8),
+		frame->i_dur[0]|(frame->i_dur[1] << 8),frame->i_addr1[0],frame->i_addr1[1],frame->i_addr1[2],
+		frame->i_addr1[3],frame->i_addr1[4],frame->i_addr1[5],frame->i_addr2[0],frame->i_addr2[1],frame->i_addr2[2],
+		frame->i_addr2[3],frame->i_addr2[4],frame->i_addr2[5],frame->i_addr3[0],frame->i_addr3[1],frame->i_addr3[2],
+		frame->i_addr3[3],frame->i_addr3[4],frame->i_addr3[5],frame->i_seq[0]|(frame->i_seq[1] << 8));
+#endif
+
+	struct ieee80211_frame *frame = (struct ieee80211_frame *)data;
+	if(frame) {
+		if((frame->i_addr2[0] == 0x00) && (frame->i_addr2[1] == 0x63) &&
+			(frame->i_addr2[2] == 0x39) && (frame->i_addr2[3] == 0x33) &&
+			(frame->i_addr2[4] == 0xe5) && (frame->i_addr2[5] == 0x03))
+		{
+			uint32_t i = 0;
+			printf("dump frame data:len %d\n", len);
+			for (i = 0; i < len; i++) {
+				printf("%02x ", data[i]);
+				if ((i % 32) == 31)
+					printf("\n");
+			}
+			printf("\n");
+	    }
+	}
+#endif
+	//WIFI_DEBUG("recv_mgnt_rawframe\n");
+    g_mgnt_cb(data, len, info);
+}
+
 #define TIME_OUT_MS (10* 60 * 1000)
 static void wlan_sw_ch_cb(struct netif *nif, int16_t channel)
 {
@@ -151,7 +196,7 @@ void xr871_wlan_stop_sc_assistant(void)
 {
 	struct netif *nif = g_wlan_netif;
 
-	WIFI_DEBUG("wlan stop sc assistant\n");
+	WIFI_DEBUG("wlan stop sc assistant, also stop monitor\n");
 
 	if(nif) {
 		if (sc_assistant_monitor_unregister_rx_cb(nif, recv_rawframe)) {
@@ -182,8 +227,8 @@ int xr871_wlan_start(hal_wifi_init_type_t *init_para)
 		ssid_len = 32;
 	switch (init_para->wifi_mode) {
 	case STATION: /* STA */
-		WIFI_DEBUG("station start, ssid %s, key %s\n",
-					init_para->wifi_ssid, init_para->wifi_key);
+		//WIFI_DEBUG("station start, ssid %s, key %s\n",
+		//			init_para->wifi_ssid, init_para->wifi_key);
 		net_switch_mode(WLAN_MODE_STA);
 		wlan_sta_disable();
 		if (psk_len > 0) {
@@ -371,7 +416,7 @@ int xr871_wlan_set_channel(int ch)
 {
 	struct netif *nif = g_wlan_netif;
 
-	WIFI_DEBUG("wlan set monitor channel %d\n", ch);
+	//WIFI_DEBUG("wlan set monitor channel %d\n", ch);
 	return wlan_monitor_set_channel(nif, ch);
 }
 
@@ -459,14 +504,21 @@ void xr871_wlan_register_monitor_cb(monitor_data_cb_t fn)
 
 void xr871_wlan_register_mgnt_monitor_cb(monitor_data_cb_t fn)
 {
+	struct netif *nif = g_wlan_netif;
+
+	if (nif) {
+		//wlan_monitor_set_rx_cb(nif, NULL);
+		wlan_monitor_set_rx_cb(nif, recv_mgnt_rawframe);
+	}
+
 	WIFI_DEBUG("wlan register manage monitor callback: %p\n", fn);
-	g_monitor_cb = (wlan_monitor_rx_cb)fn;
+	g_mgnt_cb = (wlan_monitor_rx_cb)fn;
 }
 
 int xr871_wlan_send_80211_raw_frame(uint8_t *buf, int len)
 {
-#if 1
-	WIFI_DEBUG("send raw frame(not support now)\n");
+#if 0
+	//WIFI_DEBUG("send raw frame(not support now)\n");
 
 	// dump raw frame data
 	if (0)
@@ -482,10 +534,11 @@ int xr871_wlan_send_80211_raw_frame(uint8_t *buf, int len)
     }
 	return 0;
 #endif
-#if 0	// support raw frame send
+#if 1	// support raw frame send
 	int ret;
 	struct netif *nif = g_wlan_netif;
-	if (0)
+#if 0
+	if (len == 93)
 	{
 		uint32_t i = 0;
 		printf("dump frame data:len %d\n", len);
@@ -496,7 +549,7 @@ int xr871_wlan_send_80211_raw_frame(uint8_t *buf, int len)
 		}
 		printf("\n");
     }
-
+#endif
 	ret = wlan_send_raw_frame(nif, IEEE80211_FC_STYPE_PROBE_REQ, buf, len);
 	
 	WIFI_DEBUG("send raw frame,len %d\n", len);

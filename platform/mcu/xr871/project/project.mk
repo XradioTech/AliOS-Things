@@ -22,6 +22,8 @@ $(NAME)_SOURCES := common/board/board.c \
                    common/startup/gcc/startup.S \
                    common/cmd/cmd_wlan.c \
                    common/cmd/cmd_util.c \
+                   common/cmd/cmd_upgrade.c \
+                   common/cmd/cmd_mem.c \
                    main/main.c
 
 $(NAME)_ASMFLAGS += -c -x assembler-with-cpp
