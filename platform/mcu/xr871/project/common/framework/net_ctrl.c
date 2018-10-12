@@ -34,7 +34,7 @@
 #include "lwip/dhcp.h"
 #include "lwip/netifapi.h"
 #include "net/wlan/wlan.h"
-#include "net/udhcp/usr_dhcpd.h"
+//#include "net/udhcp/usr_dhcpd.h"
 
 #include "common/framework/sys_ctrl/sys_ctrl.h"
 #include "common/framework/sysinfo.h"
@@ -76,7 +76,8 @@ static void netif_up_handler(struct netif *nif)
 		wlan_set_ip_addr(nif, (uint8_t *)&addr, sizeof(addr));
 #endif
 	} else if (mode == WLAN_MODE_HOSTAP) {
-		dhcp_server_start(NULL);
+		NET_ERR("no dhcp server\n");
+		//dhcp_server_start(NULL);
 	} else {
 		NET_ERR("Invalid wlan mode %d\n", mode);
 	}

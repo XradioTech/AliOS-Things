@@ -32,13 +32,13 @@ $(NAME)_COMPONENTS += platform/arch/arm/armv7m
 $(NAME)_COMPONENTS += rhino hal protocols.net yloop framework.common  netmgr mbedtls modules.fs.fatfs vcall libc digest_algorithm
 $(NAME)_COMPONENTS += platform/mcu/xr871/src/driver/chip
 $(NAME)_COMPONENTS += platform/mcu/xr871/src/image
-$(NAME)_COMPONENTS += platform/mcu/xr871/src/net/udhcp
+#$(NAME)_COMPONENTS += platform/mcu/xr871/src/net/udhcp
 $(NAME)_COMPONENTS += platform/mcu/xr871/src/net/wlan
 $(NAME)_COMPONENTS += platform/mcu/xr871/src/ota
 $(NAME)_COMPONENTS += platform/mcu/xr871/src/pm
 $(NAME)_COMPONENTS += platform/mcu/xr871/src/efpg
 $(NAME)_COMPONENTS += platform/mcu/xr871/src/sys
-$(NAME)_COMPONENTS += platform/mcu/xr871/src/xz
+#$(NAME)_COMPONENTS += platform/mcu/xr871/src/xz
 $(NAME)_COMPONENTS += platform/mcu/xr871/src/net/lwip
 $(NAME)_COMPONENTS += platform/mcu/xr871/src/console
 $(NAME)_COMPONENTS += platform/mcu/xr871/project
@@ -47,6 +47,7 @@ $(NAME)_COMPONENTS += platform/mcu/xr871/aos
 $(NAME)_COMPONENTS += platform/mcu/xr871/src/audio/manager
 $(NAME)_COMPONENTS += platform/mcu/xr871/src/audio/pcm
 $(NAME)_COMPONENTS += platform/mcu/xr871/lib
+$(NAME)_COMPONENTS += platform/mcu/xr871/lib/libxz
 
 GLOBAL_ASMFLAGS += -mcpu=cortex-m4     \
                  -mthumb             \

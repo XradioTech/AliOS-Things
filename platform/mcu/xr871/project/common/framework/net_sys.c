@@ -35,7 +35,7 @@
 #include "net/wlan/wlan.h"
 #include "net/wlan/wlan_defs.h"
 #include "lwip/tcpip.h"
-#include "net/udhcp/usr_dhcpd.h"
+//#include "net/udhcp/usr_dhcpd.h"
 
 #include "common/framework/sysinfo.h"
 #include "common/board/board.h"
@@ -121,7 +121,8 @@ int net_sys_start(enum wlan_mode mode)
 int net_sys_stop(void)
 {
 	if (g_wlan_netif && wlan_if_get_mode(g_wlan_netif) == WLAN_MODE_HOSTAP) {
-		dhcp_server_stop();
+		NET_ERR("no dhcp server...\n");
+		//dhcp_server_stop();
 	}
 
 	net_close_i(g_wlan_netif);
