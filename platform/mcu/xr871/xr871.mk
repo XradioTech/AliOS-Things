@@ -28,6 +28,18 @@ GLOBAL_INCLUDES += project/main
 GLOBAL_INCLUDES += project/common/framework
 GLOBAL_INCLUDES += project/common/board/xr871_evb_main
 
+GLOBAL_INCLUDES += include/cedarx/Cdx2.0Plugin/include
+GLOBAL_INCLUDES += include/cedarx/CdxEncPlugin/include
+GLOBAL_INCLUDES += include/cedarx/libcore/base/include
+GLOBAL_INCLUDES += include/cedarx/libcore/parser/include
+GLOBAL_INCLUDES += include/cedarx/libcore/playback/include
+GLOBAL_INCLUDES += include/cedarx/libcore/record/include
+GLOBAL_INCLUDES += include/cedarx/libcore/stream/include
+#GLOBAL_INCLUDES += include/cedarx/os_glue/include
+GLOBAL_INCLUDES += include/cedarx/xplayer/include
+GLOBAL_INCLUDES += include/cedarx/xrecoder/include
+$(NAME)_PREBUILT_LIBRARY := lib/libmp3.a lib/libamr.a lib/libamren.a lib/libcedarx.a
+
 $(NAME)_COMPONENTS += platform/arch/arm/armv7m
 $(NAME)_COMPONENTS += rhino hal protocols.net yloop framework.common  netmgr mbedtls modules.fs.fatfs vcall libc digest_algorithm
 $(NAME)_COMPONENTS += platform/mcu/xr871/src/driver/chip
