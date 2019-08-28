@@ -4,25 +4,17 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include <hal.h>
+#include "aos/hal/uart.h"
 #include "k_api.h"
-#define uart_dev_t aos_uart_dev_t
-#define uart_config_t aos_uart_config_t
-#include <hal/soc/uart.h>
-#undef uart_dev_t
-#undef uart_config_t
-#include <hal/soc/uart.h>
+#include "driver/uart.h"
+
 int32_t uart_receive_buffer_queue(uint8_t *data);
-
-extern void uart_init_new(void);
-extern void uart0_write_char(char c);
-
 #define UART0_BUF_QUEUE_BYTES 128
 
 kbuf_queue_t g_buf_queue_uart;
 char g_buf_uart[UART0_BUF_QUEUE_BYTES];
 
-int32_t hal_uart_send(aos_uart_dev_t *uart, const void *data, uint32_t size, uint32_t timeout)
+int32_t hal_uart_send(uart_dev_t *uart, const void *data, uint32_t size, uint32_t timeout)
 {
     int i = 0;
     char* pdata = (char *)data;
@@ -35,7 +27,7 @@ int32_t hal_uart_send(aos_uart_dev_t *uart, const void *data, uint32_t size, uin
     return 0;
 }
 
-int32_t hal_uart_recv_II(aos_uart_dev_t *uart, void *data, uint32_t expect_size,
+int32_t hal_uart_recv_II(uart_dev_t *uart, void *data, uint32_t expect_size,
                       uint32_t *recv_size, uint32_t timeout)
 {
     uint8_t *pdata = (uint8_t *)data;
@@ -73,26 +65,23 @@ int32_t hal_uart_recv_II(aos_uart_dev_t *uart, void *data, uint32_t expect_size,
     return ret;
 }
 
-int32_t hal_uart_init(aos_uart_dev_t *uart)
+int32_t hal_uart_init(uart_dev_t *uart)
 {
     int32_t ret = -1;
 
-	if (uart == NULL) 
-	{
-	    return -1;
-	}
-	
-	if(uart->port == 0)
-	{
-	    uart_init_new();
-       krhino_buf_queue_create(&g_buf_queue_uart, "buffer_queue_uart0", g_buf_uart, UART0_BUF_QUEUE_BYTES,1);
-       ret = 0;
-	}
+    if (uart == NULL) 
+    {
+        return -1;
+    }
 
-   return ret;
+    uart_init_new(uart);
+    krhino_buf_queue_create(&g_buf_queue_uart, "buffer_queue_uart0", g_buf_uart, UART0_BUF_QUEUE_BYTES,1);
+    ret = 0;
+
+    return ret;
 }
 
-int32_t hal_uart_finalize(aos_uart_dev_t *uart)
+int32_t hal_uart_finalize(uart_dev_t *uart)
 {
     return 0;
 }
@@ -108,3 +97,9 @@ int32_t uart_receive_buffer_queue(uint8_t *data)
 
     return ret;
 }
+
+#if defined(AOS_COMP_CLI) && (DEBUG_CONFIG_PANIC == 1)
+void uart_reinit()
+{
+}
+#endif

@@ -4,32 +4,27 @@ component = aos_board_component('board_linuxhost', 'linux', src)
 
 # Define the default component testcase set for this board
 testcases = Split('''
-    test/testcase/aosapi/api_test
     test/testcase/basic_test
     test/testcase/framework/alink_test
-    test/testcase/framework/fota_test
+    test/testcase/middleware/uagent/uota_test
     test/testcase/framework/mqtt_test
-    test/testcase/framework/netmgr_test
+    test/testcase/network/netmgr_test
     test/testcase/framework/wifi_hal_test
-    test/testcase/kernel/deviceIO_test
     test/testcase/kernel/modules/fatfs_test
     test/testcase/kernel/modules/kv_test
-    test/testcase/kernel/protocols/mesh_test
     test/testcase/kernel/rhino_test
-    test/testcase/kernel/vcall_test
+    test/testcase/osal/aos/aos_test
     test/testcase/kernel/vfs_test
-    test/testcase/kernel/yloop_test
+    test/testcase/network/protocols/umesh_test
     test/testcase/security/alicrypto_test
-    test/testcase/security/tfs_test
+    test/testcase/security/id2_test
     test/testcase/security/tls_test
     test/testcase/utility/cjson_test
-    test/testcase/utility/digest_algorithm_test
-    test/testcase/utility/hashtable_test
 ''')
 
 component.set_global_testcases(testcases)
 aos_global_config.set('MESHLOWPOWER',1)
 
-linux_only_targets="networkapp helloworld linuxapp tls yts linkkitapp acapp networkapp|vcall=posix helloworld|vcall=posix linuxapp|vcall=posix tls|vcall=posix linkkitapp|vcall=posix"
-build_types="release debug"
+build_types=""
 
+linux_only_targets="athostapp coapapp das_app helloworld http2app id2_app itls_app linkkit_gateway linkkitapp mqttapp otaapp prov_app tls udevapp ulocationapp yts"

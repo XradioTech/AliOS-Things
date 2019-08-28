@@ -62,7 +62,8 @@
 #include "hw.h"
 #include "radio.h"
 #include "inc/debug.h"
-#include "vcom.h"
+#include "uart-board.h"
+#include "sx1276.h"
 
 /* Force include of hal adc in order to inherite HAL_ADC_STATE_xxx */
 #include "stm32l0xx_hal_dma.h"
@@ -272,8 +273,12 @@ static void HW_AdcInit( void );
 static uint16_t HW_AdcReadChannel( uint32_t Channel );
 
 /* Exported functions ---------------------------------------------------------*/
+Gpio_t g_stLedGpio;
+
 #define SYS_LED_PORT GPIOA
 #define SYS_LED_PIN GPIO_PIN_6
+
+#define SYS_LED_GPIO  PA_6
 
 void SYS_LED_ON( void )
 {
@@ -287,22 +292,19 @@ void SYS_LED_OFF( void )
 
 void SYS_LED_Deinit( void )
 {
-    GPIO_InitTypeDef GPIO_InitStruct = { 0 };
-
-    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-
-    HW_GPIO_Init( SYS_LED_PORT, SYS_LED_PIN, &GPIO_InitStruct );
+    GpioInit( &g_stLedGpio, SYS_LED_GPIO, PIN_ANALOGIC, PIN_NO_PULL , PIN_NO_PULL, 0);
 }
 
 void SYS_LED_Init( void )
 {
-    GPIO_InitTypeDef GPIO_InitStruct = { 0 };
-
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-
-    HW_GPIO_Init( SYS_LED_PORT, SYS_LED_PIN, &GPIO_InitStruct );
+    GpioInit( &g_stLedGpio, SYS_LED_GPIO, PIN_OUTPUT, PIN_PUSH_PULL , PIN_PUSH_PULL, 0);
     SYS_LED_OFF( );
+}
+
+
+void HW_Reset( void )
+{
+    NVIC_SystemReset();
 }
 
 void HW_Init( void )
@@ -315,9 +317,11 @@ void HW_Init( void )
         NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0x3000);
 #endif
 
-        Radio.IoInit( );
-        HW_SPI_Init( );
-        HW_RTC_Init( );
+#if defined(EML3047_LORAWAN)
+        SX1276IoInit( );
+#endif
+        SpiInit(&SX1276.Spi, SPI_1, RADIO_MOSI, RADIO_MISO, RADIO_SCLK, RADIO_NSS );
+        RtcInit( );
 
 #ifdef LORA_DEBUG
         DBG_Uart_Init( );
@@ -330,8 +334,8 @@ void HW_Init( void )
 
 void HW_DeInit( void )
 {
-    HW_SPI_DeInit( );
-    Radio.IoDeInit( );
+    SpiDeInit(&SX1276.Spi);
+    SX1276IoDeInit( );
 
 #ifdef LORA_DEBUG
     DBG_Uart_Deinit( );
@@ -343,20 +347,29 @@ void HW_DeInit( void )
 
 void HW_GpioInit( void )
 {
-    GPIO_InitTypeDef GPIO_InitStruct = { 0 };
+    Gpio_t      st_gpioInit = {0};
+    uint32_t    i;
 
     /* Configure all GPIO as analog to reduce current consumption on non used IOs */
     /* Clocks are enabled in HW_GPIO_Init on GPIO A, B, C and H*/
 
-    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
     /* All GPIOs except debug pins (SWCLK and SWD) */
-    HW_GPIO_Init( GPIOA, GPIO_PIN_All & (~(GPIO_PIN_13 | GPIO_PIN_14)), &GPIO_InitStruct );
+    for (i = PA_0; i <PA_13; i++) {
+        GpioInit(&st_gpioInit, i, PIN_ANALOGIC, PIN_PUSH_PULL, PIN_NO_PULL, 0);
+    }
 
     /* All GPIOs */
-    HW_GPIO_Init( GPIOB, GPIO_PIN_All, &GPIO_InitStruct );
-    HW_GPIO_Init( GPIOC, GPIO_PIN_All, &GPIO_InitStruct );
-    HW_GPIO_Init( GPIOH, GPIO_PIN_All, &GPIO_InitStruct );
+    GpioInit(&st_gpioInit, PA_15, PIN_ANALOGIC, PIN_PUSH_PULL, PIN_NO_PULL, 0);
+
+    for (i = PB_0; i <= PB_15; i++) {
+        GpioInit(&st_gpioInit, i, PIN_ANALOGIC, PIN_PUSH_PULL, PIN_NO_PULL, 0);
+    }
+    for (i = PC_0; i <= PC_15; i++) {
+        GpioInit(&st_gpioInit, i, PIN_ANALOGIC, PIN_PUSH_PULL, PIN_NO_PULL, 0);
+    }
+    for (i = PH_0; i <= PH_15; i++) {
+        GpioInit(&st_gpioInit, i, PIN_ANALOGIC, PIN_PUSH_PULL, PIN_NO_PULL, 0);
+    }
 
     /* Disable GPIOs clock */
     LL_IOP_GRP1_DisableClock( LL_IOP_GRP1_PERIPH_GPIOA );
@@ -424,7 +437,7 @@ void HW_EnterStopMode( void )
     LL_PWR_ClearFlag_WU( );
 
     /* Disable the UART Data Register not empty Interrupt */
-    LL_LPUART_DisableIT_RXNE( UARTX );
+    //LL_LPUART_DisableIT_RXNE( UARTX );
 
     RHINO_CPU_INTRPT_ENABLE();
 
@@ -515,11 +528,19 @@ void HW_EnterSleepMode( void )
 }
 
 /* Private functions ---------------------------------------------------------*/
+void HW_SPI_IoInit( void )
+{
+    GpioInit(&SX1276.Spi.Sclk, RADIO_SCLK, PIN_ALTERNATE_FCT, PIN_PUSH_PULL, PIN_PULL_DOWN, 0);
+    GpioInit(&SX1276.Spi.Miso, RADIO_MISO, PIN_ALTERNATE_FCT, PIN_PUSH_PULL, PIN_PULL_DOWN, 0);
+    GpioInit(&SX1276.Spi.Mosi, RADIO_MOSI, PIN_ALTERNATE_FCT, PIN_PUSH_PULL, PIN_PULL_DOWN, 0);
+
+    GpioInit(&SX1276.Spi.Nss, RADIO_NSS, PIN_OUTPUT, PIN_PUSH_PULL, PIN_PULL_UP, 1);
+}
 
 static void HW_IoInit( void )
 {
     HW_SPI_IoInit( );
-    Radio.IoInit( );
+    SX1276IoInit( );
 #ifdef LORA_DEBUG
     DBG_Uart_Init( );
     SYS_LED_Init( );
@@ -529,21 +550,16 @@ static void HW_IoInit( void )
 
 static void HW_IoDeInit( void )
 {
-    GPIO_InitTypeDef initStruct = { 0 };
+    GpioInit(&SX1276.Spi.Mosi, RADIO_MOSI, PIN_ANALOGIC, PIN_PUSH_PULL, PIN_NO_PULL, 0);
+    GpioInit(&SX1276.Spi.Miso, RADIO_MISO, PIN_ANALOGIC, PIN_PUSH_PULL, PIN_NO_PULL, 0);
+    GpioInit(&SX1276.Spi.Sclk, RADIO_SCLK, PIN_ANALOGIC, PIN_PUSH_PULL, PIN_NO_PULL, 0);
+    GpioInit(&SX1276.Spi.Nss, RADIO_NSS, PIN_ANALOGIC, PIN_PUSH_PULL, PIN_NO_PULL, 0);
 
-    initStruct.Mode = GPIO_MODE_ANALOG;
-    initStruct.Pull = GPIO_NOPULL;
-    HW_GPIO_Init( RADIO_MOSI_PORT, RADIO_MOSI_PIN, &initStruct );
-    HW_GPIO_Init( RADIO_MISO_PORT, RADIO_MISO_PIN, &initStruct );
-    HW_GPIO_Init( RADIO_SCLK_PORT, RADIO_SCLK_PIN, &initStruct );
-    HW_GPIO_Init( RADIO_NSS_PORT, RADIO_NSS_PIN, &initStruct );
-
-    Radio.IoDeInit( );
+    SX1276IoDeInit( );
 #ifdef LORA_DEBUG
     DBG_Uart_Deinit( );
     SYS_LED_Deinit( );
 #endif
-    //vcom_IoDeInit();
 }
 
 static void HW_RCC_OscConfig( void )
@@ -1171,5 +1187,36 @@ static uint16_t HW_AdcReadChannel( uint32_t Channel )
     }
     return adcData;
 }
+
+uint32_t HW_Get_MFT_ID(void)
+{
+    return 0x1234;
+}
+
+uint32_t HW_Get_MFT_Model(void)
+{
+    return 0x4321;
+}
+
+uint32_t HW_Get_MFT_Rev(void)
+{
+    return 0x0001;
+}
+
+uint32_t HW_Get_MFT_SN(void)
+{
+    return 0xffff;
+}
+
+bool HW_Set_MFT_Baud(uint32_t baud)
+{
+    return true;
+}
+
+uint32_t HW_Get_MFT_Baud(void)
+{
+    return 115200;
+}
+
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

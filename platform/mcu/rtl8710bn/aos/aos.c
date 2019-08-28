@@ -2,13 +2,15 @@
  * Copyright (C) 2015-2017 Alibaba Group Holding Limited
  */
 
-#include <aos/aos.h>
+#include "aos/kernel.h"
 #include <k_api.h>
-#include <aos/kernel.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "hal/soc/soc.h"
 
+#include "aos/init.h"
+#include "aos/kernel.h"
+#include "aos/hal/wdg.h"
+#include "aos/hal/gpio.h"
 #include "diag.h"
 #include "platform_stdlib.h"
 #include "rtl8710b.h"
@@ -19,6 +21,7 @@
 #include "wifi_constants.h"
 
 #include "osdep_service.h"
+#include "rtl8710b_ota.h"
 
 #define AOS_START_STACK 2048
 
@@ -27,7 +30,6 @@ ktask_t *g_aos_init;
 static kinit_t kinit;
 
 extern int application_start(int argc, char **argv);
-extern int aos_framework_init(void);
 extern void board_init(void);
 
 extern uint32_t SystemCoreClock;
@@ -107,10 +109,13 @@ static void board_mode_check(void)
     gpio_key_elink.config = INPUT_PULL_UP;
     hal_gpio_init(&gpio_key_elink);
     uint32_t elink;
+
     hal_gpio_input_get(&gpio_key_elink, &elink);
     printf("--------------------------------> built at "__DATE__" "__TIME__"\r\n");
     hal_gpio_input_get(&gpio_key_boot, &boot);
-    printf("--------------------------------> boot %d, elink %d\r\n", boot, elink);
+    printf("--------------------------------> boot %d, elink %d \r\n", boot, elink);
+
+
 
     if(boot == 0)
     {
@@ -119,11 +124,22 @@ static void board_mode_check(void)
         else
             qc_test(0);
     }
+    if(elink == 0){
+        if(OTA_INDEX_1 == ota_get_cur_index()) {
+            OTA_Change(OTA_INDEX_2);
+            printf("-----change OTA 2 \r\n");
+        } else {
+            OTA_Change(OTA_INDEX_1);
+            printf("-----change OTA 1 \r\n");
+        }
+        aos_msleep(1000);
+        hal_reboot();
+    }
 
     board_init();
 }
 
- void sys_init_func(void)
+void sys_init_func(void)
 {
     hal_init();
 
@@ -138,13 +154,18 @@ static void board_mode_check(void)
     board_mode_check();
 #endif
 
-    aos_kernel_init(&kinit);
+    aos_components_init(&kinit);
+#ifndef AOS_BINS
+    application_start(kinit.argc, kinit.argv);  /* jump to app/example entry */
+#endif
 
     krhino_task_dyn_del(NULL);
 }
 
 void main(void)
 {
+    hal_wdg_finalize(0);
+
     aos_init();
 
     krhino_task_dyn_create(&g_aos_init, "aos-init", 0, AOS_DEFAULT_APP_PRI , 0, AOS_START_STACK, (task_entry_t)sys_init_func, 1);

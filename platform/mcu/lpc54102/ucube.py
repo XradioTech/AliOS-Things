@@ -35,7 +35,6 @@ src = Split('''
         hal/csp_log.c
         hal/hal_flash.c
         hal/hal_wifi_wmi.c
-        hal/hal_ota.c
         aos/aos.c
         aos/soc_impl.c
         hal/hook_impl.c
@@ -111,15 +110,13 @@ dependencis = Split('''
         utility/libc
         kernel/rhino
         kernel/hal
-        framework/netmgr
-        framework/common
+        network/netmgr
         security/mbedtls
         utility/cjson
-        tools/cli
-        utility/digest_algorithm
+        kernel/cli
         frameworkd/fota
-        device/sal
-        kernel/vcall
+        network/sal
+        osal
         kernel/init
 ''')
 
@@ -135,7 +132,6 @@ global_cflags = Split('''
         -mlittle-endian 
         -mthumb 
         -mthumb-interwork 
-        -march=armv7e-m
         -Wno-format 
         -Wno-incompatible-pointer-types
 ''')
@@ -167,7 +163,6 @@ global_ldflags = Split('''
 global_macro = Split('''
         CORE_M4
         SDK_DEBUGCONSOLE=1
-        RHINO_CONFIG_TASK_STACK_CUR_CHECK=1
         A_LITTLE_ENDIAN
         __MULTICORE_MASTER 
         __MULTICORE_M0SLAVE

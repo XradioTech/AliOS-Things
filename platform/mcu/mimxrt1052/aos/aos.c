@@ -8,12 +8,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <k_api.h>
-#include <aos/log.h>
-#include <hal/soc/soc.h>
-#include <hal/soc/timer.h>
-#include <hal/base.h>
-#include <aos/aos.h>
-#include <hal/hal.h>
+#include "ulog/ulog.h"
+
+#include "aos/hal/timer.h"
+#include "aos/hal/uart.h"
+#include "network/hal/base.h"
+#include "aos/kernel.h"
+
 #include "board.h"
 #include "fsl_gpio.h"
 #include "pin_mux.h"
@@ -24,31 +25,34 @@
 extern int application_start(int argc, char **argv);
 extern int vfs_init(void);
 extern int vfs_device_init(void);
-extern uart_dev_t uart_1;
+extern uart_dev_t uart_0;
 
 ktask_t *g_aos_app;
 
 static void sys_init(void)
 {
 
-#ifdef AOS_VFS
+#ifdef AOS_COMP_VFS
     vfs_init();
-    vfs_device_init();
 #endif
 
-#ifdef CONFIG_AOS_CLI
+#ifdef AOS_COMP_CLI
     aos_cli_init();
 #endif
 
-#ifdef AOS_KV
+#ifdef AOS_COMP_ULOG
+    ulog_init("A");
+#endif
+
+#ifdef AOS_COMP_KV
     aos_kv_init();
 #endif
 
 #ifdef AOS_LOOP
+    vfs_device_init();
     aos_loop_init();
 #endif
 
-    aos_framework_init();
 
     application_start(0, NULL);
 }
@@ -74,7 +78,7 @@ int main(void)
    platform_init();
 
    aos_init();
-   hal_uart_init(&uart_1);
+   hal_uart_init(&uart_0);
    krhino_task_dyn_create(&g_aos_app, "aos-init", 0, AOS_DEFAULT_APP_PRI + 2, 0, AOS_START_STACK, (task_entry_t)sys_init, 1);
 
    SysTick_Config(SystemCoreClock / RHINO_CONFIG_TICKS_PER_SECOND);

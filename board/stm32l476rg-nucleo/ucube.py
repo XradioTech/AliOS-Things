@@ -15,9 +15,12 @@ component.add_global_includes('hal', 'aos', 'Inc')
 component.add_global_macros('STM32L476xx', 'SYSINFO_PRODUCT_MODEL=\\"ALI_AOS_476-nucleo\\"', 'SYSINFO_DEVICE_NAME=\\"476-nucleo\\"')
 
 if aos_global_config.get('sal', 1) == 1:
-    component.add_comp_deps('device/sal')
+    component.add_comp_deps('network/sal')
     module = aos_global_config.get('module', 'wifi.mk3060')
     if module == 'wifi.mk3060':
         aos_global_config.set('module', 'wifi.mk3060')
 
 component.set_enable_vfp()
+
+linux_only_targets="blink coapapp helloworld http2app linkkit_gateway linkkitapp modbus_demo mqttapp otaapp tls udataapp udevapp ulocationapp yts"
+windows_only_targets="blink|COMPILER=armcc blink|COMPILER=iar helloworld|COMPILER=armcc helloworld|COMPILER=iar"

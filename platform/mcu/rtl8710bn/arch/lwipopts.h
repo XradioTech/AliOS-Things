@@ -55,8 +55,8 @@
 /* Disable lwIP asserts */
 #define LWIP_NOASSERT			1
 
-#define LWIP_DEBUG                      0
-#define LWIP_DEBUG_TRACE                0
+//#define LWIP_DEBUG                    1
+//#define LWIP_DEBUG_TRACE              1
 #define SOCKETS_DEBUG                   LWIP_DBG_OFF // | LWIP_DBG_MASK_LEVEL
 
 #define IP_DEBUG                        LWIP_DBG_OFF
@@ -441,7 +441,7 @@ The STM32F107 allows computing and verifying the IP, UDP, TCP and ICMP checksums
 #define TCPIP_MBOX_SIZE                 16
 #define DEFAULT_ACCEPTMBOX_SIZE         8
 #define DEFAULT_RAW_RECVMBOX_SIZE       4
-#define DEFAULT_UDP_RECVMBOX_SIZE       8
+#define DEFAULT_UDP_RECVMBOX_SIZE       20 // 8
 #define DEFAULT_TCP_RECVMBOX_SIZE       8
 
 #ifdef CONFIG_AOS_MESH

@@ -1,17 +1,17 @@
-src =Split('''
+src =Split(''' 
     board.c
     wifi_nvram.c
 ''')
 component =aos_component('board_mk3239', src)
 
 
-global_includes =Split('''
+global_includes =Split(''' 
     ./
 ''')
 for i in global_includes:
     component.add_global_includes(i)
 
-global_macros =Split('''
+global_macros =Split(''' 
     HSE_VALUE=26000000
     STDIO_UART=0
     CONFIG_NO_TCPIP
@@ -25,3 +25,5 @@ for i in global_macros:
 
 
 
+
+linux_only_targets="coapapp helloworld http2app linkkit_gateway linkkitapp modbus_demo mqttapp otaapp tls udataapp udevapp ulocationapp yts"

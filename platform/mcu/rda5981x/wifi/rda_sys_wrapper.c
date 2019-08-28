@@ -57,6 +57,7 @@ r_s32 rda_alarm_delete(r_void *handle)
 {
     if (NULL != handle) {
         aos_timer_free((aos_timer_t *)handle);
+        r_free(handle);
         handle = NULL;
         return  NO_ERR;
     } else {
@@ -82,7 +83,8 @@ r_s32 rda_alarm_start(r_void *handle, r_u32 timeout_ms)
 {
     r_s32 ret;
     if(NULL != handle) {
-        ret = aos_timer_change((aos_timer_t *)handle, timeout_ms);
+        //ret = aos_timer_change((aos_timer_t *)handle, timeout_ms);
+        ret = krhino_timer_change(((aos_timer_t *)handle)->hdl, krhino_ms_to_ticks(timeout_ms), 0);
         if(ret != 0)
             return ERR;
         return aos_timer_start((aos_timer_t *)handle);
@@ -144,6 +146,7 @@ r_s32 rda_sem_delete(r_void *sem)
     if ((sem != NULL)) {
         aos_sem_free((aos_sem_t *)sem);
         r_free(sem);
+        sem = NULL;
         return NO_ERR;
     } else {
         return ERR;
@@ -211,7 +214,7 @@ r_s32 rda_queue_recv(r_void *handler, r_u32 msg, r_u32 millisec)
 {
     rda_queue_handle *r_handler = (rda_queue_handle*)handler;
     r_s32 size;
-    if(aos_queue_recv((aos_queue_t *)(r_handler->queue), millisec, (r_void*)msg, &size) == 0)
+    if(aos_queue_recv((aos_queue_t *)(r_handler->queue), millisec, (r_void*)msg, &size) != 0)
         return ERR;
     else
         return NO_ERR;

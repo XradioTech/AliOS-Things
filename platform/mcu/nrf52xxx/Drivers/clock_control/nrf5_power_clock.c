@@ -6,16 +6,18 @@
  */
 #include "k_api.h"
 
-#include <soc.h>
-#include <errno.h>
+
+//#include <errno.h>
+#include <stdbool.h>
 #include <atomic.h>
 #include <device.h>
 #include <clock_control.h>
 #include <misc/__assert.h>
 #include "nrf.h"
-#include "config.h"
+#include "ctlr_config.h"
 #include "irq.h"
 #include "misc/util.h"
+#include "errno.h"
 
 
 /*#include <arch/arm/cortex_m/cmsis.h>*/
@@ -185,6 +187,13 @@ static int _k32src_start(struct device *dev, clock_control_subsys_t sub_system)
 	lf_clk_src = POINTER_TO_UINT(sub_system);
 	NRF_CLOCK->LFCLKSRC = lf_clk_src;
 
+	/*errata for RTC clk register issue, refer to 
+	 * http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.nrf52832.EngB.errata%2Fanomaly_832_20.html*/
+        NRF_CLOCK->EVENTS_LFCLKSTARTED  = 0;
+        NRF_CLOCK->TASKS_LFCLKSTART     = 1;
+        while (NRF_CLOCK->EVENTS_LFCLKSTARTED == 0) {}
+        NRF_RTC0->TASKS_STOP = 0;
+
 	/* Start and spin-wait until clock settles */
 	NRF_CLOCK->TASKS_LFCLKSTART = 1;
 
@@ -323,6 +332,20 @@ static void _power_clock_isr(void *arg)
     
     krhino_intrpt_exit();
 }
+
+#ifdef CONFIG_MESH_STACK_ALONE
+void _arch_irq_enable(unsigned int irq)
+{
+}
+
+void _arch_irq_disable(unsigned int irq)
+{
+}
+
+void _irq_priority_set(unsigned int irq, unsigned int prio, u32_t flags)
+{
+}
+#endif
 
 static int _clock_control_init(struct device *dev)
 {

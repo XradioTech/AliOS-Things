@@ -1,5 +1,5 @@
-#ifndef _RDA59XX_WIFI_COMMON_H_
-#define _RDA59XX_WIFI_COMMON_H_
+#ifndef __RDA59XX_WIFI_COMMON_H__
+#define __RDA59XX_WIFI_COMMON_H__
 
 #include "rda_def.h"
 
@@ -13,7 +13,8 @@
 #define AID_LEN                         2
 #define IE_HDR_LEN                      2
 #define MAC_HDR_ADDR2_OFFSET            10
-#define MAX_SSID_LEN                    32
+#define MAX_SSID_LEN                    32+1
+#define MAX_PW_LEN                      64+1
 #define ETH_ALEN                        6
 
 #define MACDBG                          "%02x:%02x:%02x:%02x:%02x:%02x"
@@ -31,6 +32,8 @@
 #define READ_REG32(REG)          *((volatile unsigned int*)(REG))
 #define WRITE_REG32(REG, VAL)    ((*(volatile unsigned int*)(REG)) = (unsigned int)(VAL))
 
+#define MAKE_WORD16(lsb, msb)    (((r_u16)(msb) << 8)  & 0xFF00) | (lsb)
+#define MAKE_WORD32(lsw, msw)    (((r_u32)(msw) << 16) & 0xFFFF0000) | (lsw)
 
 typedef struct {
     unsigned int type;
@@ -92,6 +95,7 @@ enum ELEMENTID_T{
     ICTEXT        = 16,  /* Challenge Text           */
     IERPINFO      = 42,  /* ERP Information          */
     IEXSUPRATES   = 50,  /* Extended Supported Rates */
+    HTPARAMS      = 61,  /* HT Info Element          */
     IWAPI         = 68
 };
 
@@ -99,7 +103,8 @@ enum COUNTRY_CODE_T
 {
     JP = 0,
     NA = 1,
-    EU = 2
+    EU = 2,
+    CHONE = 0x10
 };
 
 /* Scan type parameter for scan request */

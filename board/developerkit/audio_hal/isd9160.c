@@ -24,7 +24,6 @@
 #define ISD9160_I2C_TIMEOUT             1000
 #define MAX_PATH_SIZE                   256
 #define MAX_VERSION_SIZE                8
-#define KEY_VERSION_PRT                 "isd9160 software version: "
 
 typedef enum {
 	I2C_CMD_SLPRT = 0,
@@ -67,6 +66,13 @@ typedef enum {
 	BINTYPE_END
 } BINTYPE_UPG;
 
+typedef enum {
+	SLPRT_HINT_SWVER = 0,
+	SLPRT_HINT_VR,
+
+	SLPRT_HINT_END
+} SLPRT_HINT_FLAG;
+
 typedef struct {
 	uint32_t addr;
 	uint32_t size;
@@ -103,10 +109,17 @@ static const UPG_FLASH_MAP g_isd9160_map_table[BINTYPE_END] = {
 	{0x0000f000, 81 << 10},
 };
 
+static const char *g_slprt_hint_matching[] = {
+    "isd9160 software version: ",
+    "isd9160 Voice Recognition: ",
+};
+
 static FLASH_UPG_HEAD g_upg_head;
 static FLASH_FILE_HEAD g_file_head[BINTYPE_END];
 static char g_fw_ver[MAX_VERSION_SIZE + 1] = {0};
 static aos_mutex_t isd9160_mutex;
+static CB_SWVER svfunc = NULL;
+static CB_VRCMD vrfunc = NULL;
 
 static inline void hton_4(uint8_t *data, uint32_t value)
 {
@@ -262,23 +275,51 @@ static int isd9160_slprt_data(uint8_t *data, uint32_t size)
 	return hal_i2c_master_recv(&brd_i2c4_dev, ISD9160_I2C_ADDR, data, size, ISD9160_I2C_TIMEOUT);
 }
 
-static void detect_current_version(const char *buf)
+static int detect_slprt_hint(const char *buf, char **key)
 {
-	char *str_off = NULL;
+	int i;
 
-	if (g_fw_ver[0] != '\0') {
-		return;
+	if (buf == NULL || key == NULL) {
+		KIDS_A10_PRT("Parameters is invalid.\n");
+		return -1;
 	}
-	str_off = strstr(buf, KEY_VERSION_PRT);
-	if (str_off == NULL) {
-		return;
+	*key = NULL;
+	for (i = SLPRT_HINT_SWVER; i < SLPRT_HINT_END; ++i) {
+		*key = strstr(buf, g_slprt_hint_matching[i]);
+		if (*key) {
+			*key += strlen(g_slprt_hint_matching[i]);
+			break;
+		}
 	}
-	str_off += strlen(KEY_VERSION_PRT);
-	strncpy(g_fw_ver, str_off, MAX_VERSION_SIZE);
-	str_off = strchr(g_fw_ver, '\n');
-	if (str_off) {
-		*str_off = '\0';
+	if (i >= SLPRT_HINT_END) {
+		i = -1;
 	}
+
+	return i;
+}
+
+static void hint_software_version(const char *key)
+{
+	char *ptemp = NULL;
+
+	strncpy(g_fw_ver, key, MAX_VERSION_SIZE);
+	ptemp = strchr(g_fw_ver, '\n');
+	if (ptemp) {
+		*ptemp = '\0';
+	}
+	printf("%s%s\n", g_slprt_hint_matching[SLPRT_HINT_SWVER], g_fw_ver);
+}
+
+static void hint_voice_recognition(const char *key)
+{
+	char *ptemp = NULL;
+
+	strncpy(g_fw_ver, key, MAX_VERSION_SIZE);
+	ptemp = strchr(g_fw_ver, '\n');
+	if (ptemp) {
+		*ptemp = '\0';
+	}
+	printf("%s%s\n", g_slprt_hint_matching[SLPRT_HINT_SWVER], g_fw_ver);
 }
 
 static int handle_slprt(void)
@@ -287,7 +328,8 @@ static int handle_slprt(void)
 	uint32_t size = 0;
 	int slprt_num = 0;
 	char buf[SLAVE_DATA_MAX] = {0};
-	
+	char *str_key = NULL;
+
 	if (!aos_mutex_is_valid(&isd9160_mutex)) {
 		KIDS_A10_PRT("isd9160_mutex is invalid.\n");
 		return -1;
@@ -320,9 +362,28 @@ static int handle_slprt(void)
 			ret = -1;
 			break;
 		}
-		printf("slave_print: ");
-		printf("%s", buf);
-		detect_current_version(buf);
+		ret = detect_slprt_hint(buf, &str_key);
+		if (ret < 0) {
+			printf("slave_print: ");
+			printf("%s", buf);
+		} else {
+			switch (ret) {
+				case SLPRT_HINT_SWVER:
+					hint_software_version(str_key);
+					if (svfunc) {
+						svfunc(g_fw_ver);
+					}
+					break;
+				case SLPRT_HINT_VR:
+					if (vrfunc) {
+						vrfunc(g_fw_ver, atoi(str_key));
+					}
+					break;
+				default:
+					break;
+			}
+		}
+
 		++slprt_num;
 	}
 	
@@ -659,6 +720,20 @@ END:
 	return ret;
 }
 
+int register_swver_callback(CB_SWVER pfunc)
+{
+	svfunc = pfunc;
+
+	return 0;
+}
+
+int register_vrcmd_callback(CB_VRCMD pfunc)
+{
+	vrfunc = pfunc;
+
+	return 0;
+}
+
 int isd9160_loop_once(void)
 {
 	return handle_slprt();
@@ -674,7 +749,7 @@ void isd9160_reset(void)
 int isd9160_i2c_init(void)
 {
 	int ret = 0;
-	
+
 	if (aos_mutex_is_valid(&isd9160_mutex)) {
 		KIDS_A10_PRT("ISD9160 module initialization had completed before now.\n");
 		return -1;

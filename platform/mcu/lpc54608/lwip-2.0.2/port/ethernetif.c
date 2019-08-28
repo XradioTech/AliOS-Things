@@ -75,13 +75,16 @@
 #include "lwip/dhcp.h"
 #include "lwip/prot/dhcp.h"
 #if USE_RTOS && defined(FSL_RTOS_AOS)
-#include "aos/aos.h"
+#include "aos/kernel.h"
+#include "ulog/ulog.h"
+#include "aos/yloop.h"
 #endif
 
 #include "ethernetif.h"
 
 #include "fsl_enet.h"
 #include "fsl_phy.h"
+#include <k_api.h>
 
 /*******************************************************************************
  * Definitions
@@ -131,7 +134,7 @@ struct ethernetif
     enet_handle_t handle;
 #endif
 #if USE_RTOS && defined(FSL_RTOS_AOS)
-    aos_event_t enetTransmitAccessEvent;
+    kevent_t *enetTransmitAccessEvent;
     unsigned int txFlag;
 #endif
     enet_rx_bd_struct_t *RxBuffDescrip;
@@ -170,7 +173,7 @@ static void ethernet_callback(ENET_Type *base, enet_handle_t *handle, enet_event
             break;
         case kENET_TxEvent:
         {
-            aos_event_set(&ethernetif->enetTransmitAccessEvent, ethernetif->txFlag, 0x02);
+            krhino_event_set(&ethernetif->enetTransmitAccessEvent, ethernetif->txFlag, 0x02);
         }
         break;
         default:
@@ -441,7 +444,7 @@ static void enet_init(struct netif *netif, struct ethernetif *ethernetif,
 
 #if USE_RTOS && defined(FSL_RTOS_AOS)
     /* Create the Event for transmit busy release trigger. */
-    aos_event_new(&ethernetif->enetTransmitAccessEvent, 0);
+    krhino_event_dyn_create(&ethernetif->enetTransmitAccessEvent, "AOS", 0);
     ethernetif->txFlag = 0x1;
     NVIC_SetPriority(ETHERNET_IRQn, ENET_PRIORITY);
 #else
@@ -526,8 +529,8 @@ static unsigned char *enet_get_tx_buffer(struct ethernetif *ethernetif)
         {
             if (ENET_IsTxDescriptorDmaOwn(txBuffDesc))
             {
-                unsigned int actl_flags;
-                aos_event_get(&ethernetif->enetTransmitAccessEvent, ethernetif->txFlag, 0x02,  &actl_flags, 0xFFFFFFFF);                
+                unsigned int actl_flags;   
+                krhino_event_get(&ethernetif->enetTransmitAccessEvent, ethernetif->txFlag, 0x02, &actl_flags, RHINO_WAIT_FOREVER);
             }
             else
             {
@@ -572,8 +575,8 @@ static err_t enet_send_frame(struct ethernetif *ethernetif, unsigned char *data,
 
             if (result == kStatus_ENET_TxFrameBusy)
             {
-                unsigned int actl_flags;
-                aos_event_get(&ethernetif->enetTransmitAccessEvent, ethernetif->txFlag, 0x02,  &actl_flags, 0xFFFFFFFF);                                    
+                unsigned int actl_flags; 
+                krhino_event_get(&ethernetif->enetTransmitAccessEvent, ethernetif->txFlag, 0x02, &actl_flags, RHINO_WAIT_FOREVER);
             }
 
         } while (result == kStatus_ENET_TxFrameBusy);
@@ -1193,6 +1196,7 @@ err_t tcpip_dhcpc_start(struct netif *pstnetif)
     }
 
     netif_set_status_callback(pstnetif, tcpip_dhcpc_cb);
+    return 0;
 }
 
 static void tcpip_init_done(void *arg) {
