@@ -16,6 +16,7 @@ XR872_CHIP_FILES := \
                    $(XR872_CHIP_PATH)/hal_gpio.c                 \
                    $(XR872_CHIP_PATH)/hal_nvic.c                 \
                    $(XR872_CHIP_PATH)/hal_prcm.c                 \
+                   $(XR872_CHIP_PATH)/hal_pwm.c                  \
                    $(XR872_CHIP_PATH)/hal_rtc.c                  \
                    $(XR872_CHIP_PATH)/hal_spi.c                  \
                    $(XR872_CHIP_PATH)/hal_uart.c                 \

@@ -43,7 +43,7 @@ extern "C" {
  */
 
 /* chip clock */
-#define BOARD_HOSC_CLOCK        HOSC_CLOCK_24M
+#define BOARD_HOSC_CLOCK        HOSC_CLOCK_40M
 #define BOARD_LOSC_EXTERNAL     0   /* 0: inter 32k, 1: external 32k */
 #define BOARD_CPU_CLK_SRC       PRCM_CPU_CLK_SRC_SYSCLK
 #if defined(__CONFIG_CHIP_XR872)
