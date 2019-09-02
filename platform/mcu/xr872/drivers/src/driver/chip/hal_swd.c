@@ -40,6 +40,7 @@
 
 static int8_t g_swd_suspending = 0;
 
+__nonxip_text
 static int swd_suspend(struct soc_device *dev, enum suspend_state_t state)
 {
 	g_swd_suspending = 1;
@@ -49,7 +50,6 @@ static int swd_suspend(struct soc_device *dev, enum suspend_state_t state)
 		break;
 	case PM_MODE_STANDBY:
 	case PM_MODE_HIBERNATION:
-	case PM_MODE_POWEROFF:
 		HAL_SWD_DeInit();
 		break;
 	default:
@@ -59,6 +59,7 @@ static int swd_suspend(struct soc_device *dev, enum suspend_state_t state)
 	return 0;
 }
 
+__nonxip_text
 static int swd_resume(struct soc_device *dev, enum suspend_state_t state)
 {
 	switch (state) {
@@ -76,7 +77,7 @@ static int swd_resume(struct soc_device *dev, enum suspend_state_t state)
 	return 0;
 }
 
-static struct soc_device_driver swd_drv = {
+static const struct soc_device_driver swd_drv = {
 	.name = "swd",
 	.suspend_noirq = swd_suspend,
 	.resume_noirq = swd_resume,

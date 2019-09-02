@@ -37,6 +37,7 @@
 #include "driver/chip/hal_spinlock.h"
 #include "kernel/os/os.h"
 
+#if (__CONFIG_CHIP_ARCH_VER == 1)
 #define DBG_SPIN	0
 #define SPIN_DBG(fmt, arg...)	\
 	HAL_LOG(HAL_DBG_ON && DBG_SPIN, "[HAL SPIN] "fmt, ##arg)
@@ -211,3 +212,4 @@ HAL_Status HAL_SPIN_Unlock(SPIN_Lock_t *lock)
 
 	return HAL_OK;
 }
+#endif /* (__CONFIG_CHIP_ARCH_VER == 1) */

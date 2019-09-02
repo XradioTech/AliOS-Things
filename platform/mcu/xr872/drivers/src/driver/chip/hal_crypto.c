@@ -33,86 +33,48 @@
  */
 
 #include <stdbool.h>
+#include "sys/io.h"
 #include "driver/chip/hal_crypto.h"
 #include "hal_base.h"
 #include "sys/endian.h"
 #include "pm/pm.h"
+#include "sys/xr_debug.h"
 
 
 /*************************************** Debug *****************************************/
-#define CE_MODULE (DBG_OFF | XR_LEVEL_DEBUG)
-#define CE_REG_DEBUG
-
-#define CE_ASSERT(condition) XR_ASSERT(condition, CE_MODULE, #condition " failed\n")
-
-#define CE_DEBUG(msg, arg...) XR_DEBUG(CE_MODULE, NOEXPAND, "[CE Debug] " msg, ##arg)
-
-#define CE_ALERT(msg, arg...) XR_ALERT(CE_MODULE, NOEXPAND, "[CE Alert] " msg, ##arg)
-
-#define CE_ENTRY() XR_ENTRY(CE_MODULE, "[CE Entry]")
-
-#define CE_EXIT(val) XR_RET(CE_MODULE, "[CE Exit]", val)
-
-extern bool reg_show;
-
-#ifdef CE_REG_DEBUG
-#define CE_REG(reg) { \
-		if (reg_show) \
-			CE_DEBUG("register " #reg ": 0x%x.\n", reg); \
-	}
-
-#define CE_REG_ALL(ce) { \
-		CE_REG(ce->CTL); \
-		CE_REG(ce->KEY[0]); \
-		CE_REG(ce->KEY[1]); \
-		CE_REG(ce->KEY[2]); \
-		CE_REG(ce->KEY[3]); \
-		CE_REG(ce->KEY[4]); \
-		CE_REG(ce->KEY[5]); \
-		CE_REG(ce->KEY[6]); \
-		CE_REG(ce->KEY[7]); \
-		CE_REG(ce->IV[0]); \
-		CE_REG(ce->IV[1]); \
-		CE_REG(ce->IV[2]); \
-		CE_REG(ce->IV[3]); \
-		CE_REG(ce->CNT[0]); \
-		CE_REG(ce->CNT[1]); \
-		CE_REG(ce->CNT[2]); \
-		CE_REG(ce->CNT[3]); \
-		CE_REG(ce->FCSR); \
-		CE_REG(ce->ICSR); \
-		CE_REG(ce->MD0); \
-		CE_REG(ce->MD1); \
-		CE_REG(ce->MD2); \
-		CE_REG(ce->MD3); \
-		CE_REG(ce->MD4); \
-		CE_REG(ce->CTS_LEN); \
-		CE_REG(ce->CRC_POLY); \
-		CE_REG(ce->CRC_RESULT); \
-		CE_REG(ce->MD5); \
-		CE_REG(ce->MD6); \
-		CE_REG(ce->MD7); \
-	}
-
-#else
-#define CE_REG_ALL(ce)
-
-#define CE_REG(reg)
-
-#endif
+#define CRYPTO_ALE	(0)
+#define CRYPTO_ERR	(1)
+#define CRYPTO_INF	(2)
+#define CRYPTO_DBG	(3)
+#define CRYPTO_PRINT_LEVEL (CRYPTO_INF)
+#define CRYPTO_PRINT(print_level, fmt, arg...) 	\
+	do {										\
+        if(print_level <= CRYPTO_PRINT_LEVEL)		\
+            printf("[Crypto] "fmt, ##arg);		\
+    } while (0);
 
 #define CE_CRC_HASH_DMA_ENA	0	/* use dma to do crc/hash */
-
 #define HAL_PRNG_RAND_NUM	5	/* number of random value for one generation */
 #define HAL_PRNG_SEED_NUM	6
 
 #define __CE_STATIC_INLINE__ static inline
-bool reg_show = 0;
 
 #ifdef SWAP32
 #undef SWAP32
 #endif
 #define SWAP32(d) bswap32(d)
+
+static void  __attribute__((unused)) CE_Reg_All(const int line)
+{
+	#if (CRYPTO_DBG <= CRYPTO_PRINT_LEVEL)
+	printf("******************CE:Line %d**************************\n", line);
+	for(int i=0; i<45; i+=1) {
+		if(i%4 == 0) printf("\n0x%8x:", (uint32_t)(&(CE->CTL) + i));
+		printf("  0x%8x", (uint32_t)(*(&(CE->CTL) + i)));
+	}
+	printf("\n");
+	#endif
+}
 
 /*
  * @brief CE
@@ -144,14 +106,18 @@ uint8_t CE_GetOutputAvailCnt(CE_T *ce)
 __CE_STATIC_INLINE__
 void CE_SetInputThreshold(CE_T *ce, uint8_t threshold)
 {
-	CE_ASSERT((threshold & ~CE_FCSR_TXFIFO_INT_TRIG_LEVEL_MASK) == 0); //rx vmask = tx vmask = tx mask
+	if((threshold & ~CE_FCSR_TXFIFO_INT_TRIG_LEVEL_MASK) == 0) {
+        CRYPTO_PRINT(CRYPTO_ERR, "input threshold error\n");
+    }
 	HAL_MODIFY_REG(ce->FCSR, CE_FCSR_RXFIFO_INT_TRIG_LEVEL_MASK, threshold << CE_FCSR_RXFIFO_INT_TRIG_LEVEL_SHIFT);
 }
 
 __CE_STATIC_INLINE__
 void CE_SetOutputThreshold(CE_T *ce, uint8_t threshold)
 {
-	CE_ASSERT((threshold & ~CE_FCSR_TXFIFO_INT_TRIG_LEVEL_MASK) == 0);
+	if((threshold & ~CE_FCSR_TXFIFO_INT_TRIG_LEVEL_MASK) == 0) {
+        CRYPTO_PRINT(CRYPTO_ERR, "onput threshold error\n");
+    }
 	HAL_MODIFY_REG(ce->FCSR, CE_FCSR_TXFIFO_INT_TRIG_LEVEL_MASK, threshold << CE_FCSR_TXFIFO_INT_TRIG_LEVEL_SHIFT);
 }
 
@@ -265,21 +231,14 @@ void CE_CRC_SetResult(CE_T *ce, uint32_t crc)
 }
 
 /*
-void CE_CRC_SetLength(CE_T *ce, uint32_t len)
-{
-	CE_SetLength(ce, len);
-}
-*/
-
-
-/*
  * @brief AES/DES/3DES
  */
 __CE_STATIC_INLINE__
 void CE_Crypto_Init(CE_T *ce, CE_CTL_Method algo, CE_CTL_Crypto_Mode mode, CE_Crypto_Op op)
 {
-	CE_ASSERT(algo > CE_CTL_METHOD_3DES);
-
+    if(algo > CE_CTL_METHOD_3DES) {
+        CRYPTO_PRINT(CRYPTO_ERR, "init error\n");
+    }
 	HAL_MODIFY_REG(ce->CTL,
 				   CE_CTL_METHOD_MASK
 				   | CE_CTL_OP_MODE_MASK
@@ -302,7 +261,7 @@ void CE_AES_SetKey(CE_T *ce, CE_CTL_KeySource src, CE_CTL_AES_KeySize size, uint
 	else if (size == CE_CTL_AES_KEYSIZE_256BITS)
 		key_cnt = 8;
 	else {
-		CE_ALERT("param is out of range\n");
+		CRYPTO_PRINT(CRYPTO_ERR, "param is out of range\n");
 		return;
 	}
 
@@ -363,7 +322,7 @@ void CE_Crypto_SetLength(CE_T *ce, uint32_t len)
 }
 
 __CE_STATIC_INLINE__
-void CE_Crypto_SetIV(CE_T *ce, uint32_t iv[4], uint8_t size)
+void CE_Crypto_SetIV(CE_T *ce, const uint32_t iv[4], uint8_t size)
 {
 	uint8_t i = size / 4;
 	while (i--)
@@ -402,12 +361,6 @@ volatile const uint32_t *CE_Crypto_GetOutputAddr(CE_T *ce)
 	return &ce->TXFIFO;
 }
 
-/*HAL_Status CE_Crypto_GetOutput(CE_T *ce, uint32_t *data)
-{}
-
-HAL_Status CE_Crypto_GetInput(CE_T *ce, uint32_t *data)
-{}*/
-
 __CE_STATIC_INLINE__
 void CE_Crypto_GetIV(CE_T *ce, uint32_t iv[4], uint8_t size)
 {
@@ -442,7 +395,9 @@ HAL_Status CE_Crypto_GetCounter(CE_T *ce, uint32_t cnt[4], CE_CTL_CtrWidth size)
  */
 void CE_Hash_Init(CE_T *ce, CE_CTL_Method algo)
 {
-	CE_ASSERT((algo != CE_CTL_METHOD_SHA1) && (algo != CE_CTL_METHOD_MD5) && (algo != CE_CTL_METHOD_SHA256));
+	if((algo != CE_CTL_METHOD_SHA1) && (algo != CE_CTL_METHOD_MD5) && (algo != CE_CTL_METHOD_SHA256)) {
+        CRYPTO_PRINT(CRYPTO_ERR, "hash init error\n");
+    }
 
 	HAL_CLR_BIT(ce->CTL, CE_CTL_END_BIT_MASK);
 	HAL_MODIFY_REG(ce->CTL,
@@ -450,7 +405,7 @@ void CE_Hash_Init(CE_T *ce, CE_CTL_Method algo)
 				   algo | (1 << CE_CTL_ENABLE_SHIFT) | CE_CRYPT_OP_ENCRYPTION);
 }
 
-void CE_Hash_SetIV(CE_T *ce, CE_CTL_IvMode_SHA_MD5 iv_src, uint32_t *iv, uint32_t iv_size)
+void CE_Hash_SetIV(CE_T *ce, CE_CTL_IvMode_SHA_MD5 iv_src, const uint32_t *iv, uint32_t iv_size)
 {
 	HAL_MODIFY_REG(ce->CTL, CE_CTL_IV_MODE_MASK, iv_src);
 
@@ -506,7 +461,6 @@ void CE_Hash_Deinit(CE_T *ce)
 {
 	CE_Disable(ce);
 }
-
 
 /*
  * @brief PRNG
@@ -584,8 +538,8 @@ static void HAL_CE_DMACmpl(void *arg)
 {
 	if (arg != NULL)
 		HAL_SemaphoreRelease(&ce_block);
-#ifndef __CONFIG_XIP_SECTION_FUNC_LEVEL
-	CE_DEBUG("Transfer by dma had been finished.\n");
+#ifndef __CONFIG_SECTION_ATTRIBUTE_NONXIP
+	CRYPTO_PRINT(CRYPTO_DBG, "Transfer by dma had been finished.\n");
 #endif
 }
 
@@ -596,15 +550,14 @@ static HAL_Status HAL_Crypto_InitDMA(DMA_Channel *input, DMA_Channel *output)
 	DMA_ChannelInitParam Input_param;
 	HAL_Memset(&Output_param, 0, sizeof(Output_param));
 	HAL_Memset(&Input_param, 0, sizeof(Input_param));
-	CE_ENTRY();
 
 	if ((*output = HAL_DMA_Request()) == DMA_CHANNEL_INVALID) {
-		CE_ALERT("DMA request failed \n");
+		CRYPTO_PRINT(CRYPTO_ERR, "DMA request failed \n");
 		ret = HAL_INVALID;
 		goto out;
 	}
 	if ((*input = HAL_DMA_Request()) == DMA_CHANNEL_INVALID) {
-		CE_ALERT("DMA request failed \n");
+		CRYPTO_PRINT(CRYPTO_ERR, "DMA request failed \n");
 		HAL_DMA_Release(*output);
 		ret = HAL_INVALID;
 		goto out;
@@ -614,7 +567,7 @@ static HAL_Status HAL_Crypto_InitDMA(DMA_Channel *input, DMA_Channel *output)
 											  DMA_WAIT_CYCLE_16,
 											  DMA_BYTE_CNT_MODE_REMAIN,
 											  DMA_DATA_WIDTH_8BIT,
-											  DMA_BURST_LEN_1,
+											  DMA_BURST_LEN_4,
 											  DMA_ADDR_MODE_INC,
 											  DMA_PERIPH_SRAM,
 											  DMA_DATA_WIDTH_32BIT,
@@ -633,7 +586,7 @@ static HAL_Status HAL_Crypto_InitDMA(DMA_Channel *input, DMA_Channel *output)
 											  DMA_ADDR_MODE_FIXED,
 											  DMA_PERIPH_CE,
 											  DMA_DATA_WIDTH_8BIT,
-											  DMA_BURST_LEN_1,
+											  DMA_BURST_LEN_4,
 											  DMA_ADDR_MODE_INC,
 											  DMA_PERIPH_SRAM);
 	Input_param.irqType = DMA_IRQ_TYPE_END;
@@ -644,7 +597,6 @@ static HAL_Status HAL_Crypto_InitDMA(DMA_Channel *input, DMA_Channel *output)
 	HAL_DMA_Init(*output, &Output_param);
 
 out:
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -662,8 +614,7 @@ static HAL_Status HAL_Crypto_Convey(uint8_t *input, uint8_t *output, uint32_t si
 	uint32_t align_len = size & (~(block_size - 1));
 	uint32_t remain_len = size & (block_size - 1);
 	uint8_t padding[16] = {0};
-	CE_ENTRY();
-//	CE_DEBUG("align_len = %d, remain_len = %d, len = %d\n", align_len, remain_len, remain_len ? (align_len + block_size) : align_len);
+//	CRYPTO_PRINT(CRYPTO_ERR, "align_len = %d, remain_len = %d, len = %d\n", align_len, remain_len, remain_len ? (align_len + block_size) : align_len);
 
 	/* data preprocess */
 	if (remain_len != 0)
@@ -678,7 +629,7 @@ static HAL_Status HAL_Crypto_Convey(uint8_t *input, uint8_t *output, uint32_t si
 
 		/* data transfer by DMA */
 		if ((ret = HAL_Crypto_InitDMA(&Input_channel, &Output_channel)) != HAL_OK) {
-			CE_ALERT("DMA Request failed\n");
+			CRYPTO_PRINT(CRYPTO_ERR, "DMA Request failed\n");
 			goto out;
 		}
 
@@ -691,7 +642,7 @@ static HAL_Status HAL_Crypto_Convey(uint8_t *input, uint8_t *output, uint32_t si
 			HAL_DMA_Start(Input_channel, (uint32_t)input, (uint32_t)CE_Crypto_GetInputAddr(CE), align_len);
 			HAL_DMA_Start(Output_channel, (uint32_t)CE_Crypto_GetOutputAddr(CE), (uint32_t)output, align_len);
 			if ((ret = HAL_SemaphoreWait(&ce_block, CE_WAIT_TIME)) != HAL_OK) {
-				CE_ALERT("DMA 1st transfer failed\n");
+				CRYPTO_PRINT(CRYPTO_ERR, "DMA 1st transfer failed\n");
 				HAL_DMA_Stop(Input_channel);
 				HAL_DMA_Stop(Output_channel);
 				goto failed;
@@ -702,12 +653,12 @@ static HAL_Status HAL_Crypto_Convey(uint8_t *input, uint8_t *output, uint32_t si
 
 		if (remain_len != 0) {
 			HAL_DMA_Start(Input_channel, (uint32_t)padding, (uint32_t)CE_Crypto_GetInputAddr(CE), block_size);
-			CE_REG_ALL(CE);
+			CE_Reg_All(__LINE__);
 
 			HAL_DMA_Start(Output_channel, (uint32_t)CE_Crypto_GetOutputAddr(CE), (uint32_t)&output[align_len], block_size);
 			if ((ret = HAL_SemaphoreWait(&ce_block, CE_WAIT_TIME)) != HAL_OK) {
-				CE_ALERT("DMA 2nd transfer failed\n");
-				CE_REG_ALL(CE);
+				CRYPTO_PRINT(CRYPTO_ERR, "DMA 2nd transfer failed\n");
+				CE_Reg_All(__LINE__);
 				HAL_DMA_Stop(Input_channel);
 				HAL_DMA_Stop(Output_channel);
 				goto failed;
@@ -721,7 +672,6 @@ failed:
 		CE_DisableDMA(CE);
 		HAL_Crypto_DeinitDMA(Input_channel, Output_channel);
 out:
-		CE_EXIT(ret);
 		return ret;
 	}else {
 		/* use CPU mode */
@@ -752,7 +702,6 @@ out:
 			}
 		}
 		CE_Disable(CE);
-		CE_EXIT(ret);
 		return ret;
 	}
 }
@@ -788,10 +737,10 @@ static int ce_resume(struct soc_device *dev, enum suspend_state_t state)
 	return 0;
 }
 
-static struct soc_device_driver ce_drv = {
+static const struct soc_device_driver ce_drv = {
 	.name = "ce",
-	.suspend_noirq = ce_suspend,
-	.resume_noirq = ce_resume,
+	.suspend = ce_suspend,
+	.resume = ce_resume,
 };
 
 static struct soc_device ce_dev = {
@@ -815,14 +764,13 @@ HAL_Status HAL_CE_Init()
 	HAL_Status ret = HAL_OK;
 	uint32_t clk;
 	uint32_t div;
-	CE_ENTRY();
 
 	HAL_CE_DisableCCMU();
 	HAL_CCM_BusForcePeriphReset(CCM_BUS_PERIPH_BIT_CE);
 	HAL_CCM_BusReleasePeriphReset(CCM_BUS_PERIPH_BIT_CE);
 	clk = HAL_GetDevClock();
 	div = (clk - 1) / (80 * 1000 * 1000) + 1;
-	CE_DEBUG("CCMU src clk is %d, div is %d\n", clk, div);
+	CRYPTO_PRINT(CRYPTO_DBG, "CCMU src clk is %u, div is %u\n", clk, div);
 
 	if (div > (8 * 16))
 		return HAL_ERROR;
@@ -854,7 +802,6 @@ HAL_Status HAL_CE_Init()
 #endif
 
 out:
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -866,7 +813,6 @@ out:
 HAL_Status HAL_CE_Deinit()
 {
 	HAL_Status ret = HAL_OK;
-	CE_ENTRY();
 
 #ifdef CONFIG_PM
 	if (!hal_ce_suspending)
@@ -878,10 +824,8 @@ HAL_Status HAL_CE_Deinit()
 	if ((ret = HAL_SemaphoreDeinit(&ce_block)) != HAL_OK)
 		goto out;
 out:
-	CE_EXIT(ret);
 	return ret;
 }
-
 
 /**
   * @brief Encrypt data by AES.
@@ -910,7 +854,6 @@ out:
 HAL_Status HAL_AES_Encrypt(CE_AES_Config *aes, uint8_t *plain, uint8_t *cipher, uint32_t size)
 {
 	HAL_Status ret = HAL_OK;
-	CE_ENTRY();
 
 	if (size == 0) {
 		ret = HAL_INVALID;
@@ -936,13 +879,12 @@ HAL_Status HAL_AES_Encrypt(CE_AES_Config *aes, uint8_t *plain, uint8_t *cipher, 
 	else if ((CE_CTL_Crypto_Mode)aes->mode == CE_CTL_CRYPT_MODE_CTS)
 		CE_Crypto_SetIV(CE, (uint32_t *)aes->iv, 16);
 #endif
-
-	CE_REG_ALL(CE);
+	CE_Reg_All(__LINE__);
 
 	/* plain data convey to CE and cipher data convey from CE */
 	HAL_Crypto_Convey(plain, cipher, size, AES_BLOCK_SIZE);
+	CE_Reg_All(__LINE__);
 
-	CE_REG_ALL(CE);
 	/* CE state storage */
 	if ((CE_CTL_Crypto_Mode)aes->mode == CE_CTL_CRYPT_MODE_CBC)
 		CE_Crypto_GetIV(CE, (uint32_t *)aes->iv, 16);
@@ -962,7 +904,6 @@ HAL_Status HAL_AES_Encrypt(CE_AES_Config *aes, uint8_t *plain, uint8_t *cipher, 
 	HAL_MutexUnlock(&ce_lock);
 out:
 	ce_running = 0;
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -995,7 +936,6 @@ out:
 HAL_Status HAL_AES_Decrypt(CE_AES_Config *aes, uint8_t *cipher, uint8_t *plain, uint32_t size)
 {
 	HAL_Status ret = HAL_OK;
-	CE_ENTRY();
 
 	if (size == 0) {
 		ret = HAL_INVALID;
@@ -1021,13 +961,11 @@ HAL_Status HAL_AES_Decrypt(CE_AES_Config *aes, uint8_t *cipher, uint8_t *plain, 
 	else if ((CE_CTL_Crypto_Mode)aes->mode == CE_CTL_CRYPT_MODE_CTS)
 		CE_Crypto_SetIV(CE, (uint32_t *)aes->iv, 16);
 #endif
-
-	CE_REG_ALL(CE);
+	CE_Reg_All(__LINE__);
 
 	/* plain data convey to CE and cipher data convey from CE */
 	HAL_Crypto_Convey(cipher, plain, size, AES_BLOCK_SIZE);
-
-	CE_REG_ALL(CE);
+	CE_Reg_All(__LINE__);
 
 	/* CE state storage */
 	if ((CE_CTL_Crypto_Mode)aes->mode == CE_CTL_CRYPT_MODE_CBC)
@@ -1048,7 +986,6 @@ HAL_Status HAL_AES_Decrypt(CE_AES_Config *aes, uint8_t *cipher, uint8_t *plain, 
 	HAL_MutexUnlock(&ce_lock);
 out:
 	ce_running = 0;
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1072,7 +1009,6 @@ out:
 HAL_Status HAL_DES_Encrypt(CE_DES_Config *des, uint8_t *plain, uint8_t *cipher, uint32_t size)
 {
 	HAL_Status ret = HAL_OK;
-	CE_ENTRY();
 
 	if (size == 0) {
 		ret = HAL_INVALID;
@@ -1119,7 +1055,6 @@ HAL_Status HAL_DES_Encrypt(CE_DES_Config *des, uint8_t *plain, uint8_t *cipher, 
 	HAL_MutexUnlock(&ce_lock);
 out:
 	ce_running = 0;
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1145,7 +1080,6 @@ out:
 HAL_Status HAL_DES_Decrypt(CE_DES_Config *des, uint8_t *cipher, uint8_t *plain, uint32_t size)
 {
 	HAL_Status ret = HAL_OK;
-	CE_ENTRY();
 
 	if (size == 0) {
 		ret = HAL_INVALID;
@@ -1192,7 +1126,6 @@ HAL_Status HAL_DES_Decrypt(CE_DES_Config *des, uint8_t *cipher, uint8_t *plain, 
 	HAL_MutexUnlock(&ce_lock);
 out:
 	ce_running = 0;
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1217,7 +1150,6 @@ out:
 HAL_Status HAL_3DES_Encrypt(CE_3DES_Config *des, uint8_t *plain, uint8_t *cipher, uint32_t size)
 {
 	HAL_Status ret = HAL_OK;
-	CE_ENTRY();
 
 	if (size == 0) {
 		ret = HAL_INVALID;
@@ -1264,7 +1196,6 @@ HAL_Status HAL_3DES_Encrypt(CE_3DES_Config *des, uint8_t *plain, uint8_t *cipher
 	HAL_MutexUnlock(&ce_lock);
 out:
 	ce_running = 0;
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1292,7 +1223,6 @@ out:
 HAL_Status HAL_3DES_Decrypt(CE_3DES_Config *des, uint8_t *cipher, uint8_t *plain, uint32_t size)
 {
 	HAL_Status ret = HAL_OK;
-	CE_ENTRY();
 
 	if (size == 0) {
 		ret = HAL_INVALID;
@@ -1339,7 +1269,6 @@ HAL_Status HAL_3DES_Decrypt(CE_3DES_Config *des, uint8_t *cipher, uint8_t *plain
 	HAL_MutexUnlock(&ce_lock);
 out:
 	ce_running = 0;
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1375,11 +1304,10 @@ static HAL_Status HAL_CRC_Hash_InitDMA(DMA_Channel *input)
 	HAL_Status ret = HAL_OK;
 	DMA_ChannelInitParam Input_param;
 	HAL_Memset(&Input_param, 0, sizeof(Input_param));
-	CE_ENTRY();
 
 	if ((*input = HAL_DMA_Request()) == DMA_CHANNEL_INVALID) {
 		ret = HAL_INVALID;
-		CE_ALERT("DMA request failed \n");
+		CRYPTO_PRINT(CRYPTO_ERR, "DMA request failed \n");
 		goto out;
 	}
 
@@ -1402,17 +1330,14 @@ static HAL_Status HAL_CRC_Hash_InitDMA(DMA_Channel *input)
 	CE_EnableDMA(CE);
 
 out:
-	CE_EXIT(ret);
 	return ret;
 }
 
 static void HAL_CRC_Hash_DenitDMA(DMA_Channel input)
 {
-	CE_ENTRY();
 	CE_DisableDMA(CE);
 	HAL_DMA_DeInit(input);
 	HAL_DMA_Release(input);
-	CE_EXIT(0);
 }
 
 #endif /* CE_CRC_HASH_DMA_ENA */
@@ -1424,13 +1349,11 @@ static HAL_Status HAL_CRC_Hash_Convey(CE_Fifo_Align *align, uint8_t *data, uint3
 	uint32_t align_len;
 	uint32_t buf_left = 4 - align->word_size;
 
-	CE_ENTRY();
-	CE_DEBUG("input size = %d, buf_left = %d\n", size, buf_left);
+	CRYPTO_PRINT(CRYPTO_DBG, "input size = %u, buf_left = %u\n", size, buf_left);
 
 	if (size < buf_left) {
 		HAL_Memcpy(align->word, data, size);
 		align->word_size += size;
-		CE_ASSERT(align->word_size < 4);
 		goto out;
 	}
 	HAL_Memcpy(&align->word[align->word_size], data, buf_left);
@@ -1438,7 +1361,7 @@ static HAL_Status HAL_CRC_Hash_Convey(CE_Fifo_Align *align, uint8_t *data, uint3
 	/* use DMA mode */
 	DMA_Channel input = DMA_CHANNEL_INVALID;
 	if ((ret = HAL_CRC_Hash_InitDMA(&input)) != HAL_OK) {
-		CE_ALERT("DMA Request failed\n");
+		CRYPTO_PRINT(CRYPTO_ERR, "DMA Request failed\n");
 		goto out;
 	}
 
@@ -1446,7 +1369,7 @@ static HAL_Status HAL_CRC_Hash_Convey(CE_Fifo_Align *align, uint8_t *data, uint3
 
 	HAL_DMA_Start(input, (uint32_t)align->word, (uint32_t)CE_Crypto_GetInputAddr(CE), 4);
 	if ((ret = HAL_SemaphoreWait(&ce_block, CE_WAIT_TIME)) != HAL_OK) {
-		CE_ALERT("DMA transfer 1st block failed\n");
+		CRYPTO_PRINT(CRYPTO_ERR, "DMA transfer 1st block failed\n");
 		HAL_CRC_Hash_DenitDMA(input);
 		goto out;
 	}
@@ -1459,7 +1382,7 @@ static HAL_Status HAL_CRC_Hash_Convey(CE_Fifo_Align *align, uint8_t *data, uint3
 	if (align_len != 0) {
 		HAL_DMA_Start(input, (uint32_t)(data + buf_left), (uint32_t)CE_Crypto_GetInputAddr(CE), align_len);
 		if ((ret = HAL_SemaphoreWait(&ce_block, CE_WAIT_TIME)) != HAL_OK) {
-			CE_ALERT("DMA transfer 2rd block failed\n");
+			CRYPTO_PRINT(CRYPTO_ERR, "DMA transfer 2rd block failed\n");
 			HAL_CRC_Hash_DenitDMA(input);
 			goto out;
 		}
@@ -1487,7 +1410,6 @@ static HAL_Status HAL_CRC_Hash_Convey(CE_Fifo_Align *align, uint8_t *data, uint3
 	HAL_Memcpy(align->word, data + size - align->word_size, align->word_size);
 
 out:
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1497,10 +1419,9 @@ static void HAL_Hash_Finish(CE_MD5_Handler *hdl, uint64_t bit_size)
 {
 	uint32_t pad_size;
 	uint32_t remain_size = hdl->total_size & 0x3f; // len % 64
-	uint32_t total_size = hdl->total_size;
+//	uint32_t total_size = hdl->total_size;
 	uint8_t pad[128] = {0};
 
-	CE_ENTRY();
 //	CE_DEBUG("total size before padding = %d, remain size = %d.\n", (uint32_t)hdl->total_size, (uint32_t)remain_size);
 
 	if (remain_size < 56)
@@ -1514,11 +1435,10 @@ static void HAL_Hash_Finish(CE_MD5_Handler *hdl, uint64_t bit_size)
 
 	HAL_MD5_Append(hdl, pad, pad_size + 1 + 8);
 
-	CE_ASSERT(((total_size + pad_size + 1 + 8) & 0x3f) == 0);
+//	CE_ASSERT(((total_size + pad_size + 1 + 8) & 0x3f) == 0);
 //	CE_DEBUG("append size = %d, final total size = 0x%x.\n", (uint32_t)(pad_size + 1 + 8), (uint32_t)(total_size + pad_size + 1 + 8));
 
 	CE_Hash_Finish(CE);
-	CE_EXIT(0);
 }
 /************************ public **************************************/
 
@@ -1533,8 +1453,6 @@ HAL_Status HAL_CRC_Init1(CE_CRC_Handler *hdl, CE_CRC_Types type, uint32_t total_
 {
 	HAL_Status ret = HAL_OK;
 	const CE_CRC_Config *config = &crc_cfg[type];
-
-	CE_ENTRY();
 
 	if (total_size == 0) {
 		ret = HAL_INVALID;
@@ -1560,11 +1478,9 @@ HAL_Status HAL_CRC_Init1(CE_CRC_Handler *hdl, CE_CRC_Types type, uint32_t total_
 	CE_CRC_SetResult(CE, 0);
 	CE_SetLength(CE, total_size);
 	CE_Enable(CE);
-
-	CE_REG_ALL(CE);
+	CE_Reg_All(__LINE__);
 
 out:
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1594,8 +1510,6 @@ HAL_Status HAL_CRC_Append(CE_CRC_Handler *hdl, uint8_t *data, uint32_t size)
 {
 	HAL_Status ret = HAL_OK;
 
-	CE_ENTRY();
-
 	if (size == 0) {
 		ret = HAL_INVALID;
 		goto out;
@@ -1606,7 +1520,6 @@ HAL_Status HAL_CRC_Append(CE_CRC_Handler *hdl, uint8_t *data, uint32_t size)
 		hdl->total_size += size;
 
 out:
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1621,23 +1534,18 @@ HAL_Status HAL_CRC_Finish(CE_CRC_Handler *hdl, uint32_t *crc)
 	HAL_Status ret = HAL_OK;
 	uint8_t pad[4] = {0};
 
-	CE_ENTRY();
-
 	HAL_CRC_Append(hdl, pad, (4 - hdl->word_size) & 0x03);
 
 	CE_CRC_Finish(CE);
 	while (CE_Status(CE, CE_INT_TPYE_HASH_CRC_END) == 0);		// use irq would be better
 	CE_CRC_Calc(CE, crc);
-	CE_REG_ALL(CE);
-	CE_REG(CE->CRC_RESULT);
-
+	CE_Reg_All(__LINE__);
 	CE_Disable(CE);
 	CE_CRC_Deinit(CE);
 	HAL_CE_DisableCCMU();
 	HAL_MutexUnlock(&ce_lock);
 
 	ce_running = 0;
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1650,11 +1558,9 @@ HAL_Status HAL_CRC_Finish(CE_CRC_Handler *hdl, uint32_t *crc)
   * @param iv: MD5 Initialization Value. size of iv must be 16 bytes.
   * @retval HAL_Status:  The status of driver
   */
-HAL_Status HAL_MD5_Init(CE_MD5_Handler *hdl, CE_Hash_IVsrc src, uint32_t iv[4])
+HAL_Status HAL_MD5_Init(CE_MD5_Handler *hdl, CE_Hash_IVsrc src, const uint32_t iv[4])
 {
 	HAL_Status ret = HAL_OK;
-
-	CE_ENTRY();
 
 	ce_running = 1;
 	if ((ret = HAL_MutexLock(&ce_lock, CE_WAIT_TIME)) != HAL_OK)
@@ -1667,11 +1573,9 @@ HAL_Status HAL_MD5_Init(CE_MD5_Handler *hdl, CE_Hash_IVsrc src, uint32_t iv[4])
 	hdl->total_size = 0;
 	hdl->word_size = 0;
 	HAL_Memset(hdl->word, 0, sizeof(hdl->word));
-
-	CE_REG_ALL(CE);
+	CE_Reg_All(__LINE__);
 
 out:
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1686,8 +1590,6 @@ HAL_Status HAL_MD5_Append(CE_MD5_Handler *hdl, uint8_t *data, uint32_t size)
 {
 	HAL_Status ret = HAL_OK;
 
-	CE_ENTRY();
-
 	if (size == 0) {
 		ret = HAL_INVALID;
 		goto out;
@@ -1699,7 +1601,6 @@ HAL_Status HAL_MD5_Append(CE_MD5_Handler *hdl, uint8_t *data, uint32_t size)
 		hdl->total_size += size;
 
 out:
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1715,11 +1616,10 @@ HAL_Status HAL_MD5_Finish(CE_MD5_Handler *hdl, uint32_t digest[4])
 	HAL_Status ret = HAL_OK;
 	uint64_t bit_size = htole64(hdl->total_size << 3);
 
-	CE_ENTRY();
-
 	HAL_Hash_Finish(hdl, bit_size);
 	while (CE_Status(CE, CE_INT_TPYE_HASH_CRC_END) == 0);		// use irq would be better
-	CE_REG_ALL(CE);
+	CE_Reg_All(__LINE__);
+
 	CE_Hash_Calc(CE, CE_CTL_METHOD_MD5, digest);
 
 	CE_Hash_Deinit(CE);
@@ -1727,7 +1627,6 @@ HAL_Status HAL_MD5_Finish(CE_MD5_Handler *hdl, uint32_t digest[4])
 	HAL_MutexUnlock(&ce_lock);
 
 	ce_running = 0;
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1740,11 +1639,9 @@ HAL_Status HAL_MD5_Finish(CE_MD5_Handler *hdl, uint32_t digest[4])
   * @param iv: SHA1 Initialization Value. size of iv must be 20 bytes.
   * @retval HAL_Status:  The status of driver
   */
-HAL_Status HAL_SHA1_Init(CE_SHA1_Handler *hdl, CE_Hash_IVsrc src, uint32_t iv[5])
+HAL_Status HAL_SHA1_Init(CE_SHA1_Handler *hdl, CE_Hash_IVsrc src, const uint32_t iv[5])
 {
 	HAL_Status ret = HAL_OK;
-
-	CE_ENTRY();
 
 	ce_running = 1;
 	if ((ret = HAL_MutexLock(&ce_lock, CE_WAIT_TIME)) != HAL_OK)
@@ -1753,14 +1650,13 @@ HAL_Status HAL_SHA1_Init(CE_SHA1_Handler *hdl, CE_Hash_IVsrc src, uint32_t iv[5]
 	HAL_CE_EnableCCMU();
 	CE_Hash_Init(CE, CE_CTL_METHOD_SHA1);
 	CE_Hash_SetIV(CE, src, iv, CE_SHA1_IV_SIZE);
-	CE_REG_ALL(CE);
+	CE_Reg_All(__LINE__);
 
 	hdl->total_size = 0;
 	hdl->word_size = 0;
 	HAL_Memset(hdl->word, 0, sizeof(hdl->word));
 
 out:
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1774,11 +1670,7 @@ out:
 HAL_Status HAL_SHA1_Append(CE_SHA1_Handler *hdl, uint8_t *data, uint32_t size)
 {
 	HAL_Status ret;
-	CE_ENTRY();
-
 	ret = HAL_MD5_Append(hdl, data, size);
-
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1793,12 +1685,11 @@ HAL_Status HAL_SHA1_Finish(CE_SHA1_Handler *hdl, uint32_t digest[5])
 {
 	HAL_Status ret = HAL_OK;
 	uint64_t bit_size = htobe64(hdl->total_size << 3);
-	CE_ENTRY();
 
 	HAL_Hash_Finish(hdl, bit_size);
-	CE_REG_ALL(CE);
+	CE_Reg_All(__LINE__);
 	while (CE_Status(CE, CE_INT_TPYE_HASH_CRC_END) == 0);		// use irq
-	CE_REG_ALL(CE);
+	CE_Reg_All(__LINE__);
 	CE_Hash_Calc(CE, CE_CTL_METHOD_SHA1, digest);
 
 	CE_Hash_Deinit(CE);
@@ -1806,7 +1697,6 @@ HAL_Status HAL_SHA1_Finish(CE_SHA1_Handler *hdl, uint32_t digest[5])
 	HAL_MutexUnlock(&ce_lock);
 
 	ce_running = 0;
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1819,11 +1709,9 @@ HAL_Status HAL_SHA1_Finish(CE_SHA1_Handler *hdl, uint32_t digest[5])
   * @param iv: SHA256 Initialization Value. size of iv must be 32 bytes.
   * @retval HAL_Status:  The status of driver
   */
-HAL_Status HAL_SHA256_Init(CE_SHA256_Handler *hdl, CE_Hash_IVsrc src, uint32_t iv[8])
+HAL_Status HAL_SHA256_Init(CE_SHA256_Handler *hdl, CE_Hash_IVsrc src, const uint32_t iv[8])
 {
 	HAL_Status ret = HAL_OK;
-
-	CE_ENTRY();
 
 	ce_running = 1;
 	if ((ret = HAL_MutexLock(&ce_lock, CE_WAIT_TIME)) != HAL_OK)
@@ -1832,14 +1720,13 @@ HAL_Status HAL_SHA256_Init(CE_SHA256_Handler *hdl, CE_Hash_IVsrc src, uint32_t i
 	HAL_CE_EnableCCMU();
 	CE_Hash_Init(CE, CE_CTL_METHOD_SHA256);
 	CE_Hash_SetIV(CE, src, iv, CE_SHA256_IV_SIZE);
-	CE_REG_ALL(CE);
+	CE_Reg_All(__LINE__);
 
 	hdl->total_size = 0;
 	hdl->word_size = 0;
 	HAL_Memset(hdl->word, 0, sizeof(hdl->word));
 
 out:
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1853,11 +1740,7 @@ out:
 HAL_Status HAL_SHA256_Append(CE_SHA256_Handler *hdl, uint8_t *data, uint32_t size)
 {
 	HAL_Status ret;
-	CE_ENTRY();
-
 	ret = HAL_MD5_Append(hdl, data, size);
-
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1873,11 +1756,10 @@ HAL_Status HAL_SHA256_Finish(CE_SHA256_Handler *hdl, uint32_t digest[8])
 	HAL_Status ret = HAL_OK;
 	uint64_t bit_size = htobe64(hdl->total_size << 3);
 
-	CE_ENTRY();
-
 	HAL_Hash_Finish(hdl, bit_size);
 	while (CE_Status(CE, CE_INT_TPYE_HASH_CRC_END) == 0);		// use irq would be better
-	CE_REG_ALL(CE);
+	CE_Reg_All(__LINE__);
+
 	CE_Hash_Calc(CE, CE_CTL_METHOD_SHA256, digest);
 
 	CE_Hash_Deinit(CE);
@@ -1885,7 +1767,6 @@ HAL_Status HAL_SHA256_Finish(CE_SHA256_Handler *hdl, uint32_t digest[8])
 	HAL_MutexUnlock(&ce_lock);
 
 	ce_running = 0;
-	CE_EXIT(ret);
 	return ret;
 }
 
@@ -1917,8 +1798,6 @@ HAL_Status HAL_PRNG_Generate(uint8_t *random, uint32_t size)
 	uint8_t *p = random;
 	uint32_t cpsize;
 
-	CE_ENTRY();
-
 	if (size == 0) {
 		ret = HAL_INVALID;
 		goto out;
@@ -1931,7 +1810,7 @@ HAL_Status HAL_PRNG_Generate(uint8_t *random, uint32_t size)
 
 	CE_PRNG_Init(CE, 0);
 	CE_PRNG_Seed(CE, seed);
-	CE_REG_ALL(CE);
+	CE_Reg_All(__LINE__);
 
 	while (1) {
 		CE_PRNG_Generate(CE, seed);
@@ -1943,8 +1822,8 @@ HAL_Status HAL_PRNG_Generate(uint8_t *random, uint32_t size)
 		size -= cpsize;
 	}
 	seed[5] ^= seed[SysTick->VAL % 5];
+	CE_Reg_All(__LINE__);
 
-	CE_REG_ALL(CE);
 	CE_PRNG_Deinit(CE);
 
 	HAL_CE_DisableCCMU();
@@ -1952,7 +1831,7 @@ HAL_Status HAL_PRNG_Generate(uint8_t *random, uint32_t size)
 
 out:
 	ce_running = 0;
-	CE_EXIT(ret);
 	return ret;
 #undef HAL_PRNG_MAX_RAND_LEN
 }
+

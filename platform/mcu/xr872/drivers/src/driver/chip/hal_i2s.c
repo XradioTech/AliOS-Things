@@ -32,10 +32,11 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __CONFIG_BOOTLOADER
+
 #include "driver/chip/hal_dma.h"
 #include "driver/chip/hal_i2s.h"
 #include "hal_base.h"
-#include "sys/io.h"
 #include "pm/pm.h"
 #include "driver/chip/hal_codec.h"
 
@@ -49,11 +50,11 @@
 #define I2S_ERROR(fmt, arg...)    HAL_LOG(1, "[I2S] "fmt, ##arg)
 
 /* debug in interrupt handler */
-#ifdef __CONFIG_XIP_SECTION_FUNC_LEVEL
+#ifdef __CONFIG_SECTION_ATTRIBUTE_NONXIP
 #define I2S_IT_ERROR(fmt, arg...) HAL_IT_LOG(1, "[I2S] "fmt, ##arg)
 #else
 #define I2S_IT_ERROR              I2S_ERROR
-#endif /* __CONFIG_XIP_SECTION_FUNC_LEVEL */
+#endif /* __CONFIG_SECTION_ATTRIBUTE_NONXIP */
 
 typedef struct {
         volatile bool               isHwInit;
@@ -64,18 +65,18 @@ typedef struct {
         uint8_t                     *rxBuf;
         uint8_t                     *readPointer;
         uint8_t                     *writePointer;
-        uint32_t                    rxLength;
-        uint32_t                    txLength;
+		uint32_t					rxBufSize;
+		uint32_t					txBufSize;
 
         DMA_Channel                 txDMAChan;
         DMA_Channel                 rxDMAChan;
         I2S_HWParam                 *hwParam;
         I2S_DataParam               pdataParam;
         I2S_DataParam               cdataParam;
-        volatile uint32_t           txHalfCallCount;
-        volatile uint32_t           rxHalfCallCount;
-        volatile uint32_t           txEndCallCount;
-        volatile uint32_t           rxEndCallCount;
+        volatile uint8_t           txHalfCallCount;
+        volatile uint8_t           rxHalfCallCount;
+        volatile uint8_t           txEndCallCount;
+        volatile uint8_t           rxEndCallCount;
         uint8_t                     *txDmaPointer;
         uint8_t                     *rxDmaPointer;
 
@@ -90,6 +91,10 @@ typedef struct {
 
         uint32_t                    audioPllParam;
         uint32_t                    audioPllPatParam;
+#ifdef CONFIG_PM
+	uint32_t                    suspend;
+	struct soc_device           dev;
+#endif
 } I2S_Private;
 
 typedef struct {
@@ -115,13 +120,15 @@ typedef struct {
 #define AUDIO_PLL_22                (22579200)
 #define AUDIO_DEVICE_PLL             AUDIO_PLL_22
 
-#define I2S_MEMCPY                   memcpy
-#define I2S_MALLOC                   malloc
-#define I2S_FREE                     free
-#define I2S_MEMSET                   memset
+#define I2S_MEMCPY                   HAL_Memcpy
+#define I2S_MALLOC                   HAL_Malloc
+#define I2S_FREE                     HAL_Free
+#define I2S_MEMSET                   HAL_Memset
 
 #define UNDERRUN_THRESHOLD           3
 #define OVERRUN_THRESHOLD            3
+
+#define LOOP_EN						 (0)
 
 #ifdef RESERVERD_MEMORY_FOR_I2S_TX
 static uint8_t I2STX_BUF[I2S_BUF_LENGTH];
@@ -132,7 +139,6 @@ static uint8_t I2SRX_BUF[I2S_BUF_LENGTH];
 
 void HAL_I2S_Trigger(bool enable,I2S_StreamDir dir);
 static I2S_Private gI2sPrivate;
-static uint32_t I2S_BUF_LENGTH = 0;
 
 /*
  *default hw configuration
@@ -152,7 +158,7 @@ static I2S_HWParam gHwParam = {
         1,
 };
 
-static CLK_DIVRegval DivRegval[] = {
+static const CLK_DIVRegval DivRegval[] = {
         {1,   I2S_BCLKDIV_1,   I2S_MCLKDIV_1},
         {2,   I2S_BCLKDIV_2,   I2S_MCLKDIV_2},
         {4,   I2S_BCLKDIV_4,   I2S_MCLKDIV_4},
@@ -168,7 +174,6 @@ static CLK_DIVRegval DivRegval[] = {
         {128, I2S_BCLKDIV_128, I2S_MCLKDIV_128},
         {176, I2S_BCLKDIV_176, I2S_MCLKDIV_176},
         {192, I2S_BCLKDIV_192, I2S_MCLKDIV_192},
-        {}
 };
 
 static const HOSC_I2S_Type i2s_hosc_aud_type[] = {
@@ -198,17 +203,17 @@ uint32_t I2S_PLLAUDIO_Update(I2S_PLLMode pll)
         if (pll != I2S_PLL_24M &&  pll != I2S_PLL_22M)
                 return -1;
 
-        uint32_t hoscClock = HAL_PRCM_GetHFClock();
+        uint32_t hoscClock = HAL_GetHFClock();
 
         int i = 0;
-        for (i = 0; i < ARRAY_SIZE(i2s_hosc_aud_type); i++) {
+        for (i = 0; i < HAL_ARRAY_SIZE(i2s_hosc_aud_type); i++) {
                 if ((i2s_hosc_aud_type[i].hosc == hoscClock) && (i2s_hosc_aud_type[i].audio == pll)) {
                         i2sPrivate->audioPllParam = i2s_hosc_aud_type[i].pllParam;
                         i2sPrivate->audioPllPatParam = i2s_hosc_aud_type[i].pllPatParam;
                         break;
                 }
         }
-        if (i == ARRAY_SIZE(i2s_hosc_aud_type)) {
+        if (i == HAL_ARRAY_SIZE(i2s_hosc_aud_type)) {
                 I2S_ERROR("Update audio pll failed....\n");
                 return -1;
         }
@@ -259,7 +264,7 @@ static HAL_Status I2S_SET_Mclk(uint32_t isEnable, uint32_t clkSource, uint32_t p
                 HAL_CLR_BIT(I2S->DA_CLKD, I2S_MCLK_OUT_EN_BIT);
         } else {
                 uint32_t mclkDiv;
-                CLK_DIVRegval *divRegval;
+                const CLK_DIVRegval *divRegval;
 
                 if (clkSource == 0) {
                         I2S_ERROR("invalid clkSource %u\n", clkSource);
@@ -316,44 +321,27 @@ static HAL_Status I2S_SET_ClkDiv(I2S_DataParam *param,  I2S_HWParam *hwParam)
         int32_t ret = HAL_OK;
         if (!param || !hwParam)
                 return HAL_INVALID;
-        uint32_t rate = 0;
-        I2S_SampleRate SR = param->sampleRate;
+        uint32_t rate = param->sampleRate;
+       // I2S_SampleRate SR = param->sampleRate;
         uint32_t Period = hwParam->lrckPeriod;
         uint16_t bclkDiv = 0;
         uint32_t audioPll = AUDIO_PLL_24;
 
-        switch (SR) {
-                case I2S_SR8K:/*  8000Hz  */
-                        rate = 8000;
-                        break;
-                case I2S_SR12K:/*  12000Hz */
-                        rate = 12000;
-                        break;
-                case I2S_SR16K:/*  16000Hz */
-                        rate = 16000;
-                        break;
-                case I2S_SR24K:/*  24000Hz */
-                        rate = 24000;
-                        break;
-                case I2S_SR32K:/*  32000Hz */
-                        rate = 32000;
-                        break;
-                case I2S_SR48K:/*  48000Hz */
-                        rate = 48000;
-                        break;
-                case I2S_SR11K:
-                        rate = 11025;
-                        break;
-                case I2S_SR22K:
-                        rate = 22050;
-                        break;
-                case I2S_SR44K:
-                        rate = 44100;
-                        break;
-                default:
-                        I2S_ERROR("Invalid sample rate(%x) failed...\n",rate);
-                        return HAL_INVALID;
-        }
+		switch (rate) {
+			case 48000:
+			case 44100:
+			case 8000:
+			case 12000:
+			case 16000:
+			case 24000:
+			case 32000:
+			case 11025:
+			case 22050:
+				break;
+			default:
+				I2S_ERROR("Invalid sample rate(%x) failed...\n",rate);
+                return HAL_INVALID;
+		}
 
         I2S_DEBUG("SAMPLE RATE:%d...\n",rate);
         if ((rate % 1000) != 0)
@@ -378,7 +366,7 @@ static HAL_Status I2S_SET_ClkDiv(I2S_DataParam *param,  I2S_HWParam *hwParam)
         else
                 bclkDiv = audioPll/(Period*rate);
 
-        CLK_DIVRegval *divRegval = DivRegval;
+        const CLK_DIVRegval *divRegval = DivRegval;
         do {
                 if (divRegval->clkDiv == bclkDiv) {
                         HAL_MODIFY_REG(I2S->DA_CLKD, I2S_BCLKDIV_MASK, divRegval->bregVal);
@@ -565,23 +553,23 @@ static void I2S_DMAHalfCallback(void *arg)
         I2S_Private *i2sPrivate = &gI2sPrivate;
         if (arg == &(i2sPrivate->txReady)) {
                 i2sPrivate->txHalfCallCount ++;
-                if (I2S_DMA_BUFFER_CHECK_Threshold(0) != 0)
-                        return;
-                i2sPrivate->txDmaPointer = i2sPrivate->txBuf + I2S_BUF_LENGTH/2;
-                if (i2sPrivate->isTxSemaphore) {
+				if (i2sPrivate->isTxSemaphore) {
                         i2sPrivate->isTxSemaphore = false;
                         HAL_SemaphoreRelease((HAL_Semaphore *)arg);
                 }
-
+                if (I2S_DMA_BUFFER_CHECK_Threshold(0) != 0)
+                        return;
+                i2sPrivate->txDmaPointer = i2sPrivate->txBuf + i2sPrivate->txBufSize/2;
         } else {
                 i2sPrivate->rxHalfCallCount ++;
+				if (i2sPrivate->isRxSemaphore) {
+				        i2sPrivate->isRxSemaphore = false;
+				        HAL_SemaphoreRelease((HAL_Semaphore *)arg);
+				}
+
                 if (I2S_DMA_BUFFER_CHECK_Threshold(1) != 0)
                         return;
-                i2sPrivate->rxDmaPointer = i2sPrivate->rxBuf + I2S_BUF_LENGTH/2;
-                if (i2sPrivate->isRxSemaphore) {
-                        i2sPrivate->isRxSemaphore = false;
-                        HAL_SemaphoreRelease((HAL_Semaphore *)arg);
-                }
+				i2sPrivate->rxDmaPointer = i2sPrivate->rxBuf + i2sPrivate->rxBufSize/2;
         }
 }
 
@@ -598,22 +586,22 @@ static void I2S_DMAEndCallback(void *arg)
         I2S_Private *i2sPrivate = &gI2sPrivate;
         if (arg == &(i2sPrivate->txReady)) {
                 i2sPrivate->txEndCallCount ++;
-                if (I2S_DMA_BUFFER_CHECK_Threshold(0) != 0)
-                        return;
-                i2sPrivate->txDmaPointer = i2sPrivate->txBuf;
-                if (i2sPrivate->isTxSemaphore) {
+				if (i2sPrivate->isTxSemaphore) {
                         i2sPrivate->isTxSemaphore = false;
                         HAL_SemaphoreRelease((HAL_Semaphore *)arg);
                 }
+                if (I2S_DMA_BUFFER_CHECK_Threshold(0) != 0)
+                        return;
+                i2sPrivate->txDmaPointer = i2sPrivate->txBuf;
         } else {
                 i2sPrivate->rxEndCallCount ++;
+				if (i2sPrivate->isRxSemaphore) {
+					i2sPrivate->isRxSemaphore = false;
+					HAL_SemaphoreRelease((HAL_Semaphore *)arg);
+				}
                 if (I2S_DMA_BUFFER_CHECK_Threshold(1) != 0)
                         return;
                 i2sPrivate->rxDmaPointer = i2sPrivate->rxBuf;
-                if (i2sPrivate->isRxSemaphore) {
-                        i2sPrivate->isRxSemaphore = false;
-                        HAL_SemaphoreRelease((HAL_Semaphore *)arg);
-                }
         }
 }
 
@@ -728,7 +716,8 @@ static void rx_enable(bool enable)
 {
         I2S_Private *i2sPrivate = &gI2sPrivate;
         /*clear rx tifo*/
-        HAL_SET_BIT(I2S->DA_FCTL, I2S_RXFIFO_RESET_BIT);
+		if (!LOOP_EN)
+        	HAL_SET_BIT(I2S->DA_FCTL, I2S_RXFIFO_RESET_BIT);
 
         if (enable) {
                 if (i2sPrivate->rxDMAChan != DMA_CHANNEL_INVALID)
@@ -766,14 +755,18 @@ void HAL_I2S_Trigger(bool enable,I2S_StreamDir dir)
                         /* start dma*/
                         if (i2sPrivate->txDMAChan != DMA_CHANNEL_INVALID) {
                                 I2S_DMAStart(i2sPrivate->txDMAChan, (uint32_t)i2sPrivate->txBuf,
-                                                (uint32_t)&(I2S->DA_TXFIFO), i2sPrivate->txLength);
+                                                (uint32_t)&(I2S->DA_TXFIFO), i2sPrivate->txBufSize);
                         }
                         i2sPrivate->txRunning = true;
+
+						if (LOOP_EN) {
+							HAL_SET_BIT(I2S->DA_FCTL, I2S_RXFIFO_RESET_BIT);
+						}
                 } else {
                         rx_enable(enable);
                         if (i2sPrivate->rxDMAChan != DMA_CHANNEL_INVALID)
                                 I2S_DMAStart(i2sPrivate->rxDMAChan, (uint32_t)&(I2S->DA_RXFIFO),
-                                                (uint32_t)i2sPrivate->rxBuf, i2sPrivate->rxLength);
+                                                (uint32_t)i2sPrivate->rxBuf, i2sPrivate->rxBufSize);
                         i2sPrivate->rxRunning = true;
                 }
         } else {
@@ -813,106 +806,90 @@ void HAL_I2S_Trigger(bool enable,I2S_StreamDir dir)
   */
 int32_t HAL_I2S_Write_DMA(uint8_t *buf, uint32_t size)
 {
-        I2S_Private *i2sPrivate = &gI2sPrivate;
-        if (!buf || size <= 0)
-                return HAL_INVALID;
-        uint8_t *pdata = buf;
-        uint8_t *lastWritePointer = NULL;
-        uint32_t toWrite = 0,writeSize = I2S_BUF_LENGTH/2;
-        uint8_t err_flag; /* temp solution to avoid outputing debug message when irq disabled */
+    if (!buf || size <= 0)
+            return HAL_INVALID;
 
-        if (size < writeSize) {
-                //  I2S_INFO("Tx : size is too small....\n");
-                return HAL_INVALID;
-        }
-        while (size > 0) {
-                if (size < writeSize)
-                        break;
-                if (i2sPrivate->txRunning == false) {
-                        if (!i2sPrivate->writePointer)
-                                i2sPrivate->writePointer = i2sPrivate->txBuf;
+    I2S_Private *i2sPrivate = &gI2sPrivate;
 
-                        lastWritePointer = i2sPrivate->writePointer;
+    uint8_t *pdata = buf;
+    uint8_t *lastWritePointer = NULL;
+    uint32_t toWrite = 0, writeSize = i2sPrivate->txBufSize / 2;
+    uint8_t err_flag; /* temp solution to avoid outputing debug message when irq disabled */
+#ifdef CONFIG_PM
+	if (i2sPrivate->suspend) {
+		I2S_ERROR("I2S has suspend, should stop write I2S!\n");
+		return 0;
+	}
+#endif
+	if (writeSize == 0) {
+		I2S_ERROR("TxBuf not exist\n");
+		return -1;
+	}
 
-                        I2S_MEMCPY(lastWritePointer, pdata, writeSize);
-                        pdata += writeSize;
-                        lastWritePointer += writeSize;
-                        toWrite += writeSize;
-                        size -= writeSize;
-                        if (lastWritePointer >= i2sPrivate->txBuf + I2S_BUF_LENGTH)
-                                lastWritePointer = i2sPrivate->txBuf;
-                        i2sPrivate->writePointer = lastWritePointer;
-                        if (i2sPrivate->writePointer == i2sPrivate->txBuf) {
-                                I2S_DEBUG("Tx: play start...\n");
-                                HAL_I2S_Trigger(true,PLAYBACK);/*play*/
-                                i2sPrivate->txRunning =true;
-                        }
-                } else {
-                        err_flag = 0;
-                        /*disable irq*/
-                        HAL_DisableIRQ();
+	if (size < writeSize) {
+		//I2S_ERROR("Write size too small\n");
+		return -1;
+	}
 
-                        lastWritePointer = i2sPrivate->writePointer;
-                        if (i2sPrivate->txHalfCallCount && i2sPrivate->txEndCallCount) {
-                                err_flag = 1;
-                                i2sPrivate->txHalfCallCount = 0;
-                                i2sPrivate->txEndCallCount = 0;
+	for ( ; size >= writeSize; pdata += writeSize, toWrite += writeSize, size -= writeSize)
+	{
+		if (i2sPrivate->txRunning == false) {
+			if (!i2sPrivate->writePointer)
+			        i2sPrivate->writePointer = i2sPrivate->txBuf;
+			lastWritePointer = i2sPrivate->writePointer;
 
-                                if (i2sPrivate->txDmaPointer == i2sPrivate->txBuf) {
-                                        lastWritePointer = i2sPrivate->txBuf + I2S_BUF_LENGTH/2;
-                                } else {
-                                        lastWritePointer = i2sPrivate->txBuf;
-                                }
-                        } else if (i2sPrivate->txHalfCallCount) {
-                                i2sPrivate->txHalfCallCount --;
-                        } else if (i2sPrivate->txEndCallCount) {
-                                i2sPrivate->txEndCallCount --;
-                        } else {
-                                /**enable irq**/
-                                i2sPrivate->isTxSemaphore = true;
-                                HAL_EnableIRQ();
-                                HAL_SemaphoreWait(&(i2sPrivate->txReady), HAL_WAIT_FOREVER);
-                                /**disable irq**/
-                                HAL_DisableIRQ();
-                                if (i2sPrivate->txHalfCallCount && i2sPrivate->txEndCallCount) {
-                                        err_flag = 1;
-                                        i2sPrivate->txHalfCallCount = 0;
-                                        i2sPrivate->txEndCallCount = 0;
+			I2S_MEMCPY(lastWritePointer, pdata, writeSize);
+			I2S_DEBUG("Tx: play start...\n");
+			HAL_I2S_Trigger(true,PLAYBACK);/*play*/
+			i2sPrivate->txRunning =true;
+		} else {
+			err_flag = 0;
+			HAL_DisableIRQ();
+			if (i2sPrivate->txHalfCallCount && i2sPrivate->txEndCallCount) {
+				err_flag = 1;
+				i2sPrivate->txHalfCallCount = 0;
+				i2sPrivate->txEndCallCount = 0;
+			} else if (i2sPrivate->txHalfCallCount) {
+				i2sPrivate->txHalfCallCount --;
+			} else if (i2sPrivate->txEndCallCount) {
+				i2sPrivate->txEndCallCount --;
+			} else {
+				i2sPrivate->isTxSemaphore = true;
+				HAL_EnableIRQ();
+				HAL_SemaphoreWait(&(i2sPrivate->txReady), HAL_WAIT_FOREVER);
+				HAL_DisableIRQ();
 
-                                        if (i2sPrivate->txDmaPointer == i2sPrivate->txBuf)
-                                                lastWritePointer = i2sPrivate->txBuf + I2S_BUF_LENGTH/2;
-                                        else
-                                                lastWritePointer = i2sPrivate->txBuf;
-                                } else {
-                                        if (i2sPrivate->txHalfCallCount) {
-                                                i2sPrivate->txHalfCallCount --;
-                                        }
+				if (i2sPrivate->txHalfCallCount && i2sPrivate->txEndCallCount) {
+					err_flag = 1;
+					i2sPrivate->txHalfCallCount = 0;
+					i2sPrivate->txEndCallCount = 0;
+				} else {
+					if (i2sPrivate->txHalfCallCount)
+						i2sPrivate->txHalfCallCount --;
+					if (i2sPrivate->txEndCallCount)
+						i2sPrivate->txEndCallCount --;
+				}
+			}
 
-                                        if (i2sPrivate->txEndCallCount) {
-                                                i2sPrivate->txEndCallCount --;
-                                        }
-                                }
-                        }
+			if (i2sPrivate->txDmaPointer == i2sPrivate->txBuf) {
+				lastWritePointer = i2sPrivate->txBuf + writeSize;
+				i2sPrivate->writePointer = i2sPrivate->txBuf;
+			} else {
+				lastWritePointer = i2sPrivate->txBuf;
+				i2sPrivate->writePointer =  i2sPrivate->txBuf + writeSize;
+			}
+			I2S_MEMCPY(lastWritePointer, pdata, writeSize);
+			HAL_EnableIRQ();
 
-                        I2S_MEMCPY(lastWritePointer, pdata, writeSize);
-                        pdata += writeSize;
-                        lastWritePointer += writeSize;
-                        toWrite += writeSize;
-                        size -= writeSize;
-                        if (lastWritePointer >= i2sPrivate->txBuf + I2S_BUF_LENGTH)
-                                lastWritePointer = i2sPrivate->txBuf;
-                        i2sPrivate->writePointer = lastWritePointer;
+			if (err_flag) {
+				I2S_ERROR("TxCount:(H:%u,F:%u)\n",i2sPrivate->txHalfCallCount,
+                                                  i2sPrivate->txEndCallCount);
+				I2S_ERROR("Tx : underrun....\n");
+			}
+		}
+	}
 
-                        /**enable irq**/
-                        HAL_EnableIRQ();
-                        if (err_flag) {
-                            I2S_ERROR("TxCount:(H:%u,F:%u)\n",i2sPrivate->txHalfCallCount,
-                                                              i2sPrivate->txEndCallCount);
-                            I2S_ERROR("Tx : underrun....\n");
-                        }
-                }
-        }
-        return toWrite;
+    return toWrite;
 }
 
 /**
@@ -931,87 +908,82 @@ int32_t HAL_I2S_Read_DMA(uint8_t *buf, uint32_t size)
                 return HAL_INVALID;
         uint8_t *pdata = buf;
         uint8_t *lastReadPointer = NULL;
-        uint32_t readSize = I2S_BUF_LENGTH/2;
+        uint32_t readSize = i2sPrivate->rxBufSize / 2;
         uint32_t toRead = 0;
         uint8_t err_flag; /* temp solution to avoid outputing debug message when irq disabled */
 
-        if ((size / readSize) < 1) {
-                I2S_ERROR("Rx buf size too small...\n");
-                return HAL_INVALID;
+#ifdef CONFIG_PM
+	if (i2sPrivate->suspend) {
+		I2S_ERROR("I2S has suspend, should stop read I2S!\n");
+		return 0;
+	}
+#endif
+		if (readSize == 0) {
+			I2S_ERROR("RxBuf not exist\n");
+			return -1;
+		}
+
+		if (size < readSize) {
+			I2S_ERROR("Read size too small\n");
+			return -1;
         }
 
-        while (size > 0) {
+		while (size >= readSize) {
+			if (i2sPrivate->rxRunning == false) {
+			    I2S_DEBUG("Rx: record start...\n");
+			    HAL_I2S_Trigger(true,RECORD);
+			} else {
+				err_flag = 0;
+				/*disable irq*/
+				HAL_DisableIRQ();
+				lastReadPointer = i2sPrivate->readPointer;
+				if (i2sPrivate->rxHalfCallCount && i2sPrivate->rxEndCallCount) {
+					err_flag = 1;
+					i2sPrivate->rxHalfCallCount = 0;
+					i2sPrivate->rxEndCallCount = 0;
+				} else if (i2sPrivate->rxHalfCallCount) {
+					i2sPrivate->rxHalfCallCount --;
+				} else if (i2sPrivate->rxEndCallCount) {
+					i2sPrivate->rxEndCallCount --;
+				} else {
+					/**enable irq**/
+					i2sPrivate->isRxSemaphore = true;
+					HAL_EnableIRQ();
+					HAL_SemaphoreWait(&(i2sPrivate->rxReady), HAL_WAIT_FOREVER);
+					/**disable irq**/
+					HAL_DisableIRQ();
+					if (i2sPrivate->rxHalfCallCount && i2sPrivate->rxEndCallCount) {
+						err_flag = 1;
+						i2sPrivate->rxHalfCallCount = 0;
+						i2sPrivate->rxEndCallCount = 0;
+					} else {
+						if (i2sPrivate->rxHalfCallCount)
+								i2sPrivate->rxHalfCallCount --;
+						if (i2sPrivate->rxEndCallCount)
+								i2sPrivate->rxEndCallCount --;
+					}
+				}
 
-                if (size/readSize < 1)
-                        break;
-                if (i2sPrivate->rxRunning == false) {
+				if (i2sPrivate->rxDmaPointer == i2sPrivate->rxBuf) {
+					lastReadPointer = i2sPrivate->rxBuf + readSize;
+				} else {
+					lastReadPointer = i2sPrivate->rxBuf;
+				}
+				I2S_MEMCPY(pdata, lastReadPointer, readSize);
+				pdata += readSize;
+				//i2sPrivate->readPointer = lastReadPointer;
+				/**enable irq**/
+				HAL_EnableIRQ();
+				size -= readSize;
+				toRead += readSize;
 
-                        if (!i2sPrivate->readPointer)
-                                i2sPrivate->readPointer = i2sPrivate->rxBuf;
-                        I2S_DEBUG("Rx: record start...\n");
-                        HAL_I2S_Trigger(true,RECORD);
-
-                } else {
-                        err_flag = 0;
-                        /*disable irq*/
-                        HAL_DisableIRQ();
-                        lastReadPointer = i2sPrivate->readPointer;
-                        if (i2sPrivate->rxHalfCallCount && i2sPrivate->rxEndCallCount) {
-                                err_flag = 1;
-                                i2sPrivate->rxHalfCallCount = 0;
-                                i2sPrivate->rxEndCallCount = 0;
-
-                                if (i2sPrivate->rxDmaPointer == i2sPrivate->rxBuf) {
-                                        lastReadPointer = i2sPrivate->rxBuf + I2S_BUF_LENGTH/2;
-                                } else {
-                                        lastReadPointer = i2sPrivate->rxBuf;
-                                }
-                        } else if (i2sPrivate->rxHalfCallCount) {
-                                i2sPrivate->rxHalfCallCount --;
-                        } else if (i2sPrivate->rxEndCallCount) {
-                                i2sPrivate->rxEndCallCount --;
-                        } else {
-                                /**enable irq**/
-                                i2sPrivate->isRxSemaphore = true;
-                                HAL_EnableIRQ();
-                                HAL_SemaphoreWait(&(i2sPrivate->rxReady), HAL_WAIT_FOREVER);
-                                /**disable irq**/
-                                HAL_DisableIRQ();
-                                if (i2sPrivate->rxHalfCallCount && i2sPrivate->rxEndCallCount) {
-                                        err_flag = 1;
-                                        i2sPrivate->rxHalfCallCount = 0;
-                                        i2sPrivate->rxEndCallCount = 0;
-
-                                        if (i2sPrivate->rxDmaPointer == i2sPrivate->rxBuf)
-                                                lastReadPointer = i2sPrivate->rxBuf + I2S_BUF_LENGTH/2;
-                                        else
-                                                lastReadPointer = i2sPrivate->rxBuf;
-                                } else {
-                                        if (i2sPrivate->rxHalfCallCount) {
-                                                i2sPrivate->rxHalfCallCount --;
-                                        }
-                                        if (i2sPrivate->rxEndCallCount) {
-                                                i2sPrivate->rxEndCallCount --;
-                                        }
-                                }
-                        }
-                        I2S_MEMCPY(pdata, lastReadPointer, readSize);
-                        pdata += readSize;
-                        lastReadPointer += readSize;
-                        if (lastReadPointer >= i2sPrivate->rxBuf + I2S_BUF_LENGTH)
-                                lastReadPointer = i2sPrivate->rxBuf;
-                        i2sPrivate->readPointer = lastReadPointer;
-                        /**enable irq**/
-                        HAL_EnableIRQ();
-                        if (err_flag) {
-                            I2S_ERROR("RxCount:(H:%u,F:%u)\n",i2sPrivate->rxHalfCallCount,
-                                                              i2sPrivate->rxEndCallCount);
-                            I2S_ERROR("Rx : overrun....\n");
-                        }
-                        size -= readSize;
-                        toRead += readSize;
-                }
-        }
+				if (err_flag) {
+					I2S_ERROR("Rx overrun, (H:%u,F:%u)\n",
+					          i2sPrivate->rxHalfCallCount,
+					          i2sPrivate->rxEndCallCount);
+				}
+			}
+		}
         return toRead;
 }
 
@@ -1045,19 +1017,18 @@ HAL_Status HAL_I2S_Open(I2S_DataParam *param)
 
                 I2S_MEMCPY(&(i2sPrivate->cdataParam), param, sizeof(*param));
         }
-        I2S_BUF_LENGTH = dataParam->bufSize;
 
         if (param->direction == PLAYBACK) {
                 i2sPrivate->txDMAChan = DMA_CHANNEL_INVALID;
-                i2sPrivate->txLength = I2S_BUF_LENGTH;
+                i2sPrivate->txBufSize = dataParam->bufSize;
                 i2sPrivate->txHalfCallCount = 0;
                 i2sPrivate->txEndCallCount = 0;
 #ifdef RESERVERD_MEMORY_FOR_I2S_TX
                 i2sPrivate->txBuf = I2STX_BUF;
 #else
-                i2sPrivate->txBuf = I2S_MALLOC(I2S_BUF_LENGTH);
+                i2sPrivate->txBuf = I2S_MALLOC(i2sPrivate->txBufSize);
                 if(i2sPrivate->txBuf)
-                        I2S_MEMSET(i2sPrivate->txBuf,0,I2S_BUF_LENGTH);
+                        I2S_MEMSET(i2sPrivate->txBuf, 0, i2sPrivate->txBufSize);
                 else {
                         I2S_ERROR("Malloc tx buf(for DMA),faild...\n");
                         return HAL_ERROR;
@@ -1076,15 +1047,15 @@ HAL_Status HAL_I2S_Open(I2S_DataParam *param)
                 HAL_SemaphoreInitBinary(&i2sPrivate->txReady);
         } else {
                 i2sPrivate->rxDMAChan = DMA_CHANNEL_INVALID;
-                i2sPrivate->rxLength = I2S_BUF_LENGTH;
+                i2sPrivate->rxBufSize = dataParam->bufSize;
                 i2sPrivate->rxHalfCallCount = 0;
                 i2sPrivate->rxEndCallCount = 0;
 #ifdef RESERVERD_MEMORY_FOR_I2S_RX
                 i2sPrivate->rxBuf = I2SRX_BUF;
 #else
-                i2sPrivate->rxBuf = I2S_MALLOC(I2S_BUF_LENGTH);
+                i2sPrivate->rxBuf = I2S_MALLOC(i2sPrivate->rxBufSize);
                 if(i2sPrivate->rxBuf)
-                        I2S_MEMSET(i2sPrivate->rxBuf,0,I2S_BUF_LENGTH);
+                        I2S_MEMSET(i2sPrivate->rxBuf, 0, i2sPrivate->rxBufSize);
                 else {
                         I2S_ERROR("Malloc rx buf(for DMA),faild...\n");
                         return HAL_ERROR;
@@ -1113,9 +1084,9 @@ HAL_Status HAL_I2S_Open(I2S_DataParam *param)
         I2S_SET_Channels(dataParam);
 
         if (param->direction == PLAYBACK) {
-                I2S_EnableTx();
+				I2S_EnableTx();
         } else {
-                I2S_EnableRx();
+				I2S_EnableRx();
         }
         HAL_MutexUnlock(&i2sPrivate->devSetLock);
 
@@ -1148,7 +1119,7 @@ HAL_Status HAL_I2S_Close(uint32_t dir)
 #endif
                 HAL_SemaphoreDeinit(&i2sPrivate->txReady);
                 i2sPrivate->txBuf = NULL;
-                i2sPrivate->txLength = 0;
+                i2sPrivate->txBufSize = 0;
                 i2sPrivate->writePointer = NULL;
                 i2sPrivate->txHalfCallCount = 0;
                 i2sPrivate->txEndCallCount = 0;
@@ -1169,7 +1140,7 @@ HAL_Status HAL_I2S_Close(uint32_t dir)
 #endif
                 HAL_SemaphoreDeinit(&i2sPrivate->rxReady);
                 i2sPrivate->rxBuf = NULL;
-                i2sPrivate->rxLength = 0;
+                i2sPrivate->rxBufSize = 0;
                 i2sPrivate->readPointer = NULL;
 
                 i2sPrivate->rxHalfCallCount = 0;
@@ -1254,14 +1225,16 @@ static inline HAL_Status I2S_HwDeInit(I2S_HWParam *param)
 }
 
 #ifdef CONFIG_PM
+__nonxip_text
 static int i2s_suspend(struct soc_device *dev, enum suspend_state_t state)
 {
         I2S_Private *i2sPrivate = &gI2sPrivate;
+
+        i2sPrivate->suspend = 1;
         switch (state) {
                 case PM_MODE_SLEEP:
                 case PM_MODE_STANDBY:
                 case PM_MODE_HIBERNATION:
-                case PM_MODE_POWEROFF:
                         HAL_MutexLock(&i2sPrivate->devSetLock, OS_WAIT_FOREVER);
                         I2S_HwDeInit(i2sPrivate->hwParam);
                         HAL_MutexUnlock(&i2sPrivate->devSetLock);
@@ -1278,6 +1251,7 @@ static int i2s_suspend(struct soc_device *dev, enum suspend_state_t state)
         return 0;
 }
 
+__nonxip_text
 static int i2s_resume(struct soc_device *dev, enum suspend_state_t state)
 {
         I2S_Private *i2sPrivate = &gI2sPrivate;
@@ -1306,23 +1280,15 @@ static int i2s_resume(struct soc_device *dev, enum suspend_state_t state)
                 default:
                         break;
         }
+        i2sPrivate->suspend = 0;
         return 0;
 }
 
-static struct soc_device_driver i2s_drv = {
+static const struct soc_device_driver i2s_drv = {
         .name = "I2S",
         .suspend = i2s_suspend,
         .resume = i2s_resume,
 };
-
-static struct soc_device i2s_dev = {
-        .name = "I2S",
-        .driver = &i2s_drv,
-};
-
-#define I2S_DEV (&i2s_dev)
-#else
-#define I2S_DEV NULL
 #endif
 
 /**
@@ -1345,12 +1311,12 @@ HAL_Status HAL_I2S_Init(I2S_Param *param)
         I2S_MEMSET(i2sPrivate, 0, sizeof(*i2sPrivate));
         i2sPrivate->isHwInit = true;
 
-        if (param->hwParam == NULL)
+        if (param->hwParam == NULL) {
                 i2sPrivate->hwParam = &gHwParam;
-        else
+        } else {
                 i2sPrivate->hwParam = param->hwParam;
-
-		i2sPrivate->hwParam->codecClkDiv = param->mclkDiv;
+	}
+	i2sPrivate->hwParam->codecClkDiv = param->mclkDiv;
 
         HAL_MutexInit(&i2sPrivate->devSetLock);
 
@@ -1371,7 +1337,10 @@ HAL_Status HAL_I2S_Init(I2S_Param *param)
         ret = I2S_HwInit(i2sPrivate->hwParam);
 
 #ifdef CONFIG_PM
-        pm_register_ops(I2S_DEV);
+	i2sPrivate->suspend = 0;
+	i2sPrivate->dev.name = "I2S";
+	i2sPrivate->dev.driver = &i2s_drv;
+	pm_register_ops(&i2sPrivate->dev);
 #endif
         HAL_MutexUnlock(&i2sPrivate->devSetLock);
         return ret;
@@ -1394,6 +1363,10 @@ void HAL_I2S_REG_DEBUG()
 void HAL_I2S_DeInit()
 {
         I2S_Private *i2sPrivate = &gI2sPrivate;
+
+#ifdef CONFIG_PM
+	pm_unregister_ops(&i2sPrivate->dev);
+#endif
         HAL_MutexLock(&i2sPrivate->devSetLock, OS_WAIT_FOREVER);
         i2sPrivate->isHwInit = false;
         I2S_HwDeInit(i2sPrivate->hwParam);
@@ -1409,3 +1382,22 @@ void HAL_I2S_DeInit()
 
         I2S_MEMSET(i2sPrivate, 0, sizeof(I2S_Private));
 }
+
+void I2S_Loop_En(uint8_t en)
+{
+#if LOOP_EN
+   	if (en)
+		HAL_SET_BIT(I2S->DA_CTL, I2S_LOOP_TSET_EN_EN_BIT);
+	else
+		HAL_CLR_BIT(I2S->DA_CTL, I2S_LOOP_TSET_EN_EN_BIT);
+#endif
+}
+void I2S_RXFIFO_Flush(void)
+{
+#if LOOP_EN
+	HAL_SET_BIT(I2S->DA_FCTL, I2S_RXFIFO_RESET_BIT);
+#endif
+}
+
+
+#endif /* __CONFIG_BOOTLOADER */

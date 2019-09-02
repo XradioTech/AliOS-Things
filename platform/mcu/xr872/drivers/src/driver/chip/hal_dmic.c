@@ -32,13 +32,14 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __CONFIG_BOOTLOADER
+
 #include "driver/chip/hal_dma.h"
 #include "driver/chip/hal_dmic.h"
-#include "sys/xr_debug.h"
 #include "hal_base.h"
-#include "sys/io.h"
 #include "pm/pm.h"
 
+#if (__CONFIG_CHIP_ARCH_VER == 1)
 #define DMIC_DBG_ON                0
 
 #if (DMIC_DBG_ON == 1)
@@ -49,11 +50,11 @@
 #define DMIC_ERROR(fmt, arg...)    HAL_LOG(1, "[DMIC] "fmt, ##arg)
 
 /* debug in interrupt handler */
-#ifdef __CONFIG_XIP_SECTION_FUNC_LEVEL
+#ifdef __CONFIG_SECTION_ATTRIBUTE_NONXIP
 #define DMIC_IT_ERROR(fmt, arg...) HAL_IT_LOG(1, "[DMIC] "fmt, ##arg)
 #else
 #define DMIC_IT_ERROR              DMIC_ERROR
-#endif /* __CONFIG_XIP_SECTION_FUNC_LEVEL */
+#endif /* __CONFIG_SECTION_ATTRIBUTE_NONXIP */
 
 typedef struct {
         bool               isHwInit;
@@ -61,7 +62,7 @@ typedef struct {
         bool               isSemaphore;
         volatile bool      isRunning;
         DMA_Channel        DMAChan;
-        DMIC_HWParam       *hwParam;
+        const DMIC_HWParam *hwParam;
         DMIC_DataParam     dataParam;
         uint8_t            *usrBuf;
         uint32_t           length;
@@ -86,10 +87,10 @@ typedef struct {
         uint32_t pllPatParam;
 } HOSC_DMIC_Type;
 
-#define DMIC_MEMCPY                           memcpy
-#define DMIC_MALLOC                           malloc
-#define DMIC_FREE                             free
-#define DMIC_MEMSET                           memset
+#define DMIC_MEMCPY                           HAL_Memcpy
+#define DMIC_MALLOC                           HAL_Malloc
+#define DMIC_FREE                             HAL_Free
+#define DMIC_MEMSET                           HAL_Memset
 
 #define DMIC_OVERRUN_THRESHOLD              3
 
@@ -100,7 +101,7 @@ DMIC_Private gDMICPrivate;
 static uint32_t DMIC_BUF_LENGTH = 0;
 
 /* default hardware configuration */
-static DMIC_HWParam gHwParam = {
+static const DMIC_HWParam gHwParam = {
         DMIC_CTLR_DMICFDT_5MS,
         DMIC_FIFOCR_MODE1,
         0x40,
@@ -126,17 +127,17 @@ static uint32_t DMIC_PLLAUDIO_Update(DMIC_PLLMode pll)
         if (pll != DMIC_PLL_24M &&  pll != DMIC_PLL_22M)
                 return -1;
 
-        uint32_t hoscClock = HAL_PRCM_GetHFClock();
+        uint32_t hoscClock = HAL_GetHFClock();
 
         int i = 0;
-        for (i = 0; i < ARRAY_SIZE(dmic_hosc_aud_type); i++) {
+        for (i = 0; i < HAL_ARRAY_SIZE(dmic_hosc_aud_type); i++) {
                 if ((dmic_hosc_aud_type[i].hosc == hoscClock) && (dmic_hosc_aud_type[i].audio == pll)) {
                         dmicPrivate->audioPllParam = dmic_hosc_aud_type[i].pllParam;
                         dmicPrivate->audioPllPatParam = dmic_hosc_aud_type[i].pllPatParam;
                         break;
                 }
         }
-        if (i == ARRAY_SIZE(dmic_hosc_aud_type)) {
+        if (i == HAL_ARRAY_SIZE(dmic_hosc_aud_type)) {
                 DMIC_ERROR("Update audio pll failed....\n");
                 return -1;
         }
@@ -366,7 +367,7 @@ int32_t HAL_DMIC_Read_DMA(uint8_t *buf, uint32_t size)
   *         some hardware configuration information
   * @retval HAL status
   */
-static inline HAL_Status DMIC_HwInit(DMIC_HWParam *param)
+static inline HAL_Status DMIC_HwInit(const DMIC_HWParam *param)
 {
         if (!param)
                 return HAL_INVALID;
@@ -394,7 +395,7 @@ static inline HAL_Status DMIC_HwInit(DMIC_HWParam *param)
   *         some hardware configuration information.
   * @retval HAL status
   */
-static inline HAL_Status DMIC_HwDeInit(DMIC_HWParam *param)
+static inline HAL_Status DMIC_HwDeInit(const DMIC_HWParam *param)
 {
         if (!param)
                 return HAL_INVALID;
@@ -585,7 +586,6 @@ static int dmic_suspend(struct soc_device *dev, enum suspend_state_t state)
         case PM_MODE_SLEEP:
         case PM_MODE_STANDBY:
         case PM_MODE_HIBERNATION:
-        case PM_MODE_POWEROFF:
                 DMIC_HwDeInit(dmicPrivate->hwParam);
                 DMIC_PINS_DeInit();
                 HAL_CCM_DMIC_DisableMClock();
@@ -628,7 +628,7 @@ static int dmic_resume(struct soc_device *dev, enum suspend_state_t state)
         return 0;
 }
 
-static struct soc_device_driver dmic_drv = {
+static const struct soc_device_driver dmic_drv = {
         .name    = "DMIC",
         .suspend = dmic_suspend,
         .resume  = dmic_resume,
@@ -640,8 +640,6 @@ static struct soc_device dmic_dev = {
 };
 
 #define DMIC_DEV (&dmic_dev)
-#else
-#define DMIC_DEV NULL
 #endif
 
 /**
@@ -710,3 +708,5 @@ void HAL_DMIC_DeInit()
 
         DMIC_MEMSET(dmicPrivate, 0, sizeof(DMIC_Private));
 }
+#endif /* (__CONFIG_CHIP_ARCH_VER == 1) */
+#endif /* __CONFIG_BOOTLOADER */

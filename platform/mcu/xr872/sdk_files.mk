@@ -6,24 +6,34 @@ XR872_CHIP_FILES := \
                    $(XR872_CHIP_PATH)/flashchip/flash_chip_cfg.c  \
                    $(XR872_CHIP_PATH)/hal_icache.c \
                    $(XR872_CHIP_PATH)/hal_dcache.c  \
+                   $(XR872_CHIP_PATH)/hal_adc.c                  \
                    $(XR872_CHIP_PATH)/hal_board.c                \
                    $(XR872_CHIP_PATH)/hal_ccm.c                  \
+                   $(XR872_CHIP_PATH)/hal_crypto.c               \
                    $(XR872_CHIP_PATH)/hal_dma.c                  \
+                   $(XR872_CHIP_PATH)/hal_dmic.c                 \
                    $(XR872_CHIP_PATH)/hal_efuse.c                \
                    $(XR872_CHIP_PATH)/hal_flash.c                \
                    $(XR872_CHIP_PATH)/hal_flashctrl.c            \
                    $(XR872_CHIP_PATH)/hal_global.c               \
                    $(XR872_CHIP_PATH)/hal_gpio.c                 \
+                   $(XR872_CHIP_PATH)/hal_i2c.c                  \
+                   $(XR872_CHIP_PATH)/hal_i2s.c                  \
+                   $(XR872_CHIP_PATH)/hal_irrx.c                 \
+                   $(XR872_CHIP_PATH)/hal_irtx.c                 \
                    $(XR872_CHIP_PATH)/hal_nvic.c                 \
                    $(XR872_CHIP_PATH)/hal_prcm.c                 \
                    $(XR872_CHIP_PATH)/hal_pwm.c                  \
                    $(XR872_CHIP_PATH)/hal_rtc.c                  \
                    $(XR872_CHIP_PATH)/hal_spi.c                  \
+                   $(XR872_CHIP_PATH)/hal_spinlock.c             \
+                   $(XR872_CHIP_PATH)/hal_timer.c                \
                    $(XR872_CHIP_PATH)/hal_uart.c                 \
                    $(XR872_CHIP_PATH)/hal_util.c                 \
                    $(XR872_CHIP_PATH)/hal_wakeup.c               \
                    $(XR872_CHIP_PATH)/hal_wdg.c                  \
                    $(XR872_CHIP_PATH)/hal_xip.c                  \
+                   $(XR872_CHIP_PATH)/hal_swd.c                  \
                    $(XR872_CHIP_PATH)/sdmmc/core.c               \
                    $(XR872_CHIP_PATH)/sdmmc/hal_sdhost.c         \
                    $(XR872_CHIP_PATH)/sdmmc/sd.c                 \
