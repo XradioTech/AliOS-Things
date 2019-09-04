@@ -105,7 +105,7 @@ efpg_stop:
 	if (efpg)
 		efpg_free(efpg);
 
-	OS_ThreadDelete(NULL);
+	//OS_ThreadDelete(NULL);
 }
 
 /**

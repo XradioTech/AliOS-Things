@@ -66,8 +66,8 @@ void hal_init(void)
 void hal_init_post(void)
 {
     // init wifi
-	//hal_wifi_register_module(&sim_aos_wifi_xr871);
-	//hal_wifi_init();
+	hal_wifi_register_module(&sim_aos_wifi_xr871);
+	hal_wifi_init();
 
 // 	hal_ota_register_module(&xr871_ota_module);
 }
@@ -84,6 +84,6 @@ void hal_boot(hal_partition_t partition)
 
 void hal_reboot(void)
 {
-	//HAL_WDG_Reboot();
+	HAL_WDG_Reboot();
 }
 

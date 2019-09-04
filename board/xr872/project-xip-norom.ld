@@ -83,6 +83,7 @@ SECTIONS
         *yloop.a: (.text .text.* .rodata .rodata.*)
         *kv.a: (.text .text.* .rodata .rodata.*)
         *udhcp.a: (.text .text.* .rodata .rodata.*)
+				/**rhino.a: (.text .text.* .rodata .rodata.*)  can not set*/
 
 		/* security */
         *alicrypto.a: (.text .text.* .rodata .rodata.*)
@@ -111,6 +112,8 @@ SECTIONS
 				*wlan.a: (.text .text.* .rodata .rodata.*)
 				*net80211.a: (.text .text.* .rodata .rodata.*)
 				*wpa.a: (.text .text.* .rodata .rodata.*)
+				*libsc_assistant.a: (.text .text.* .rodata .rodata.*)
+				*wireless.a: (.text .text.* .rodata .rodata.*)
 
         /* All xip end */
         __xip_end__ = .;

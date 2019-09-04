@@ -441,7 +441,7 @@ int net_switch_mode(enum wlan_mode mode)
 	case WLAN_MODE_HOSTAP:
 	case WLAN_MODE_STA:
 	case WLAN_MODE_MONITOR:
-		net_close(nif);
+		net_close_i(nif);
 		nif = net_open(mode, net_ctrl_msg_send);
 		g_wlan_netif = nif;
 		if (nif) {

@@ -89,7 +89,7 @@ int net_sys_stop(void)
 		//dhcp_server_stop();
 	}
 
-	net_close(g_wlan_netif);
+	net_close_i(g_wlan_netif);
 	g_wlan_netif = NULL;
 
 	while (HAL_PRCM_IsSys3Alive()) {

@@ -41,10 +41,15 @@
 #include "common/framework/sys_ctrl/sys_ctrl.h"
 #include "smartlink/sc_assistant.h"
 
+#define WIFI_PORT_DEBUG 0
+#if WIFI_PORT_DEBUG
 #define WIFI_DEBUG(...) do { \
                             printf("[wifi_port]: "); \
                             printf(__VA_ARGS__); \
                         } while (0)
+#else
+#define WIFI_DEBUG(...)
+#endif
 
 #define MAX_SCAN_RESULTS	10
 
@@ -191,7 +196,7 @@ static void recv_rawframe(uint8_t *data, uint32_t len, void *info)
     g_monitor_cb(data, len, info);
 }
 
-void xr871_wlan_stop_sc_assistant(void) 
+void xr871_wlan_stop_sc_assistant(void)
 {
 	struct netif *nif = g_wlan_netif;
 
@@ -443,7 +448,7 @@ void xr871_wlan_start_monitor(void)
 	config.time_sw_ch_short = 0;
 
 	WIFI_DEBUG("wlan start monitor mode, nif %p, cb %p\n", nif, g_monitor_cb);
-	
+
 	if(nif) {
 		sc_assistant_get_fun(&sca_fun);
 		sc_assistant_init(nif, &sca_fun, &config);
@@ -465,7 +470,7 @@ void xr871_wlan_start_monitor(void)
 
 void xr871_wlan_stop_monitor(void)
 {
-	/*nothing need to do ,beacause after stop, xr871_wlan_register_monitor_cb deliver 
+	/*nothing need to do ,beacause after stop, xr871_wlan_register_monitor_cb deliver
 	  the null callback, than user cannt recv raw pkt. do nothing for  the reason:
 	  the function stop sc_assisant, close net thread and the  the start connect thread confict, then system hold.
 	*/
@@ -489,7 +494,7 @@ void xr871_wlan_stop_monitor(void)
 		if (sc_assistant_monitor_unregister_sw_ch_cb(nif, wlan_sw_ch_cb)) {
 			WIFI_DEBUG("%s,%d cancel sw ch cb fail\n", __func__, __LINE__);
 		}
-		
+
 		//sc_assistant_deinit(nif);
 	}
 #endif
@@ -550,7 +555,7 @@ int xr871_wlan_send_80211_raw_frame(uint8_t *buf, int len)
     }
 #endif
 	ret = wlan_send_raw_frame(nif, IEEE80211_FC_STYPE_PROBE_REQ, buf, len);
-	
+
 	WIFI_DEBUG("send raw frame,len %d\n", len);
 	if (ret != 0) {
 		WIFI_DEBUG("send raw frame fail\n");

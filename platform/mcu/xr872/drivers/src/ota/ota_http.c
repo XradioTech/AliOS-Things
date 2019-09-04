@@ -32,7 +32,7 @@
 #include "ota_i.h"
 #include "ota_debug.h"
 #include "ota_http.h"
-//#include "net/HTTPClient/HTTPCUsr_api.h"
+#include "net/HTTPClient/HTTPCUsr_api.h"
 
 #if OTA_OPT_PROTOCOL_HTTP
 

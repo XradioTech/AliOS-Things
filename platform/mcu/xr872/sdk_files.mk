@@ -39,7 +39,7 @@ XR872_CHIP_FILES := \
                    $(XR872_CHIP_PATH)/sdmmc/sd.c                 \
                    $(XR872_CHIP_PATH)/sdmmc/mmc.c               \
                    $(XR872_CHIP_PATH)/sdmmc/quirks.c         \
-		   						 $(XR872_CHIP_PATH)/sdmmc/sdio.c         \
+                   $(XR872_CHIP_PATH)/sdmmc/sdio.c         \
                    $(XR872_CHIP_PATH)/system_chip.c
 
 # drivers/src/image
@@ -54,10 +54,9 @@ XR872_ETHERNETIF_PATH  := drivers/src/net/ethernetif
 XR872_ETHERNETIF_FILES := $(XR872_ETHERNETIF_PATH)/ethernetif.c
 
 # drivers/src/ota
-XR872_OTA_PATH  := drivers/src/ota
-XR872_OTA_FILES := $(XR872_OTA_PATH)/ota.c \
-                   $(XR872_OTA_PATH)/ota_file.c \
-                   $(XR872_OTA_PATH)/ota_http.c
+XR871_OTA_PATH  := drivers/src/ota
+XR871_OTA_FILES := $(XR872_OTA_PATH)/ota.c \
+                   $(XR872_OTA_PATH)/ota_file.c
 
 # drivers/src/pm 
 XR872_PM_PATH  := drivers/src/pm
@@ -73,7 +72,7 @@ XR872_EFPG_FILES := $(XR872_EFPG_PATH)/efpg_efuse.c \
 # drivers/src/sys
 XR872_SYS_PATH  := drivers/src/sys
 XR872_SYS_FILES :=  $(XR872_SYS_PATH)/mbuf/mbuf_0.c \
-										$(XR872_SYS_PATH)/mbuf/mbuf_0_mem.c
+		$(XR872_SYS_PATH)/mbuf/mbuf_0_mem.c
 
 # drivers/src/net/lwip
 XR872_LWIP_PATH  := drivers/src/net/lwip

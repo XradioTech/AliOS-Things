@@ -22,6 +22,8 @@ GLOBAL_INCLUDES += drivers/include \
 $(NAME)_SOURCES += hal/soc/flash.c \
                    hal/soc/sd.c \
                    hal/soc/uart.c \
+                   hal/wifi_port.c \
+                   hal/wifi.c \
                    hal/hal.c \
                    cli_ext/cli_ext.c \
 
@@ -35,12 +37,13 @@ $(NAME)_SOURCES += $(XR872_CHIP_FILES) \
                    $(XR872_IMAGE_FILES) \
                    $(XR872_ETHERNETIF_FILES) \
                    $(XR872_EFPG_FILES) \
-                   $(XR872_SYS_FILES)
+                   $(XR872_SYS_FILES) \
+                   $(XR872_OTA_FILES)
 
 $(NAME)_PREBUILT_LIBRARY := \
                             drivers/lib/libamr.a \
-                            drivers/lib/libsc_assistant.a \
-			    									drivers/lib/libxz/libxz.a \
+                            drivers/lib/sc_assistant.a \
+                            drivers/lib/libxz/libxz.a \
                             drivers/lib/wpa.a \
                             drivers/lib/wlan.a \
                             drivers/lib/wireless.a \

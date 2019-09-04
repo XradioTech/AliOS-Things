@@ -79,11 +79,15 @@ static __inline OS_Status OS_ThreadCreate(OS_Thread_t *thread, const char *name,
 
 static __inline OS_Status OS_ThreadDelete(OS_Thread_t *thread)
 {
+	if(thread)
+		thread->handle = OS_INVALID_HANDLE;  //add for wpa bug
+#if 0
 	if (RHINO_SUCCESS == krhino_task_dyn_del(thread->handle)) {
 		return OS_OK;
 	} else {
 		return OS_FAIL;
 	}
+#endif
 }
 
 static __inline int OS_ThreadIsValid(OS_Thread_t *thread)
