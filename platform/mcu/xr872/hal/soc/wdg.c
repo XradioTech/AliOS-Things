@@ -45,13 +45,13 @@ int32_t hal_wdg_init(wdg_dev_t *wdg)
 	tbl_size = sizeof(timeout_tbl)/sizeof(timeout_tbl[0]);
         int pos = wdg->config.timeout > 500 ? (wdg->config.timeout/1000) : 0;
 	if (pos < tbl_size) {
-		param.timeout = timeout_tbl[pos];
+		param.hw.timeout = timeout_tbl[pos];
 	}
 	else {
-		param.timeout = timeout_tbl[tbl_size-1];
+		param.hw.timeout = timeout_tbl[tbl_size-1];
 	}
-	printf("*********hal_wdg_init timeout:%d",param.timeout);
-	param.event = WDG_EVT_RESET;
+	printf("*********hal_wdg_init timeout:%d",param.hw.timeout);
+	param.hw.event = WDG_EVT_RESET;
 
 	HAL_WDG_Init(&param);
 	HAL_WDG_Start();

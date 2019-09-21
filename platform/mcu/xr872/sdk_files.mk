@@ -54,8 +54,8 @@ XR872_ETHERNETIF_PATH  := drivers/src/net/ethernetif
 XR872_ETHERNETIF_FILES := $(XR872_ETHERNETIF_PATH)/ethernetif.c
 
 # drivers/src/ota
-XR871_OTA_PATH  := drivers/src/ota
-XR871_OTA_FILES := $(XR872_OTA_PATH)/ota.c \
+XR872_OTA_PATH  := drivers/src/ota
+XR872_OTA_FILES := $(XR872_OTA_PATH)/ota.c \
                    $(XR872_OTA_PATH)/ota_file.c
 
 # drivers/src/pm 

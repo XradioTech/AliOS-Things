@@ -313,6 +313,7 @@ int ota_upgrade_cb(void* pctx, char *json)
     return 0;
 }
 
+extern ota_hal_module_t xr871_ota_module;
 int ota_service_init(ota_service_t *ctx)
 {
     int ret = 0;
@@ -324,7 +325,8 @@ int ota_service_init(ota_service_t *ctx)
         ret = OTA_INIT_FAIL;
         return ret;
     }
-    ota_hal_register_module(&ota_hal_module);
+   // ota_hal_register_module(&ota_hal_module);
+    ota_hal_register_module(&xr871_ota_module);
     ctx->upgrade_cb = ota_upgrade_cb;
     ctx->boot_param = ota_malloc(sizeof(ota_boot_param_t));
     if(!ctx->boot_param) {

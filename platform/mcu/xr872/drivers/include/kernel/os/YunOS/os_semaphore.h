@@ -95,19 +95,8 @@ static __inline OS_Status OS_SemaphoreWait(OS_Semaphore_t *sem, OS_Time_t waitMS
 	return ret;
 }
 
-static __inline OS_Status OS_SemaphoreRelease(OS_Semaphore_t *sem)
-{
-	if (sem->max_count == 1 && sem->count == 1) {
-		return OS_FAIL;
-	}
-	if (RHINO_SUCCESS == krhino_sem_give(&sem->sem)) {
-		if (sem->count < sem->max_count)
-			sem->count++;
-		return OS_OK;
-	} else {
-		return OS_FAIL;
-	}
-}
+OS_Status OS_SemaphoreRelease(OS_Semaphore_t *sem);
+
 
 static __inline int OS_SemaphoreIsValid(OS_Semaphore_t *sem)
 {

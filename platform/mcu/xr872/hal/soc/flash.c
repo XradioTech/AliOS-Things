@@ -118,14 +118,14 @@ int32_t hal_flash_erase(hal_partition_t in_partition, uint32_t off_set, uint32_t
 
     for(addr = start_addr; addr <= end_addr; addr += SECTOR_SIZE)
     {
-       // hal_wdg_reload(&wdg);
+        hal_wdg_reload(&wdg);
         GLOBAL_INT_DISABLE();
         //flash_ctrl(CMD_FLASH_ERASE_SECTOR, &addr);
         //printf("flash_ctrl: addr=0x%08x\n", addr);
-        //flash_erase(XR871_FLASH, addr, SECTOR_SIZE);
+        flash_erase(XR871_FLASH, addr, SECTOR_SIZE);
         GLOBAL_INT_RESTORE();
     }
-    //hal_wdg_reload(&wdg);
+    hal_wdg_reload(&wdg);
 
     return 0;
 }
@@ -144,13 +144,14 @@ int32_t hal_flash_write(hal_partition_t in_partition, uint32_t *off_set, const v
 
     start_addr = partition_info->partition_start_addr + *off_set;
 
-    //hal_wdg_reload(&wdg);
+    hal_wdg_reload(&wdg);
+   // printf("start_addr 0x%08x\n",start_addr);
     GLOBAL_INT_DISABLE();
-    //flash_rw(XR871_FLASH, start_addr, in_buf, in_buf_len, FLASH_WRITE);
+    flash_rw(XR871_FLASH, start_addr, in_buf, in_buf_len, FLASH_WRITE);
 	//printf("flash_write: addr=0x%08x,len=%d\n", start_addr, in_buf_len);
    // HAL_Flash_Write(XR871_FLASH, start_addr, in_buf, in_buf_len);
     GLOBAL_INT_RESTORE();
-    //hal_wdg_reload(&wdg);
+    hal_wdg_reload(&wdg);
 
     *off_set += in_buf_len;
 
@@ -171,14 +172,14 @@ int32_t hal_flash_read(hal_partition_t in_partition, uint32_t *off_set, void *ou
 
     start_addr = partition_info->partition_start_addr + *off_set;
 
-   // hal_wdg_reload(&wdg);
+    hal_wdg_reload(&wdg);
     GLOBAL_INT_DISABLE();
     //flash_read(out_buf, out_buf_len, start_addr);
-	//flash_rw(XR871_FLASH, start_addr, out_buf, out_buf_len, FLASH_READ);
+	flash_rw(XR871_FLASH, start_addr, out_buf, out_buf_len, FLASH_READ);
     //printf("flash_read: addr=0x%08x,len=%d\n", start_addr, out_buf_len);
    // HAL_Flash_Read(XR871_FLASH, start_addr, out_buf, out_buf_len);
     GLOBAL_INT_RESTORE();
-    //hal_wdg_reload(&wdg);
+    hal_wdg_reload(&wdg);
 
     *off_set += out_buf_len;
 

@@ -22,10 +22,13 @@ GLOBAL_INCLUDES += drivers/include \
 $(NAME)_SOURCES += hal/soc/flash.c \
                    hal/soc/sd.c \
                    hal/soc/uart.c \
+                   hal/soc/wdg.c \
                    hal/wifi_port.c \
                    hal/wifi.c \
                    hal/hal.c \
+                   hal/fota_port.c \
                    cli_ext/cli_ext.c \
+                   hal/os_semaphore.c
 
 include $(SOURCE_ROOT)/platform/mcu/xr872/sdk_files.mk
 

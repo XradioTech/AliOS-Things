@@ -201,10 +201,12 @@ void soc_driver_init(void)
     printf("soc_driver_init done\n");
 }
 
+//extern uint32_t dumpsys_mm_info_func(uint32_t len);
 void soc_system_init(void)
 {
     printf("%s %d\n", __func__, __LINE__);
     platform_init();
+	//dumpsys_mm_info_func(0);
 }
 
 void soc_systick_init(void)

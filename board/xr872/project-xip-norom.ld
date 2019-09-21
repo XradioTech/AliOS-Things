@@ -74,6 +74,8 @@ SECTIONS
         *libiot_mqtt.a: (.text .text.* .rodata .rodata.*)
         *linkkitapp.a: (.text .text.* .rodata .rodata.*)
 				*uOTA.a: (.text .text.* .rodata .rodata.*)
+				*libiot_coap_local.a: (.text .text.* .rodata .rodata.*)
+				*libiot_coap_coappack.a: (.text .text.* .rodata .rodata.*)
 
 		/* kernel */
         *net.a: (.text .text.* .rodata .rodata.*)
@@ -83,6 +85,7 @@ SECTIONS
         *yloop.a: (.text .text.* .rodata .rodata.*)
         *kv.a: (.text .text.* .rodata .rodata.*)
         *udhcp.a: (.text .text.* .rodata .rodata.*)
+        /**libc_nano.a: (.text .text.* .rodata .rodata.*)*/
 				/**rhino.a: (.text .text.* .rodata .rodata.*)  can not set*/
 
 		/* security */
@@ -91,7 +94,6 @@ SECTIONS
         *libmbedtls.a: (.text .text.* .rodata .rodata.*)
         *tlsrc.a: (.text .text.* .rodata .rodata.*)
         *mbedtls.a: (.text .text.* .rodata .rodata.*)
-
 
 		/* utils */
         *base64.a: (.text .text.* .rodata .rodata.*)
@@ -112,8 +114,21 @@ SECTIONS
 				*wlan.a: (.text .text.* .rodata .rodata.*)
 				*net80211.a: (.text .text.* .rodata .rodata.*)
 				*wpa.a: (.text .text.* .rodata .rodata.*)
-				*libsc_assistant.a: (.text .text.* .rodata .rodata.*)
+				*sc_assistant.a: (.text .text.* .rodata .rodata.*)
 				*wireless.a: (.text .text.* .rodata .rodata.*)
+
+				*mcu_xr872.a:container.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:event_queue.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:observer.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:publisher.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:sys_ctrl.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:looper.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:net_ctrl.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:sc_assistant_port.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:sysinfo.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:cmd_util.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:cmd_mem.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:board.o (.text .text.* .rodata .rodata.*)
 
         /* All xip end */
         __xip_end__ = .;

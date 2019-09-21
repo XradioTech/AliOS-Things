@@ -4,10 +4,12 @@
 #include <unistd.h>
 
 #include <errno.h>
-#include <hal/ota.h>
-#include <aos/aos.h>
-#include <hal/soc/soc.h>
-#include <CheckSumUtils.h>
+//#include <hal/ota.h>
+#include "ota_hal_plat.h"
+//#include <aos/aos.h>
+//#include <hal/soc/soc.h>
+//#include <CheckSumUtils.h>
+#include "aos/hal/flash.h"
 #include "sys/image.h"
 #include "sys/ota.h"
 
@@ -52,17 +54,17 @@ typedef struct
 
 static ota_reboot_info_t ota_info;
 
-static  CRC16_Context contex;
+//static  CRC16_Context contex;
 hal_partition_t ota_partition = HAL_PARTITION_OTA_TEMP;
 
-static int xr871_ota_init(hal_ota_module_t *m, void *something)
+static int xr871_ota_init(void *something)
 {
 #if 0
     hal_logic_partition_t *partition_info;
 
 	image_seq_t	seq;
 	ota_cfg_t	cfg;
- 
+
 	OTA_DEBUG("xr871_ota_init enter\n");
 
 	if (ota_read_cfg(&cfg) != OTA_STATUS_OK)
@@ -129,14 +131,14 @@ static int xr871_ota_init(hal_ota_module_t *m, void *something)
 }
 
 
-static int xr871_ota_write(hal_ota_module_t *m, volatile uint32_t* off_set, uint8_t* in_buf ,uint32_t in_buf_len)
+static int xr871_ota_write(int* off, char* in_buf , int in_buf_len)
 {
 	int ret = 0;
 	unsigned int _off_set = 0;
 	hal_logic_partition_t *partition_info;
 
-	OTA_DEBUG("xr871_ota_write enter\n");
-	
+	//OTA_DEBUG("xr871_ota_write enter\n");
+
 	partition_info = hal_flash_get_info(HAL_PARTITION_BOOTLOADER);
 
 	if (ota_info.ota_len + in_buf_len < partition_info->partition_length) {
@@ -160,18 +162,19 @@ static int xr871_ota_write(hal_ota_module_t *m, volatile uint32_t* off_set, uint
 
     //CRC16_Update( &contex, in_buf, in_buf_len);
 
-    OTA_DEBUG(" &_off_set 0x %08x, %d\n", _off_set ,ota_info.ota_len);
+    OTA_DEBUG("w &_off_set 0x %08x, %d\n", _off_set ,ota_info.ota_len);
 
-	OTA_DEBUG("xr871_ota_write exit\n");
+	//OTA_DEBUG("xr871_ota_write exit\n");
 
     return ret;
 }
 
-static int xr871_ota_read(hal_ota_module_t *m,  volatile uint32_t* off_set, uint8_t* out_buf, uint32_t out_buf_len)
+
+static int xr871_ota_read(int* off_set, char* out_buf, int out_buf_len)
 {
 	uint32_t temp;
 
-	OTA_DEBUG("xr871_ota_read enter\n");
+	//OTA_DEBUG("xr871_ota_read enter\n");
 
 	temp = *off_set;
 
@@ -182,38 +185,14 @@ static int xr871_ota_read(hal_ota_module_t *m,  volatile uint32_t* off_set, uint
     hal_flash_read(ota_partition, &temp, out_buf, out_buf_len);
 
 	*off_set += out_buf_len;
-	OTA_DEBUG("xr871_ota_read exit\n");
+	OTA_DEBUG("r *off_set %d\n", *off_set);
+	//OTA_DEBUG("xr871_ota_read exit\n");
 
     return 0;
 }
 
-static int xr871_ota_set_boot(hal_ota_module_t *m, void *something)
+static int xr871_ota_set_boot(void *something)
 {
-#if 0
-	ota_cfg_t ota_cfg;
-    uint8_t parti = *(uint8_t *)something;
-    //CRC16_Final( &contex, &ota_info.ota_crc );
-    OTA_DEBUG("xr871 set boot\n");
-
-	if (ota_partition == HAL_PARTITION_OTA_TEMP) {
-		ota_cfg.image = 2;
-	}
-	else {
-		ota_cfg.image = 1;
-	}
-
-	ota_cfg.state = OTA_STATE_UNVERIFIED;
-	ota_write_cfg(&ota_cfg);
-	ota_set_size(ota_info.ota_len);
-	if (ota_verify_image(OTA_VERIFY_NONE, NULL)  != OTA_STATUS_OK) {
-		OTA_DEBUG("xr871 set boot fail\n");
-	}
-
-    /* reboot */
-    hal_reboot();
-
-    return 0;
-#endif
 	OTA_DEBUG("xr871 set boot\n");
 	ota_set_get_size(ota_info.ota_len);
 	// checksum
@@ -229,13 +208,13 @@ static int xr871_ota_set_boot(hal_ota_module_t *m, void *something)
 		return;
 	}
 	OTA_DEBUG("ota upgrade success");
-	
+
 	hal_reboot();
 }
 
-struct hal_ota_module_s xr871_ota_module = {
+struct ota_hal_module_s xr871_ota_module = {
     .init = xr871_ota_init,
-    .ota_write = xr871_ota_write,
-    .ota_read = xr871_ota_read,
-    .ota_set_boot = xr871_ota_set_boot,
+    .write = xr871_ota_write,
+    .read = xr871_ota_read,
+    .boot = xr871_ota_set_boot,
 };
