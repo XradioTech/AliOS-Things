@@ -27,6 +27,7 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "sys/interrupt.h"
 #include "cmd_util.h"
 #include "driver/chip/hal_prcm.h"
 
@@ -63,7 +64,7 @@ enum cmd_status cmd_reboot(PRCM_CPUABootFlag flag)
 
 	HAL_PRCM_SetCPUABootFlag(flag);
 	handler = CMD_BROM_RESET_HANDLER;
-#ifdef __CONFIG_CHIP_XR871
+#ifdef __CONFIG_CPU_CM4F
 	handler |= 0x1; /* set thumb bit */
 #endif
 

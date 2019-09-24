@@ -64,12 +64,12 @@ extern "C" {
     } while (0)
 
 /* debug in interrupt handler */
-#ifdef __CONFIG_XIP_SECTION_FUNC_LEVEL
+#ifdef __CONFIG_SECTION_ATTRIBUTE_NONXIP
 
 #define CONS_IT_LOG(flags, fmt, arg...)                 \
     do {                                                \
         if (flags) {                                    \
-            __nonxip_data static char __fmt[] = fmt;    \
+            __nonxip_rodata static char __fmt[] = fmt;  \
             CONS_SYSLOG(__fmt, ##arg);                  \
         }                                               \
     } while (0)
@@ -84,14 +84,14 @@ extern "C" {
             CONS_ABORT();                                   \
     } while (0)
 
-#else /* __CONFIG_XIP_SECTION_FUNC_LEVEL */
+#else /* __CONFIG_SECTION_ATTRIBUTE_NONXIP */
 
 #define __s_func        __func__
 #define CONS_IT_DBG     CONS_DBG
 #define CONS_IT_WRN     CONS_WRN
 #define CONS_IT_ERR     CONS_ERR
 
-#endif /* __CONFIG_XIP_SECTION_FUNC_LEVEL */
+#endif /* __CONFIG_SECTION_ATTRIBUTE_NONXIP */
 
 #ifdef __cplusplus
 }

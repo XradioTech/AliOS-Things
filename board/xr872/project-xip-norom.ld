@@ -85,7 +85,7 @@ SECTIONS
         *yloop.a: (.text .text.* .rodata .rodata.*)
         *kv.a: (.text .text.* .rodata .rodata.*)
         *udhcp.a: (.text .text.* .rodata .rodata.*)
-        /**libc_nano.a: (.text .text.* .rodata .rodata.*)*/
+        /**libc_nano.a: (.text .text.* .rodata .rodata.*) can not set*/
 				/**rhino.a: (.text .text.* .rodata .rodata.*)  can not set*/
 
 		/* security */
@@ -117,6 +117,14 @@ SECTIONS
 				*sc_assistant.a: (.text .text.* .rodata .rodata.*)
 				*wireless.a: (.text .text.* .rodata .rodata.*)
 
+				/**board_xr872.a:k_config.o (.text .text.* .rodata .rodata.*) can not set*/
+				*board_xr872.a:partition_conf.o (.text .text.* .rodata .rodata.*)
+				*board_xr872.a:oled.o (.text .text.* .rodata .rodata.*)
+				*board_xr872.a:ssd1306.o (.text .text.* .rodata .rodata.*)
+				*board_xr872.a:cli_ext.o (.text .text.* .rodata .rodata.*)
+				*board_xr872.a:cli_upgrade.o (.text .text.* .rodata .rodata.*)
+				*board_xr872.a:cli_mem.o (.text .text.* .rodata .rodata.*)
+
 				*mcu_xr872.a:container.o (.text .text.* .rodata .rodata.*)
 				*mcu_xr872.a:event_queue.o (.text .text.* .rodata .rodata.*)
 				*mcu_xr872.a:observer.o (.text .text.* .rodata .rodata.*)
@@ -128,7 +136,10 @@ SECTIONS
 				*mcu_xr872.a:sysinfo.o (.text .text.* .rodata .rodata.*)
 				*mcu_xr872.a:cmd_util.o (.text .text.* .rodata .rodata.*)
 				*mcu_xr872.a:cmd_mem.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:cmd_upgrade.o (.text .text.* .rodata .rodata.*)
 				*mcu_xr872.a:board.o (.text .text.* .rodata .rodata.*)
+
+				*mcu_xr872.a:console.o (.text .text.* .rodata .rodata.*)
 
         /* All xip end */
         __xip_end__ = .;

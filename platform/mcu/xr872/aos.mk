@@ -27,7 +27,6 @@ $(NAME)_SOURCES += hal/soc/flash.c \
                    hal/wifi.c \
                    hal/hal.c \
                    hal/fota_port.c \
-                   cli_ext/cli_ext.c \
                    hal/os_semaphore.c
 
 include $(SOURCE_ROOT)/platform/mcu/xr872/sdk_files.mk
@@ -41,7 +40,8 @@ $(NAME)_SOURCES += $(XR872_CHIP_FILES) \
                    $(XR872_ETHERNETIF_FILES) \
                    $(XR872_EFPG_FILES) \
                    $(XR872_SYS_FILES) \
-                   $(XR872_OTA_FILES)
+                   $(XR872_OTA_FILES) \
+		   $(XR872_CONSOLE_FILES)
 
 $(NAME)_PREBUILT_LIBRARY := \
                             drivers/lib/libamr.a \

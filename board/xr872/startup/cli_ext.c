@@ -21,6 +21,6 @@ void cli_cmd_add_xr_cmd(void)
 
 void aos_cli_ext_init(void)
 {
-    //cli_cmd_add_upgrade();
-   // cli_cmd_add_mem();
+	cli_cmd_add_upgrade();
+	cli_cmd_add_mem();
 }

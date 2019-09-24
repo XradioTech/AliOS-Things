@@ -24,6 +24,8 @@ $(NAME)_SOURCES += config/k_config.c \
 				   drivers/oled.c \
 				   drivers/ssd1306.c \
                    startup/cli_ext.c \
+                   startup/cli_upgrade.c \
+                   startup/cli_mem.c \
                    startup/board.c   \
                    startup/startup.c
 

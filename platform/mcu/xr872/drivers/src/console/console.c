@@ -171,8 +171,8 @@ static void console_rx_callback(void *arg)
 	int8_t do_restart;
 #endif
 
-#if (defined(__CONFIG_XIP_SECTION_FUNC_LEVEL) && CONS_ERR_ON)
-	__nonxip_data static char __s_func[] = "console_rx_callback";
+#if (defined(__CONFIG_SECTION_ATTRIBUTE_NONXIP) && CONS_ERR_ON)
+	__nonxip_rodata static char __s_func[] = "console_rx_callback";
 #endif
 	uart = (UART_T *)arg;
 	console = &g_console;

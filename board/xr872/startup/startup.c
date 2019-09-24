@@ -54,7 +54,7 @@ static void sys_init(void)
     fatfs_register();
 #endif
 
-    //aos_cli_ext_init();
+    aos_cli_ext_init();
 
     #ifndef AOS_BINS
     application_start(0, NULL);  /* jump to app/example entry */
