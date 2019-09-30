@@ -19,6 +19,9 @@ GLOBAL_INCLUDES += drivers/include \
                    drivers/project/common/framework \
                    drivers/project/common/board/xradio_evb
 
+#make helloworld and kernel can compile
+GLOBAL_INCLUDES += ../../../middleware/uagent/ota/hal
+
 $(NAME)_SOURCES += hal/soc/flash.c \
                    hal/soc/sd.c \
                    hal/soc/uart.c \
