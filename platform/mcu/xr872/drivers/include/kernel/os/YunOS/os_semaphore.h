@@ -72,31 +72,8 @@ static __inline OS_Status OS_SemaphoreDelete(OS_Semaphore_t *sem)
 	}
 }
 
-static __inline OS_Status OS_SemaphoreWait(OS_Semaphore_t *sem, OS_Time_t waitMS)
-{
-	tick_t ticks = waitMS == OS_WAIT_FOREVER ? OS_WAIT_FOREVER : OS_MSecsToTicks(waitMS);
-	OS_Status ret;
-	kstat_t sta;
-	uint32_t time_tick = OS_GetTicks();
-
-	if (sem == NULL) {
-		return OS_FAIL;
-	}
-
-	sta = krhino_sem_take(&sem->sem, ticks);
-	if(sta == RHINO_SUCCESS) {
-		if (sem->count)
-			sem->count--;
-		ret = OS_OK;
-	} else {
-		ret = OS_E_TIMEOUT;
-	}
-
-	return ret;
-}
-
-OS_Status OS_SemaphoreRelease(OS_Semaphore_t *sem);
-
+OS_Status OS_SemaphoreWait(OS_Semaphore_t *sem, OS_Time_t waitMS);//xradio irq call,can not in xip
+OS_Status OS_SemaphoreRelease(OS_Semaphore_t *sem);//xradio irq, can not xin xip
 
 static __inline int OS_SemaphoreIsValid(OS_Semaphore_t *sem)
 {

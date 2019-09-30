@@ -47,6 +47,7 @@ extern "C" {
 typedef enum {
 	AEC_OK=0,
 	AEC_BLANK_LINE,
+	AEC_CMD_FAIL,
 	AEC_CMD_ERROR,
 	AEC_PARA_ERROR,
 	AEC_NO_PARA,
@@ -66,6 +67,10 @@ typedef enum {
 	AEC_NETWORK_ERROR,
 	AEC_NOT_ENOUGH_MEMORY,
 	AEC_IMPROPER_OPERATION,
+	AEC_SOCKET_EXISTING,
+	AEC_SEND_READY,
+	AEC_SEND_TIMEOUT,
+	AEC_UPGRADE_FAILED,
 	AEC_UNDEFINED,
 } AT_ERROR_CODE;
 
@@ -91,7 +96,78 @@ typedef enum {
 	ACC_GPIOR, /* Read specified GPIO */
 	ACC_GPIOW, /* Write specified GPIO */
 	ACC_SCAN, /* scan available AP */
+	//ADD FOR XR809 ACORDING TO ESP8266
+	ACC_GMR,
+	ACC_RESTORE,
+	ACC_UART_DEF,
+	ACC_SLEEP,
+	ACC_WAKEUPGPIO,
+	ACC_CWMODE_CUR,
+	ACC_CWJAP_CUR,
+	ACC_CWJAP_INFO,
+	ACC_CWLAPOPT,
+	ACC_CWLAP,
+	ACC_CWQAP,
+	ACC_CWDHCP_CUR,
+	ACC_CIPSTAMAC_CUR,
+	ACC_CIPSTA_CUR,
+	ACC_CWHOSTNAME,
+//add
+	ACC_CIPSTATUS,
+	ACC_CIPDOMAIN,
+	ACC_CIPSTART,
+	ACC_CIPSENDBUF,
+	ACC_CIPCLOSE,
+	ACC_CIPMUX,
+	ACC_CIPMODE,
+	ACC_CIPDNS_CUR,
+	ACC_CIPRECVDATA,
+	ACC_CIPRECVMODE,
+	ACC_CIPSEND,
+	ACC_SYSIOSETCFG,
+	ACC_SYSIOGETCFG,
+	ACC_SYSGPIODIR,
+	ACC_SYSGPIOWRITE,
+	ACC_SYSGPIOREAD,
+	ACC_DELETEAP,
+	ACC_OTA,
+
 } AT_CALLBACK_CMD;
+
+
+typedef struct {
+    at_di_t	linkId;
+    at_text_t type[4];
+    at_text_t hostname[AT_PARA_MAX_SIZE];
+    at_di_t	port;
+    at_di_t	localport;
+    at_di_t    keepAlive;
+} at_network_para_t;
+
+
+typedef struct {
+	at_di_t ID;
+    at_di_t	mode;
+    at_di_t	driving;
+    at_di_t	pull;
+} at_setgpio_para_t;
+
+typedef struct {
+	at_di_t ID;
+    at_di_t	data;
+} at_writegpio_para_t;
+
+typedef struct {
+	at_di_t ID;
+    at_di_t	mode;
+} at_setgpiodir_para_t;
+
+typedef struct {
+    at_di_t linkId;
+	at_di_t bufferlen;
+    at_text_t *buffer;
+} at_sendData_para_t;
+
 
 typedef struct {
 	at_config_t *cfg;
@@ -107,10 +183,12 @@ typedef struct {
 			s32 method; /* 0: default 1: "a,r" 2: "p,r"*/
 		} scan;
 		struct {
+			int fd;
 			char hostname[AT_PARA_MAX_SIZE];
 			s32 port;
-			s32 protocol; /* 0: TCP 1: UDP */
-			s32 ind; /* 0: disable 1: enable */
+			s32 protocol;	/* 0: TCP 1: UDP */
+			s32 ind;		/* 0: disable 1: enable */
+			int keepAlive;
 		} sockon;
 		struct {
 			s32 id;
@@ -135,11 +213,76 @@ typedef struct {
 			s32 len; /* transparent transmission send buffer length */
 			u8 *buf; /* transparent transmission send buffer */
 		} mode;
+		struct{
+			int uartId;
+			int uartBaud;
+			int dataBit;
+			int parity;
+			int stopBit;
+			int hwfc;
+		}uart;
+		struct{
+			int sleepMode;
+		}sleep;
+		struct{
+			int gpioId;
+			int edge;
+		}wakeupgpio;
+		struct {
+			int mode;
+		}wifiMode;
+		struct{
+			char ssid[33];
+			char pwd[33];
+		}joinParam;
+		struct{
+			char hostname[33];
+		}iphostname;
+		struct{
+			char hostname[128];
+		}dns_parse;
+		struct{
+			at_ip_t setdnsip;
+		}set_dns;
+		struct {
+			int linkId;
+			char networkType[4];
+			char hostname[AT_PARA_MAX_SIZE];
+			char IpAddr[12];
+			at_text_t type[4];
+			int port;
+			int localport;
+			int keepAlive;
+		}net_param;
+		struct{
+			int id;
+		}close_id;
+		struct{
+			int ID;
+			int mode;
+			int driving;
+			int pull;
+		}setgpio_para;
+		struct{
+			int ID;
+			int mode;
+		}setiodir_para;
+		struct{
+			int ID;
+			int data;
+		}writeiodata_para;
+		struct{
+			int ID;
+		}readiodata_para;
+		struct{
+			int apnum;
+		}deleteap_para;
 	} u;
  } at_callback_para_t;
 
 typedef struct
 {
+	u8  status; // 0: empty, 1: carry msg 
 	s32 type; /* 0: value 1: buffer pointer */
 	void *vptr; /* value or buffer pointer */
 	s32 vsize;
@@ -152,6 +295,9 @@ typedef struct {
 
 typedef struct {
 	u32 baudrate;
+	u32 dataBit;
+	u32 parity;
+	u32 stopBit;
 	u32 hwfc;
 } at_serial_para_t;
 
@@ -162,6 +308,11 @@ extern AT_ERROR_CODE at_parse(void);
 extern s32 at_event(s32 idx);
 extern s32 at_serial(at_serial_para_t *ppara);
 extern s32 at_dump(char* format, ...);
+extern u32 at_get_errorcode(void);
+extern s32 atcmd_send(char* format, ...);
+extern int get_reconnect_enable_status(void);
+extern void set_reconnect_disable(void);
+
 
 #ifdef __cplusplus
 }

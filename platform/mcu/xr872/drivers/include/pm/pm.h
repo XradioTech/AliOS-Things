@@ -33,6 +33,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "sys/list.h"
+#include "driver/chip/hal_prcm.h"
 
 #if (defined(__CONFIG_PM))
 #define CONFIG_PM
@@ -66,6 +67,12 @@ enum suspend_state_t {
 	PM_MODE_STANDBY         = 2,
 	PM_MODE_HIBERNATION     = 3,
 	PM_MODE_MAX             = 4,
+};
+
+enum pm_sram_N {
+    PM_SRAM_0   = PRCM_SYS_SRAM_32K_SWM4_BIT,           /*sram 0x200000 ~ 0x207FFF*/
+    PM_SRAM_1   = PRCM_SYS_SRAM_32K_SWM3_BIT,           /*sram 0x208000 ~ 0x20FFFF*/
+    PM_SRAM_2   = PRCM_SYS_SRAM_352K_SWM2_BIT,          /*sram 0x210000 ~ 0x25FFFF*/
 };
 
 #define PM_MODE_MAGIC           (0x7FF20000)
@@ -246,6 +253,7 @@ extern int pm_check_wakeup_irqs(void);
 
 extern int pm_test(void);
 extern void pm_set_debug_mask(uint16_t debug_mask);
+void pm_standby_sram_retention_only(uint32_t sramN);
 
 #else /* CONFIG_PM */
 #ifdef __CINFIG_ROM

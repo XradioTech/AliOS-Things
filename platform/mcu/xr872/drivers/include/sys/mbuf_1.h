@@ -72,6 +72,11 @@ struct pkthdr {
 
 	struct m_cb cb;
 };
+
+struct ext_info {
+	uint8_t eigth[32];
+};
+
 #define ether_vtag  PH_per.sixteen[0]
 #define PH_vt       PH_per
 #define vt_nrecs    sixteen[0]
@@ -83,7 +88,7 @@ struct pkthdr {
  * The core of the mbuf object along with some shortcut defines for practical
  * purposes.
  */
-struct mbuf { // Size : 48
+struct mbuf { // Size : 48 + 32 = 80
 	/*
 	 * Header present at the beginning of every mbuf.
 	 * Size : 24
@@ -100,6 +105,7 @@ struct mbuf { // Size : 48
 	/*** End of the mbuf header ***/
 
 	struct pkthdr m_pkthdr;	/* M_PKTHDR always set */
+	struct ext_info m_ext_info;   /* extend info */
 };
 
 #define MBUF_HEAD_SPACE 68 /* reserved head space in mbuf::m_buf, align to 4 */

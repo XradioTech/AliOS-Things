@@ -44,8 +44,10 @@ typedef enum efpg_field {
 	EFPG_FIELD_HOSC = 0,    /* data buffer size: 1  byte  */
 	EFPG_FIELD_BOOT,        /* data buffer size: 32 bytes */
 	EFPG_FIELD_MAC,         /* data buffer size: 6  bytes */
+	EFPG_FIELD_DCXO,        /* data buffer size: 1  byte  */
+	EFPG_FIELD_POUT,        /* data buffer size: 3  bytes */
 	EFPG_FIELD_CHIPID,      /* data buffer size: 16 bytes */
-	EFPG_FIELD_UA,          /* data buffer size: 601 bits */
+	EFPG_FIELD_UA,          /* data buffer size: V1(1447~2047) : V2(765~1023 bit)*/
 	EFPG_FIELD_NUM,
 } efpg_field_t;
 
@@ -61,10 +63,27 @@ typedef enum efpg_field {
 typedef void (*efpg_cb_t)(void);
 
 int efpg_start(uint8_t *key, uint8_t key_len, UART_ID uart_id, efpg_cb_t start_cb, efpg_cb_t stop_cb);
-
 int efpg_read(efpg_field_t field, uint8_t *data);
-
 int efpg_read_ua(uint32_t start, uint32_t num, uint8_t *data);
+
+/**
+ * @brief EFPG return value definition
+ */
+#define EFPG_ACK_OK             (200)
+#define EFPG_ACK_CS_ERR         (400)
+#define EFPG_ACK_MD_ERR         (401)
+#define EFPG_ACK_PARSE_ERR      (402)
+#define EFPG_ACK_RW_ERR         (403)
+#define EFPG_ACK_DI_ERR         (404)
+#define EFPG_ACK_NODATA_ERR     (405)
+
+uint16_t efpg_read_mac(uint8_t *r_data);
+uint16_t efpg_read_dcxo(uint8_t *r_data);
+uint16_t efpg_read_pout(uint8_t *r_data);
+uint16_t efpg_read_chipid(uint8_t *r_data);
+uint16_t efpg_read_boot(uint8_t *r_data);
+uint16_t efpg_read_hosc(uint8_t *r_data);
+uint16_t efpg_read_user_area(uint16_t start, uint16_t num, uint8_t *r_data);
 
 #ifdef __cplusplus
 }

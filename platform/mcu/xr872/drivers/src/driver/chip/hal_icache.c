@@ -70,8 +70,8 @@ static int icache_resume(struct soc_device *dev, enum suspend_state_t state)
 
 static const struct soc_device_driver icache_drv = {
 	.name = "icache",
-	.suspend = icache_suspend,
-	.resume = icache_resume,
+	.suspend_noirq = icache_suspend,
+	.resume_noirq = icache_resume,
 };
 
 static struct soc_device icache_dev = {

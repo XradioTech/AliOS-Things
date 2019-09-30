@@ -32,6 +32,7 @@
 
 #include <stdint.h>
 #include "audio/pcm/audio_pcm.h"
+#include "audio/manager/audio_manager.h"
 #include "net/wlan/wlan_defs.h"
 
 #ifdef __cplusplus
@@ -99,7 +100,7 @@ voiceprint_ret_t wlan_voiceprint_connect_ack(struct netif *nif, uint32_t timeout
 static __inline int voice_print_start(struct netif *nif, const char *key)
 {
 	voiceprint_param_t param;
-	param.audio_card = AUDIO_CARD0;
+	param.audio_card = AUDIO_SND_CARD_DEFAULT;
 	param.nif = nif;
 	return voiceprint_start(&param);
 }

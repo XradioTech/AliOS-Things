@@ -128,6 +128,10 @@ int wlan_ap_disable(void);
 int wlan_ap_sta_num(int *num);
 int wlan_ap_sta_info(wlan_ap_stas_t *stas);
 
+int wlan_ap_scan_once(void);
+int wlan_ap_scan(wlan_sta_scan_param_t *param);
+int wlan_ap_scan_result(wlan_sta_scan_results_t *results);
+
 /* monitor */
 typedef enum {
 	AUTH_ALG_OPEN,

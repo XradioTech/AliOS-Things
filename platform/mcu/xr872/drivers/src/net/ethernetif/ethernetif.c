@@ -526,3 +526,8 @@ enum wlan_mode ethernetif_get_mode(struct netif *nif)
 		return WLAN_MODE_INVALID;
 	}
 }
+
+void *ethernetif_get_state(struct netif *nif)
+{
+	return (nif ? nif->state : NULL);
+}

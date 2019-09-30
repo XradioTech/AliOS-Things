@@ -55,7 +55,61 @@ void HAL_Dcache_SetWriteThrough(uint32_t idx, uint32_t en, uint32_t sadd, uint32
 		DCACHE_CTRL->WT_ADDR[idx].END_ADDR = 0;
 	}
 }
+
+void HAL_Dcache_FlushClean(uint32_t sadd, uint32_t len)
+{
+	HAL_ASSERT_PARAM((sadd >= IDCACHE_START_ADDR) && (len > 0) && ((sadd-len) < IDCACHE_END_ADDR));
+
+	DCACHE_CTRL->CLEAN_FLUSH_SADDR = sadd;
+	DCACHE_CTRL->CLEAN_FLUSH_LEN = len;
+
+    unsigned long flag;
+    flag = HAL_EnterCriticalSection();
+
+	HAL_MODIFY_REG(DCACHE_CTRL->DCACHE_COM_CFG,
+	               (DCACHE_FLUSH_START_MASK | DCACHE_CLEAN_START_MASK),
+	               (DCACHE_FLUSH_START_MASK | DCACHE_CLEAN_START_MASK));
+	while (DCACHE_CTRL->DCACHE_COM_CFG &
+	       (DCACHE_FLUSH_START_MASK | DCACHE_CLEAN_START_MASK))
+		;
+    HAL_ExitCriticalSection(flag);
+}
+
+void HAL_Dcache_Clean(uint32_t sadd, uint32_t len)
+{
+	HAL_ASSERT_PARAM((sadd >= IDCACHE_START_ADDR) && (len > 0) && ((sadd-len) < IDCACHE_END_ADDR));
+
+	DCACHE_CTRL->CLEAN_FLUSH_SADDR = sadd;
+	DCACHE_CTRL->CLEAN_FLUSH_LEN = len;
+
+    unsigned long flag;
+    flag = HAL_EnterCriticalSection();
+
+	HAL_SET_BIT(DCACHE_CTRL->DCACHE_COM_CFG, DCACHE_CLEAN_START_MASK);
+	while (DCACHE_CTRL->DCACHE_COM_CFG & DCACHE_CLEAN_START_MASK)
+		;
+
+    HAL_ExitCriticalSection(flag);
+}
+
 #endif
+
+void HAL_Dcache_Flush(uint32_t sadd, uint32_t len)
+{
+	HAL_ASSERT_PARAM(len > 0);
+
+	DCACHE_CTRL->CLEAN_FLUSH_SADDR = sadd;
+	DCACHE_CTRL->CLEAN_FLUSH_LEN = len;
+
+    unsigned long flag;
+    flag = HAL_EnterCriticalSection();
+
+	HAL_SET_BIT(DCACHE_CTRL->DCACHE_COM_CFG, DCACHE_FLUSH_START_MASK);
+	while (DCACHE_CTRL->DCACHE_COM_CFG & DCACHE_FLUSH_START_MASK)
+		;
+
+    HAL_ExitCriticalSection(flag);
+}
 
 #ifdef CONFIG_PM
 static DCache_Config _dcache_cfg;
@@ -102,8 +156,8 @@ static int dcache_resume(struct soc_device *dev, enum suspend_state_t state)
 
 static const struct soc_device_driver dcache_drv = {
 	.name = "dcache",
-	.suspend = dcache_suspend,
-	.resume = dcache_resume,
+	.suspend_noirq = dcache_suspend,
+	.resume_noirq = dcache_resume,
 };
 
 static struct soc_device dcache_dev = {

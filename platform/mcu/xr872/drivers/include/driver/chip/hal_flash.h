@@ -47,7 +47,6 @@ extern "C" {
 
 #define FLASH_FLASHC_ENABLE (1)
 #define FLASH_SPI_ENABLE (!defined(__CONFIG_BOOTLOADER))
-//#define FLASH_SPI_ENABLE 0
 
 typedef enum FlashControlCmd
 {

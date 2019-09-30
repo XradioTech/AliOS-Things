@@ -62,8 +62,9 @@ typedef struct {
 	__I uint32_t HIT_COUNT_H;       /* ,     Address offset: 0x0A8   */
 	__I uint32_t HIT_COUNT_L;       /* ,     Address offset: 0x0AC   */
 	__I uint32_t DCACHE_STA;        /* ,     Address offset: 0x0B0   */
-	__IO uint32_t CLEAN_FLUSH_SADDR; /* Address offset: 0x0B4, clean or flush start addr */
-	__IO uint32_t CLEAN_FLUSH_LEN;   /* Address offset: 0x0B8, clean or flush length   */
+    __I uint32_t RESERVEB4[3];
+	__IO uint32_t CLEAN_FLUSH_SADDR; /* Address offset: 0x0C0, clean or flush start addr */
+	__IO uint32_t CLEAN_FLUSH_LEN;   /* Address offset: 0x0C4, clean or flush length   */
 } DCACHE_T;
 
 #define DCACHE_CTRL ((DCACHE_T *)PSRAM_DCACHE_BASE)
@@ -137,6 +138,7 @@ void HAL_Dcache_FlushAll(void);
 void HAL_Dcache_FlushCleanAll(void);
 void HAL_Dcache_FlushClean(uint32_t sadd, uint32_t len);
 void HAL_Dcache_Clean(uint32_t sadd, uint32_t len);
+void HAL_Dcache_Flush(uint32_t sadd, uint32_t len);
 void HAL_Dcache_SetWriteThrough(uint32_t idx, uint32_t en, uint32_t sadd, uint32_t eadd);
 void HAL_Dcache_DUMP_MissHit(void);
 void HAL_Dcache_Config(DCache_Config *cfg);

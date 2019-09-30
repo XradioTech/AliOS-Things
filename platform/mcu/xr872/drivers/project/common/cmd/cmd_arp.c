@@ -27,21 +27,22 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if PRJCONF_NET_EN
+
 #include "cmd_util.h"
 #include "common/framework/net_ctrl.h"
-#include "lwip/tcpip.h"
+#include "lwip/netifapi.h"
 #include "netif/etharp.h"
 
 int arp_clean_table(struct netif *netif)
 {
-	tcpip_callback((tcpip_callback_fn)etharp_cleanup_netif, netif);
-	return 0;
+	return netifapi_netif_common(netif, etharp_cleanup_netif, NULL);
 }
 
 int arp_state(struct netif *netif)
 {
 /*	void etharp_printtable_netif(struct netif *netif);
-	tcpip_callback((tcpip_callback_fn)etharp_printtable_netif, netif);
+	return netifapi_netif_common(netif, etharp_printtable_netif, NULL);
 */
 	return 0;
 }
@@ -88,4 +89,4 @@ enum cmd_status cmd_arp_exec(char *cmd)
 	return (ret == 0 ? CMD_STATUS_OK : CMD_STATUS_FAIL);
 }
 
-
+#endif /* PRJCONF_NET_EN */

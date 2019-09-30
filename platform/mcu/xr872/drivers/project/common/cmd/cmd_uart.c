@@ -26,15 +26,15 @@
  *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+#include "string.h"
 #include "cmd_util.h"
 #include "cmd_uart.h"
 #include "driver/chip/hal_gpio.h"
 #include "driver/chip/hal_uart.h"
-
+#include "common/board/board.h"
 
 typedef int32_t (*uart_receive_func)(UART_ID uartID, uint8_t *buf, int32_t size, uint32_t msec);
-typedef int32_t (*uart_transmit_func)(UART_ID uartID, uint8_t *buf, int32_t size);
+typedef int32_t (*uart_transmit_func)(UART_ID uartID, const uint8_t *buf, int32_t size);
 
 #define CMD_UART_TRANSFER_BUF_SIZE			2048
 #define CMD_UART_QUEUE_LEN					1
@@ -56,6 +56,7 @@ struct cmd_uart_priv {
 	enum cmd_uart_transfer_mode	mode;
 	OS_Queue_t					queue;
 	OS_Thread_t					thread;
+    uint32_t                      delay;
 };
 
 struct cmd_uart_priv g_cmd_uart_priv;
@@ -67,16 +68,16 @@ UART_DataBits uart_data_bits[4] = {
 UART_StopBits uart_stop_bits[2] = { UART_STOP_BITS_1, UART_STOP_BITS_2 };
 
 /*
- * drv uart config i=<id> b=<baud-rate> d=<data-bits> p=<parity> s=<stop-bits> f=<flow-ctrl>
+ * cmd line: i=<id> b=<baud-rate> d=<data-bits> p=<parity> s=<stop-bits> f=<flow-ctrl>
  */
-static enum cmd_status cmd_uart_config_exec(char *cmd)
+static enum cmd_status cmd_uart_parse_config(char *cmd, uint32_t *uart_id,
+                                             UART_InitParam *uart_param)
 {
 	uint32_t id, baud_rate, data_bits, stop_bits;
 	char parity[8];
 	char flow_ctrl[8];
 	int cnt;
 	UART_Parity uart_parity;
-	UART_InitParam uart_param;
 
 	cnt = cmd_sscanf(cmd, "i=%u b=%u d=%u p=%7s s=%u f=%7s", &id, &baud_rate,
 	                 &data_bits, parity, &stop_bits, flow_ctrl);
@@ -115,21 +116,210 @@ static enum cmd_status cmd_uart_config_exec(char *cmd)
 		return CMD_STATUS_INVALID_ARG;
 	}
 
-	if (cmd_strcmp(flow_ctrl, "none") != 0) {
-		CMD_ERR("invalid flow contorl %s\n", flow_ctrl);
-		return CMD_STATUS_INVALID_ARG;
+	if (cmd_strcmp(flow_ctrl, "off") == 0) {
+        uart_param->isAutoHwFlowCtrl = 0;
+	} else if (cmd_strcmp(flow_ctrl, "on") == 0) {
+        uart_param->isAutoHwFlowCtrl = 1;
+    } else {
+        CMD_ERR("invalid flow contorl %s\n", flow_ctrl);
+        return CMD_STATUS_INVALID_ARG;
+    }
+
+	*uart_id = id;
+	uart_param->baudRate = baud_rate;
+	uart_param->parity = uart_parity;
+	uart_param->stopBits = uart_stop_bits[stop_bits - 1];
+	uart_param->dataBits = uart_data_bits[data_bits - 5];
+
+	return CMD_STATUS_OK;
+}
+
+/*
+ * drv uart config i=<id> b=<baud-rate> d=<data-bits> p=<parity> s=<stop-bits> f=<flow-ctrl>
+ */
+static enum cmd_status cmd_uart_config_exec(char *cmd)
+{
+	enum cmd_status ret;
+	uint32_t id;
+	UART_InitParam uart_param;
+
+	ret = cmd_uart_parse_config(cmd, &id, &uart_param);
+	if (ret != CMD_STATUS_OK) {
+		return ret;
 	}
+    if(BOARD_MAIN_UART_ID == id) {
+        CMD_ERR("Uart%u is console\n", id);
+        return CMD_STATUS_INVALID_ARG;
+    }
 
 	HAL_UART_DeInit((UART_ID)id);
-	uart_param.baudRate = baud_rate;
-	uart_param.parity = uart_parity;
-	uart_param.stopBits = uart_stop_bits[stop_bits - 1];
-	uart_param.dataBits = uart_data_bits[data_bits - 5];
-	uart_param.isAutoHwFlowCtrl = 0;
 	HAL_UART_Init((UART_ID)id, &uart_param);
 
 	return CMD_STATUS_OK;
 }
+
+/*
+ * drv uart deconfig i=<id>
+ */
+static enum cmd_status cmd_uart_deconfig_exec(char *cmd)
+{
+	uint32_t id;
+	int cnt;
+
+	cnt = cmd_sscanf(cmd, "i=%u", &id);
+	if (cnt != 1) {
+		return CMD_STATUS_INVALID_ARG;
+	}
+
+	if (id >= UART_NUM) {
+		CMD_ERR("invalid id %u\n", id);
+		return CMD_STATUS_INVALID_ARG;
+	}
+
+	HAL_UART_DeInit((UART_ID)id);
+
+	return CMD_STATUS_OK;
+}
+
+/*
+ * drv uart change i=<id> b=<baud-rate> d=<data-bits> p=<parity> s=<stop-bits> f=<flow-ctrl>
+ */
+static enum cmd_status cmd_uart_change_exec(char *cmd)
+{
+	enum cmd_status ret;
+	uint32_t id;
+	UART_InitParam uart_param;
+
+	ret = cmd_uart_parse_config(cmd, &id, &uart_param);
+	if (ret != CMD_STATUS_OK) {
+		return ret;
+	}
+
+	HAL_UART_SetConfig((UART_ID)id, &uart_param);
+
+	return CMD_STATUS_OK;
+}
+
+static void cmd_uart_echo_start(void *arg)
+{
+	struct cmd_uart_priv *priv = arg;
+	uart_receive_func rx_func;
+	uart_transmit_func tx_func;
+	uint8_t *buf = NULL;
+	int32_t cnt;
+
+	if (priv->mode == CMD_UART_TRANSFER_MODE_IT) {
+		rx_func = HAL_UART_Receive_IT;
+		tx_func = HAL_UART_Transmit_IT;
+	} else if (priv->mode == CMD_UART_TRANSFER_MODE_DMA) {
+		rx_func = HAL_UART_Receive_DMA;
+		tx_func = HAL_UART_Transmit_DMA;
+	} else if (priv->mode == CMD_UART_TRANSFER_MODE_POLL) {
+		rx_func = HAL_UART_Receive_Poll;
+		tx_func = HAL_UART_Transmit_Poll;
+	} else {
+		CMD_ERR("invalid mode %d\n", priv->mode);
+		goto out;
+	}
+
+	buf = cmd_malloc(CMD_UART_TRANSFER_BUF_SIZE);
+	if (buf == NULL) {
+		CMD_ERR("no memory\n");
+		goto out;
+	}
+
+	if (priv->mode == CMD_UART_TRANSFER_MODE_DMA) {
+		if (HAL_UART_EnableRxDMA(priv->id) != HAL_OK) {
+			CMD_ERR("enable rx dma fail\n");
+			goto out;
+		}
+		if (HAL_UART_EnableTxDMA(priv->id) != HAL_OK) {
+			CMD_ERR("enable tx dma fail\n");
+			HAL_UART_DisableRxDMA(priv->id);
+			goto out;
+		}
+	}
+
+    buf[CMD_UART_TRANSFER_BUF_SIZE-1] = '\0';
+	while (1) {
+		cnt = rx_func(priv->id, buf, CMD_UART_TRANSFER_BUF_SIZE-1, priv->delay);
+        if((strstr((char*)buf, "stop") != NULL) \
+            || (strstr((char*)buf, "\x13\x14\x0f\x10") != NULL) \
+            || (strstr((char*)buf, "\x33\x34\x2f\x30") != NULL)) {
+            strcpy((char*)buf, "Exit uart echo\n");
+            tx_func(priv->id, buf, 16);
+            printf("Exit uart echo\n");
+            break;
+        }
+		if (cnt > 0) {
+			cnt = tx_func(priv->id, buf, cnt);
+		}
+	}
+
+	if (priv->mode == CMD_UART_TRANSFER_MODE_DMA) {
+		HAL_UART_DisableTxDMA(priv->id);
+		HAL_UART_DisableRxDMA(priv->id);
+	}
+
+out:
+	if (buf)
+		cmd_free(buf);
+
+}
+
+/*
+ * drv uart start i=<id> m=<mode>
+ */
+static enum cmd_status cmd_uart_echo_exec(char *cmd)
+{
+	int32_t cnt;
+	uint32_t id;
+    uint32_t waitMs;
+	char mode[8];
+	struct cmd_uart_priv *priv = &g_cmd_uart_priv;
+
+	if (OS_ThreadIsValid(&priv->thread)) {
+		CMD_ERR("uart transfer already start\n");
+		return CMD_STATUS_FAIL;
+	}
+
+	cnt = cmd_sscanf(cmd, "i=%u m=%7s w=%d", &id, mode, &waitMs);
+	if (cnt != 3) {
+        CMD_ERR("invalid cmd: %s\n", cmd);
+		return CMD_STATUS_INVALID_ARG;
+	}
+
+	if (id >= UART_NUM) {
+		CMD_ERR("invalid id %u\n", id);
+		return CMD_STATUS_INVALID_ARG;
+	} else {
+		priv->id = (UART_ID)id;
+	}
+
+	if (cmd_strcmp(mode, "it") == 0) {
+		priv->mode = CMD_UART_TRANSFER_MODE_IT;
+	} else if (cmd_strcmp(mode, "dma") == 0) {
+		priv->mode = CMD_UART_TRANSFER_MODE_DMA;
+	} else if (cmd_strcmp(mode, "poll") == 0) {
+		priv->mode = CMD_UART_TRANSFER_MODE_POLL;
+	} else {
+		CMD_ERR("invalid mode %s\n", mode);
+		return CMD_STATUS_INVALID_ARG;
+	}
+
+    priv->delay = waitMs;
+    if(BOARD_MAIN_UART_ID == id) {
+        console_disable();
+    }
+    cmd_uart_echo_start(priv);
+
+    if(BOARD_MAIN_UART_ID == id) {
+        console_enable();
+    }
+
+	return CMD_STATUS_OK;
+}
+
 
 static void cmd_uart_transfer_task(void *arg)
 {
@@ -184,8 +374,10 @@ static void cmd_uart_transfer_task(void *arg)
 		}
 
 		cnt = rx_func(priv->id, buf, msg.len, msg.timeout);
+		CMD_DBG("recv %d\n", cnt);
 		if (cnt > 0) {
-			tx_func(priv->id, buf, cnt);
+			cnt = tx_func(priv->id, buf, cnt);
+			CMD_DBG("send %d\n", cnt);
 		}
 	}
 
@@ -197,6 +389,8 @@ static void cmd_uart_transfer_task(void *arg)
 out:
 	if (buf)
 		cmd_free(buf);
+
+	OS_QueueDelete(&priv->queue);
 
 	CMD_DBG("%s() exit\n", __func__);
 	OS_ThreadDelete(&priv->thread);
@@ -337,7 +531,6 @@ static enum cmd_status cmd_uart_transfer_stop_exec(char *cmd)
 		OS_MSleep(1); /* wait for thread termination */
 	}
 
-	OS_QueueDelete(&priv->queue);
 	return CMD_STATUS_OK;
 }
 
@@ -371,12 +564,44 @@ static enum cmd_status cmd_uart_sendbreak_exec(char *cmd)
 	return CMD_STATUS_OK;
 }
 
-static struct cmd_data g_uart_cmds[] = {
-	{ "config",			cmd_uart_config_exec },
-	{ "transfer-start",	cmd_uart_transfer_start_exec },
-	{ "transfer-data",	cmd_uart_transfer_data_exec },
-	{ "transfer-stop",	cmd_uart_transfer_stop_exec },
-	{ "sendbreak",		cmd_uart_sendbreak_exec },
+/*
+ * drv uart txdelay i=<id> d=<txdelay>
+ */
+static enum cmd_status cmd_uart_txdelay_exec(char *cmd)
+{
+	uint32_t id, txdelay;
+	int32_t cnt;
+
+	cnt = cmd_sscanf(cmd, "i=%u d=%u", &id, &txdelay);
+	if (cnt != 2) {
+		return CMD_STATUS_INVALID_ARG;
+	}
+
+	if (id >= UART_NUM) {
+		CMD_ERR("invalid id %u\n", id);
+		return CMD_STATUS_INVALID_ARG;
+	}
+
+	if (txdelay > 0xff) {
+		CMD_ERR("invalid txdelay %u\n", txdelay);
+		return CMD_STATUS_INVALID_ARG;
+	}
+
+	HAL_UART_SetTxDelay((UART_ID)id, txdelay);
+
+	return CMD_STATUS_OK;
+}
+
+static const struct cmd_data g_uart_cmds[] = {
+	{ "config",         cmd_uart_config_exec },
+	{ "deconfig",       cmd_uart_deconfig_exec },
+	{ "change",         cmd_uart_change_exec },
+    { "echo",           cmd_uart_echo_exec },
+    { "transfer-start", cmd_uart_transfer_start_exec },
+	{ "transfer-data",  cmd_uart_transfer_data_exec },
+	{ "transfer-stop",  cmd_uart_transfer_stop_exec },
+	{ "sendbreak",      cmd_uart_sendbreak_exec },
+	{ "txdelay",        cmd_uart_txdelay_exec },
 };
 
 enum cmd_status cmd_uart_exec(char *cmd)

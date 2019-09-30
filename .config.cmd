@@ -115,6 +115,7 @@ deps_config := \
 	kernel/init/Config.in \
 	kernel/rhino/Config.in \
 	kernel/Config.in \
+	board/xr808/Config.in \
 	platform/mcu/xr872/Config.in \
 	board/xr872/Config.in \
 	board/xr871evb/Config.in \

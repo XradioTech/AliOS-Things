@@ -51,8 +51,8 @@ extern "C" {
 			EFPG_SYSLOG(fmt, ##arg);	\
 	} while (0)
 
-#define EFPG_DBG(fmt, arg...)	EFPG_LOG(EFPG_DBG_ON, "[efpg] "fmt, ##arg)
-#define EFPG_WARN(fmt, arg...)	EFPG_LOG(EFPG_WARN_ON, "[efpg WARN] "fmt, ##arg)
+#define EFPG_DBG(fmt, arg...)	EFPG_LOG(EFPG_DBG_ON, "[efpg] %s %d: "fmt, __func__, __LINE__, ##arg)
+#define EFPG_WARN(fmt, arg...)	EFPG_LOG(EFPG_WARN_ON, "[efpg WARN]  %s %d: "fmt,  __func__, __LINE__, ##arg)
 #define EFPG_ERR(fmt, arg...)								\
 	do {													\
 		EFPG_LOG(EFPG_ERR_ON, "[efpg ERR] %s():%d, "fmt,	\

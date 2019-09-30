@@ -30,6 +30,8 @@
 #ifndef _CEDARX_H_
 #define _CEDARX_H_
 
+#include "soundStream.h"
+
 typedef enum {
     XPLAYER_THREAD,
     DEMUX_THREAD,
@@ -77,5 +79,9 @@ int CedarxEncoderRegisterAmr(void);
 int CedarxEncoderRegisterPcm(void);
 
 int CedarxThreadStackSizeSet(CDX_THREAD_NAME name, int size);
+
+int SoundStreamListInit(void);
+int SoundStreamRegisterCard(void);
+int SoundStreamRegisterReverb(void);
 
 #endif

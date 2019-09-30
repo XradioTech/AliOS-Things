@@ -118,14 +118,16 @@ typedef enum {
 
 #if (__CONFIG_CHIP_ARCH_VER == 2)
 #define ADC_VREF_MODE_SEL_SHIFT			1
-#define ADC_VREF_MODE_SEL_MASK			(0x1U << ADC_VREF_MODE_SEL_SHIFT)
+#define ADC_VREF_MODE_SEL_MASK			(0x7U << ADC_VREF_MODE_SEL_SHIFT)
 
 /**
  * @brief ADC vref mode select
  */
 typedef enum {
-	ADC_VREF_MODE_SMPS		= 0U,
-	ADC_VREF_MODE_VDD		= 1U,
+	ADC_VREF_MODE_0		= 0U,/*Vref select inside voltage, input range of 0~1.4V*/
+	ADC_VREF_MODE_1		= 1U,/*Vref select inside voltage, input range of 0~2.5V*/
+	ADC_VREF_MODE_2		= 2U,/*Vref select outside pin VDDIO, EXT_LDO 3.3V*/
+	ADC_VREF_MODE_3		= 6U,/*Vref select outside pin VDDIO, EXT_LDO 3.1V*/
 } ADC_VrefMode;
 #endif /* __CONFIG_CHIP_ARCH_VER */
 
@@ -255,6 +257,7 @@ ADC_IRQState HAL_ADC_GetIRQState(ADC_Channel chan);
 uint32_t HAL_ADC_GetValue(ADC_Channel chan);
 uint32_t HAL_ADC_GetFifoData(void);
 uint8_t HAL_ADC_GetFifoDataCount(void);
+void HAL_ADC_Set_VrefMode(ADC_VrefMode mode);
 
 #ifdef __cplusplus
 }

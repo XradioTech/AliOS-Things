@@ -95,3 +95,8 @@ uint8_t HAL_GlobalGetSmpsBgtr(void)
 	}
 	return 0xff;
 }
+
+uint8_t HAL_GlobalGetTopLdoVsel(void)
+{
+	return GlobalGetBitValue(68, 4);
+}

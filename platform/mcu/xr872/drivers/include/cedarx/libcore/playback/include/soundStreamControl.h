@@ -30,29 +30,13 @@
 #ifndef SOUND_STREAM_CONTROL_H
 #define SOUND_STREAM_CONTROL_H
 
+#include "soundStream.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef void * SoundStreamCtrl;
-
-typedef enum {
-	STREAM_TYPE_SOUND_CARD   = 0,
-	STREAM_TYPE_REVERB_PCM   = 1,
-	STREAM_TYPE_MAX_VALUE    = 2,
-} SoundStreamType;
-
-typedef enum {
-	STREAM_CMD_SET_CONFIG,
-	STREAM_CMD_SET_OUTPUT_CONFIG,
-	STREAM_CMD_CLEAR_OUTPUT_CONFIG,
-	STREAM_CMD_SET_BLOCK_MODE,
-} SoundStreamCmd;
-
-struct SscPcmConfig {
-	unsigned int  channels;
-	unsigned int  rate;
-};
 
 SoundStreamCtrl snd_stream_create(SoundStreamType type);
 void snd_stream_destroy(SoundStreamCtrl ssc, SoundStreamType type);

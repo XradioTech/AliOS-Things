@@ -32,6 +32,8 @@
 #include "pm/pm.h"
 #include "driver/chip/hal_wakeup.h"
 #include "driver/chip/hal_prcm.h"
+#include "driver/hal_board.h"
+#include "driver/hal_dev.h"
 
 #ifdef CONFIG_PM
 extern void uart_set_suspend_record(unsigned int len);
@@ -100,6 +102,7 @@ static enum cmd_status cmd_pm_check_exec(char *cmd)
 
 /* pm wk_timer <Seconds>
  *  <Seconds>: seconds.
+ * eg. pm wk_timer 10
  */
 static enum cmd_status cmd_pm_wakeuptimer_exec(char *cmd)
 {
@@ -126,6 +129,7 @@ static void key_IrqCb(void *arg)
  *  <Port_Num>: 0 ~ 9
  *  <Mode>: 0: negative edge, 1: positive edge, 2: disable this port as wakeup io.
  *  <Pull>: 0: no pull, 1: pull up, 2: pull down.
+ * eg. pm wk_io p=2 m=1 p=0
  */
 static enum cmd_status cmd_pm_wakeupio_exec(char *cmd)
 {
@@ -202,21 +206,16 @@ static enum cmd_status cmd_pm_hibernation_exec(char *cmd)
 	return CMD_STATUS_OK;
 }
 
-static enum cmd_status cmd_pm_poweroff_exec(char *cmd)
-{
-	pm_enter_mode(PM_MODE_POWEROFF);
-
-	return CMD_STATUS_OK;
-}
-
+#if PRJCONF_NET_EN
 static enum cmd_status cmd_pm_net_prepare_exec(char *cmd)
 {
 	pm_set_sync_magic();
 	HAL_PRCM_AllowCPUNDeepSleep();
 	return CMD_STATUS_OK;
 }
+#endif
 
-static struct cmd_data g_pm_cmds[] = {
+static const struct cmd_data g_pm_cmds[] = {
 	{ "config",      cmd_pm_config_exec },
 	{ "dump",        cmd_pm_dump_exec },
 	{ "wk_check",    cmd_pm_check_exec },
@@ -227,9 +226,9 @@ static struct cmd_data g_pm_cmds[] = {
 	{ "sleep",       cmd_pm_sleep_exec },
 	{ "standby",     cmd_pm_standby_exec },
 	{ "hibernation", cmd_pm_hibernation_exec },
-	{ "poweroff",    cmd_pm_poweroff_exec },
+#if PRJCONF_NET_EN
 	{ "net_prepare", cmd_pm_net_prepare_exec },
-	{ "shutdown",    cmd_pm_poweroff_exec },
+#endif
 };
 
 enum cmd_status cmd_pm_exec(char *cmd)

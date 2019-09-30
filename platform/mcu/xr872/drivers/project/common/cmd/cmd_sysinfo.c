@@ -27,6 +27,7 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "version.h"
 #include "cmd_util.h"
 #include "lwip/inet.h"
 #include "common/framework/sysinfo.h"
@@ -111,6 +112,8 @@ enum cmd_status cmd_sysinfo_load_exec(char *cmd)
 }
 #endif
 
+#if PRJCONF_NET_EN
+
 static int cmd_sysinfo_parse_int(const char *value, int min, int max, int *dst)
 {
 	int val;
@@ -134,6 +137,7 @@ static int cmd_sysinfo_parse_int(const char *value, int min, int max, int *dst)
 
 static enum cmd_status cmd_sysinfo_set_mac(char *cmd, struct sysinfo *sysinfo)
 {
+#if (PRJCONF_MAC_ADDR_SOURCE == SYSINFO_MAC_ADDR_FLASH)
 	int i;
 	int cnt;
 	uint32_t mac[SYSINFO_MAC_ADDR_LEN];
@@ -149,6 +153,10 @@ static enum cmd_status cmd_sysinfo_set_mac(char *cmd, struct sysinfo *sysinfo)
 		sysinfo->mac_addr[i] = (uint8_t)mac[i];
 
 	return CMD_STATUS_OK;
+#else
+	CMD_DBG("CMD not supported due to mac addr is not from flash\n");
+	return CMD_STATUS_FAIL;
+#endif
 }
 
 static enum cmd_status cmd_sysinfo_set_ssid(char *cmd, uint8_t *ssid, uint8_t *ssid_len)
@@ -224,6 +232,8 @@ static enum cmd_status cmd_sysinfo_set_netif(char *cmd, ip4_addr_t *addr)
 	return CMD_STATUS_OK;
 }
 
+#endif /* PRJCONF_NET_EN */
+
 enum cmd_status cmd_sysinfo_set_exec(char *cmd)
 {
 	struct sysinfo *sysinfo = sysinfo_get();
@@ -231,6 +241,8 @@ enum cmd_status cmd_sysinfo_set_exec(char *cmd)
 		CMD_ERR("sysinfo %p\n", sysinfo);
 		return CMD_STATUS_FAIL;
 	}
+
+#if PRJCONF_NET_EN
 
 	if (cmd_strncmp(cmd, "mac ", 4) == 0) {
 		return cmd_sysinfo_set_mac(cmd + 4, sysinfo);
@@ -274,6 +286,13 @@ enum cmd_status cmd_sysinfo_set_exec(char *cmd)
 	}
 
 	return CMD_STATUS_OK;
+
+#else /* PRJCONF_NET_EN */
+
+	CMD_ERR("invalid arg '%s'\n", cmd);
+	return CMD_STATUS_INVALID_ARG;
+
+#endif /* PRJCONF_NET_EN */
 }
 
 enum cmd_status cmd_sysinfo_get_exec(char *cmd)
@@ -283,6 +302,8 @@ enum cmd_status cmd_sysinfo_get_exec(char *cmd)
 		CMD_ERR("sysinfo %p\n", sysinfo);
 		return CMD_STATUS_FAIL;
 	}
+
+#if PRJCONF_NET_EN
 
 	if (cmd_strcmp(cmd, "mac") == 0) {
 		CMD_LOG(1, "MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",
@@ -326,9 +347,29 @@ enum cmd_status cmd_sysinfo_get_exec(char *cmd)
 	}
 
 	return CMD_STATUS_OK;
+
+#else /* PRJCONF_NET_EN */
+
+	CMD_ERR("invalid arg '%s'\n", cmd);
+	return CMD_STATUS_INVALID_ARG;
+
+#endif /* PRJCONF_NET_EN */
 }
 
-static struct cmd_data g_sysinfo_cmds[] = {
+enum cmd_status cmd_sysinfo_chip_exec(char *cmd)
+{
+	CMD_LOG(1, "chip arch version %d\n", __CONFIG_CHIP_ARCH_VER);
+	return CMD_STATUS_OK;
+}
+
+enum cmd_status cmd_sysinfo_version_exec(char *cmd)
+{
+	CMD_LOG(1, "version: %s\n", SDK_VERSION_STR);
+
+	return CMD_STATUS_OK;
+}
+
+static const struct cmd_data g_sysinfo_cmds[] = {
     { "default", cmd_sysinfo_default_exec},
 #if PRJCONF_SYSINFO_SAVE_TO_FLASH
     { "save",    cmd_sysinfo_save_exec},
@@ -336,6 +377,8 @@ static struct cmd_data g_sysinfo_cmds[] = {
 #endif
     { "set",     cmd_sysinfo_set_exec},
     { "get",     cmd_sysinfo_get_exec},
+    { "chip",    cmd_sysinfo_chip_exec},
+    { "version", cmd_sysinfo_version_exec},
 };
 
 enum cmd_status cmd_sysinfo_exec(char *cmd)

@@ -27,3 +27,14 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "driver/chip/hal_rtc.h"
+#include "hal_base.h"
+
+void HAL_RTC_SetLeapYear(uint8_t isLeapYear)
+{
+	if (isLeapYear) {
+		HAL_SET_BIT(RTC->YYMMDD, RTC_LEAP_YEAR_BIT);
+	} else {
+		HAL_CLR_BIT(RTC->YYMMDD, RTC_LEAP_YEAR_BIT);
+	}
+}

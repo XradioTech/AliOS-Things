@@ -56,20 +56,14 @@ extern "C" {
 #define EFPG_UA_FRAME_LEN		((76) + EFPG_MSG_DGST_LEN)
 #define EFPG_CHIPID_FRAME_LEN	((16) + EFPG_MSG_DGST_LEN)
 
-#define EFPG_ACK_OK				(200)
-#define EFPG_ACK_CS_ERR			(400)
-#define EFPG_ACK_MD_ERR			(401)
-#define EFPG_ACK_PARSE_ERR		(402)
-#define EFPG_ACK_RW_ERR			(403)
-#define EFPG_ACK_DI_ERR			(404)
-#define EFPG_ACK_NODATA_ERR		(405)
-
 #define EFPG_OP_CODE_READ		(0x0FF0)
 #define EFPG_OP_CODE_WRITE		(0xF00F)
 #define EFPG_OP_CODE_EXIT		(0xFFFF)
 
 #define EFPG_TYPE_HOSC			(0xFF00)
 #define EFPG_TYPE_BOOT			(0xFE01)
+#define EFPG_DCXO_TRIM          (0xFD02)
+#define EFPG_POUT_CAL           (0xFC03)
 #define EFPG_TYPE_MAC			(0xFB04)
 #define EFPG_TYPE_USER_AREA		(0xFA05)
 #define EFPG_TYPE_CHIPID		(0xF906)
@@ -114,32 +108,72 @@ extern "C" {
 #define EFPG_USER_AREA_START	(1447)
 #define EFPG_USER_AREA_NUM		(601)
 #elif (__CONFIG_CHIP_ARCH_VER == 2)
-#define EFPG_HOSC_TYPE_START	(242)
-#define EFPG_HOSC_TYPE_NUM		(4)
 
-#define EFPG_BOOT_FLAG_START	(246)
-#define EFPG_BOOT_FLAG_NUM		(2)
-#define EFPG_BOOT_1ST_EN_START	(248)
-#define EFPG_BOOT_1ST_EN_NUM	(1)
-#define EFPG_BOOT_1ST_NO_START	(249)
-#define EFPG_BOOT_1ST_NO_NUM	(8)
-#define EFPG_BOOT_2ND_EN_START	(257)
-#define EFPG_BOOT_2ND_EN_NUM	(1)
-#define EFPG_BOOT_2ND_NO_START	(258)
-#define EFPG_BOOT_2ND_NO_NUM	(8)
-#define EFPG_BOOT_HASH_START	(266)
-#define EFPG_BOOT_HASH_NUM		(256)
+#define EFPG_CHIPID_1ST_START	        (114)
+#define EFPG_CHIPID_1ST_NUM		        (128)
 
-#define EFPG_MAC_FLAG_START		(522)
-#define EFPG_MAC_FLAG_NUM		(6)
-#define EFPG_MAC_ADDR_START		(528)
-#define EFPG_MAC_ADDR_NUM		(48)
+#define EFPG_HOSC_TYPE_START	        (242)
+#define EFPG_HOSC_TYPE_NUM		        (4)
 
-#define EFPG_CHIPID_1ST_START	(114)
-#define EFPG_CHIPID_1ST_NUM		(128)
+#define EFPG_BOOT_FLAG_START	        (246)
+#define EFPG_BOOT_FLAG_NUM		        (2)
 
-#define EFPG_USER_AREA_START	(672)
-#define EFPG_USER_AREA_NUM		(352)
+#define EFPG_BOOT_1ST_EN_START	        (248)
+#define EFPG_BOOT_1ST_EN_NUM	        (1)
+
+#define EFPG_BOOT_1ST_NO_START	        (249)
+#define EFPG_BOOT_1ST_NO_NUM	        (8)
+
+#define EFPG_BOOT_2ND_EN_START	        (257)
+#define EFPG_BOOT_2ND_EN_NUM	        (1)
+
+#define EFPG_BOOT_2ND_NO_START	        (258)
+#define EFPG_BOOT_2ND_NO_NUM	        (8)
+
+#define EFPG_BOOT_HASH_START	        (266)
+#define EFPG_BOOT_HASH_NUM		        (256)
+
+#define EFPG_DCXO_TRIM_FLAG_START       (522)
+#define EFPG_DCXO_TRIM_FLAG_NUM         (3)
+
+#define EFPG_DCXO_TRIM0_START           (50)
+#define EFPG_DCXO_TRIM0_NUM             (8)
+
+#define EFPG_DCXO_TRIM1_START           (525)
+#define EFPG_DCXO_TRIM1_NUM             (8)
+
+#define EFPG_DCXO_TRIM2_START           (533)
+#define EFPG_DCXO_TRIM2_NUM             (8)
+
+#define EFPG_DCXO_TRIM3_START           (541)
+#define EFPG_DCXO_TRIM3_NUM             (8)
+
+#define EFPG_POUT_CAL_FLAG_START        (549)
+#define EFPG_POUT_CAL_FLAG_NUM          (3)
+
+#define EFPG_POUT_CAL1_START            (552)
+#define EFPG_POUT_CAL1_NUM              (21)
+
+#define EFPG_POUT_CAL2_START            (573)
+#define EFPG_POUT_CAL2_NUM              (21)
+
+#define EFPG_POUT_CAL3_START            (594)
+#define EFPG_POUT_CAL3_NUM              (21)
+
+#define EFPG_MAC_FLAG_START		        (615)
+#define EFPG_MAC_FLAG_NUM		        (6)
+
+#define EFPG_MAC_ADDR_START	            (621)
+#define EFPG_MAC_ADDR_NUM		        (48)
+
+#define EFPG_MAC_ADDR2_START	        (669)
+#define EFPG_MAC_ADDR2_NUM		        (48)
+
+#define EFPG_MAC_ADDR3_START	        (717)
+#define EFPG_MAC_ADDR3_NUM		        (48)
+
+#define EFPG_USER_AREA_START	        (765)
+#define EFPG_USER_AREA_NUM		        (259)
 #endif
 
 #define EFPG_HOSC_BUF_LEN		(1)

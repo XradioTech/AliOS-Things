@@ -26,14 +26,8 @@
  *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef _KERNEL_OS_YUNOS_OS_SEMAPHORE_H_
-#define _KERNEL_OS_YUNOS_OS_SEMAPHORE_H_
-
 #include "kernel/os/YunOS/os_common.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "kernel/os/os_time.h"
 
 typedef struct OS_Semaphore {
 	ksem_t sem;
@@ -41,6 +35,28 @@ typedef struct OS_Semaphore {
 	uint32_t max_count;
 } OS_Semaphore_t;
 
+OS_Status OS_SemaphoreWait(OS_Semaphore_t *sem, OS_Time_t waitMS)
+{
+	tick_t ticks = waitMS == OS_WAIT_FOREVER ? OS_WAIT_FOREVER : OS_MSecsToTicks(waitMS);
+	OS_Status ret;
+	kstat_t sta;
+	uint32_t time_tick = OS_GetTicks();
+
+	if (sem == NULL) {
+		return OS_FAIL;
+	}
+
+	sta = krhino_sem_take(&sem->sem, ticks);
+	if(sta == RHINO_SUCCESS) {
+		if (sem->count)
+			sem->count--;
+		ret = OS_OK;
+	} else {
+		ret = OS_E_TIMEOUT;
+	}
+
+	return ret;
+}
 
 //__nonxip_text
 OS_Status OS_SemaphoreRelease(OS_Semaphore_t *sem)
@@ -57,9 +73,3 @@ OS_Status OS_SemaphoreRelease(OS_Semaphore_t *sem)
 	}
 }
 
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* _KERNEL_OS_YUNOS_OS_SEMAPHORE_H_ */

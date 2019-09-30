@@ -32,6 +32,7 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if (__CONFIG_CHIP_ARCH_VER == 1)
 #include "driver/chip/hal_csi.h"
 #include "driver/chip/hal_gpio.h"
 #include "driver/chip/hal_dma.h"
@@ -54,15 +55,15 @@ uint8_t csi_is_run = 0;
 
 void CSI_ModuleEnable()
 {
-	HAL_CCM_BusDisablePeriphClock(CCM_BUS_PERIPH_BIT_CSI);
-	HAL_CCM_BusForcePeriphReset(CCM_BUS_PERIPH_BIT_CSI);
-	HAL_CCM_BusReleasePeriphReset(CCM_BUS_PERIPH_BIT_CSI);
-	HAL_CCM_BusEnablePeriphClock(CCM_BUS_PERIPH_BIT_CSI);
+	HAL_CCM_BusDisablePeriphClock(CCM_BUS_PERIPH_BIT_CSI_JPEG);
+	HAL_CCM_BusForcePeriphReset(CCM_BUS_PERIPH_BIT_CSI_JPEG);
+	HAL_CCM_BusReleasePeriphReset(CCM_BUS_PERIPH_BIT_CSI_JPEG);
+	HAL_CCM_BusEnablePeriphClock(CCM_BUS_PERIPH_BIT_CSI_JPEG);
 }
 
 void CSI_ModuleDisable()
 {
-	HAL_CCM_BusDisablePeriphClock(CCM_BUS_PERIPH_BIT_CSI);
+	HAL_CCM_BusDisablePeriphClock(CCM_BUS_PERIPH_BIT_CSI_JPEG);
 }
 
 void CSI_InputFormat() //raw
@@ -70,25 +71,23 @@ void CSI_InputFormat() //raw
 	HAL_CLR_BIT(CSI->CSI_CFG_REG , CSI_CFG_INPUT_FORMAT);
 }
 
-void CSI_Irq_Enable()
-{
-	HAL_NVIC_SetPriority(CSI_IRQn, 0);
-	HAL_NVIC_EnableIRQ(CSI_IRQn);
-}
-
-void CSI_Irq_Disable()
-{
-	HAL_NVIC_DisableIRQ(CSI_IRQn);
-}
-
-CSI_Call_Back private_csi_cb;
-
+static CSI_Call_Back private_csi_cb;
 
 __nonxip_text
-void CSI_IRQHandler()
+static void CSI_IRQHandler()
 {
 	if(private_csi_cb.callBack != NULL)
 		private_csi_cb.callBack(private_csi_cb.arg);
+}
+
+static void CSI_Irq_Enable()
+{
+	HAL_NVIC_ConfigExtIRQ(CSI_IRQn, CSI_IRQHandler, NVIC_PERIPH_PRIO_DEFAULT);
+}
+
+static void CSI_Irq_Disable()
+{
+	HAL_NVIC_DisableIRQ(CSI_IRQn);
 }
 
 /**
@@ -395,3 +394,4 @@ void CSI_Printf()
 	printf("CSI_TRUE_DATA_NUM 0x%x 0x%x\n", (uint32_t)&CSI->CSI_TRUE_DATA_NUM, CSI->CSI_TRUE_DATA_NUM);
 	printf("CSI_JPEG_MOD_SEL 0x%x 0x%x\n", (uint32_t)&CSI->CSI_JPEG_MOD_SEL, CSI->CSI_JPEG_MOD_SEL);
 }
+#endif

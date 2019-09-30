@@ -45,6 +45,12 @@ static struct cmd_adc_test_priv{
 	uint32_t	deviation;
 } priv[ADC_CHANNEL_NUM];
 
+static struct cmd_adc_common_priv{
+	uint8_t		work_mode;
+	uint32_t	voltage;
+	uint32_t	deviation;
+} common_priv;
+
 static enum cmd_status cmd_adc_output_check(uint32_t data, uint32_t voltage,
 											uint32_t deviation)
 {
@@ -74,9 +80,22 @@ static void cmd_adc_irq_cb(void *arg)
 	uint32_t channel, data;
 	ADC_IRQState irq_state;
 
+	if (common_priv.work_mode == ADC_BURST_CONV) {
+		uint8_t i, num;
+		num = HAL_ADC_GetFifoDataCount();
+		for(i = 0; i <= num; i++) {
+			if (CMD_STATUS_OK != cmd_adc_output_check(HAL_ADC_GetFifoData(),
+							common_priv.voltage, common_priv.deviation))
+				break;
+		}
+		return;
+	}
+
 	for (channel = ADC_CHANNEL_0; channel < ADC_CHANNEL_NUM; channel++) {
 		if (priv[channel].enable == 0)
 			continue;
+
+		cmd_adc_pass = 1;
 
 		data		= HAL_ADC_GetValue((ADC_Channel)channel);
 		irq_state	= HAL_ADC_GetIRQState((ADC_Channel)channel);
@@ -116,61 +135,26 @@ static void cmd_adc_irq_cb(void *arg)
 			}
 			break;
 		case ADC_IRQ_LOW_DATA:
-			if (irq_state == ADC_LOW_DATA_IRQ) {
-				if (data > priv[channel].low_value) {
-					cmd_adc_pass = 0;
-					CMD_ERR("irq_state = %d, low_value = %u, data = %u\n",
-							irq_state, priv[channel].low_value, data);
-				}
-			} else if (irq_state != ADC_DATA_IRQ) {
+			if (irq_state != ADC_LOW_DATA_IRQ && irq_state != ADC_DATA_IRQ) {
 				cmd_adc_pass = 0;
 				CMD_ERR("irq_mode: ADC_IRQ_LOW_DATA, irq_state = %d\n", irq_state);
 			}
 			break;
 		case ADC_IRQ_HIGH_DATA:
-			if (irq_state == ADC_HIGH_DATA_IRQ) {
-				if (data < priv[channel].high_value) {
-					cmd_adc_pass = 0;
-					CMD_ERR("irq_state = %d, high_value = %u, data = %u\n",
-							irq_state, priv[channel].high_value, data);
-				}
-			} else if (irq_state != ADC_DATA_IRQ) {
+			if (irq_state != ADC_HIGH_DATA_IRQ && irq_state != ADC_DATA_IRQ) {
 				cmd_adc_pass = 0;
 				CMD_ERR("irq_mode: ADC_IRQ_HIGH_DATA, irq_state = %d\n", irq_state);
 			}
 			break;
 		case ADC_IRQ_LOW_HIGH:
-			if (irq_state == ADC_LOW_IRQ) {
-				if (data > priv[channel].low_value) {
-					cmd_adc_pass = 0;
-					CMD_ERR("irq_state = %d, low_value = %u, data = %u\n",
-							irq_state, priv[channel].low_value, data);
-				}
-			} else if (irq_state == ADC_HIGH_IRQ) {
-				if (data < priv[channel].high_value) {
-					cmd_adc_pass = 0;
-					CMD_ERR("irq_state = %d, high_value = %u, data = %u\n",
-							irq_state, priv[channel].high_value, data);
-				}
-			} else {
+			if (irq_state != ADC_LOW_IRQ && irq_state != ADC_HIGH_IRQ) {
 				cmd_adc_pass = 0;
 				CMD_ERR("irq_mode: ADC_IRQ_LOW_HIGH, irq_state = %d\n", irq_state);
 			}
 			break;
 		case ADC_IRQ_LOW_HIGH_DATA:
-			if (irq_state == ADC_LOW_DATA_IRQ) {
-				if (data > priv[channel].low_value) {
-					cmd_adc_pass = 0;
-					CMD_ERR("irq_state = %d, low_value = %u, data = %u\n",
-							irq_state, priv[channel].low_value, data);
-				}
-			} else if (irq_state == ADC_HIGH_DATA_IRQ) {
-				if (data < priv[channel].high_value) {
-					cmd_adc_pass = 0;
-					CMD_ERR("irq_state = %d, high_value = %u, data = %u\n",
-							irq_state, priv[channel].high_value, data);
-				}
-			} else if (irq_state != ADC_DATA_IRQ) {
+			if (irq_state != ADC_LOW_DATA_IRQ && irq_state != ADC_HIGH_DATA_IRQ
+			                                  && irq_state != ADC_DATA_IRQ) {
 				cmd_adc_pass = 0;
 				CMD_ERR("irq_mode: ADC_IRQ_LOW_HIGH_DATA, irq_state = %d\n", irq_state);
 			}
@@ -178,6 +162,7 @@ static void cmd_adc_irq_cb(void *arg)
 		default:
 			cmd_adc_pass = 0;
 			CMD_ERR("channel = %u, irq_mode = %u\n", channel, priv[channel].irq_mode);
+			break;
 		}
 	}
 
@@ -189,12 +174,18 @@ static enum cmd_status cmd_adc_init_exec(char *cmd)
 	int cnt;
 	uint32_t freq;
 	uint32_t delay;
+	uint32_t work_mode;
 	ADC_InitParam adc_param;
 	HAL_Status hal_status;
 
-	cnt = cmd_sscanf(cmd, "f=%u d=%u", &freq, &delay);
-	if (cnt != 2) {
+	cnt = cmd_sscanf(cmd, "m=%u f=%u d=%u", &work_mode, &freq, &delay);
+	if (cnt != 3) {
 		CMD_ERR("cmd_sscanf return: cnt = %d\n", cnt);
+		return CMD_STATUS_INVALID_ARG;
+	}
+
+	if (work_mode > 1) {
+		CMD_ERR("invalid work mode %u\n", work_mode);
 		return CMD_STATUS_INVALID_ARG;
 	}
 
@@ -212,10 +203,14 @@ static enum cmd_status cmd_adc_init_exec(char *cmd)
 
 	adc_param.freq		= freq;
 	adc_param.delay		= delay;
-	adc_param.mode		= ADC_CONTI_CONV;
+	adc_param.mode		= work_mode ? ADC_BURST_CONV : ADC_CONTI_CONV;
+#if (__CONFIG_CHIP_ARCH_VER == 2)
+	adc_param.vref_mode = ADC_VREF_MODE_1;
+#endif
 
 	hal_status = HAL_ADC_Init(&adc_param);
 	if (hal_status == HAL_OK) {
+		common_priv.work_mode = adc_param.mode;
 		return CMD_STATUS_OK;
 	} else {
 		CMD_ERR("HAL_ADC_Init return: hal_status = %d\n", hal_status);
@@ -322,6 +317,18 @@ static enum cmd_status cmd_adc_config_exec(char *cmd)
 		return CMD_STATUS_INVALID_ARG;
 	}
 
+	if (common_priv.work_mode == ADC_BURST_CONV) {
+		hal_status = HAL_ADC_FifoConfigChannel((ADC_Channel)channel, (ADC_Select)enable);
+		if (hal_status != HAL_OK) {
+			CMD_ERR("HAL_ADC_FifoConfigChannel return: hal_status = %d\n", hal_status);
+			return CMD_STATUS_FAIL;
+		}
+		common_priv.voltage = voltage;
+		common_priv.deviation = deviation;
+
+		return CMD_STATUS_OK;
+	}
+
 	hal_status = HAL_ADC_ConfigChannel((ADC_Channel)channel, (ADC_Select)enable,
 									   (ADC_IRQMode)irq_mode, low_value, high_value);
 	if (hal_status != HAL_OK) {
@@ -393,16 +400,16 @@ static enum cmd_status cmd_adc_conv_it_stop_exec(char *cmd)
 		return CMD_STATUS_FAIL;
 }
 
-static struct cmd2_data g_adc_cmds[] = {
-	{ "init ",			5,	cmd_adc_init_exec },
-	{ "deinit",			6,	cmd_adc_deinit_exec },
-	{ "conv-polling ",	13,	cmd_adc_conv_polling_exec },
-	{ "config ",		7,	cmd_adc_config_exec },
-	{ "conv-it-start",	13,	cmd_adc_conv_it_start_exec },
-	{ "conv-it-stop",	12,	cmd_adc_conv_it_stop_exec },
+static const struct cmd_data g_adc_cmds[] = {
+    { "init",           cmd_adc_init_exec },
+    { "deinit",         cmd_adc_deinit_exec },
+    { "conv-polling",   cmd_adc_conv_polling_exec },
+    { "config",         cmd_adc_config_exec },
+    { "conv-it-start",  cmd_adc_conv_it_start_exec },
+    { "conv-it-stop",   cmd_adc_conv_it_stop_exec },
 };
 
 enum cmd_status cmd_adc_exec(char *cmd)
 {
-	return cmd2_exec(cmd, g_adc_cmds, cmd_nitems(g_adc_cmds));
+	return cmd_exec(cmd, g_adc_cmds, cmd_nitems(g_adc_cmds));
 }

@@ -122,6 +122,7 @@ extern "C" {
 #else /* __CONFIG_SECTION_ATTRIBUTE_NONXIP */
 
 #define __s_func        __func__
+#define HAL_IT_LOG      HAL_LOG
 #define HAL_IT_DBG      HAL_DBG
 #define HAL_IT_I2C_DBG  HAL_I2C_DBG
 #define HAL_IT_MBOX_DBG	HAL_MBOX_DBG

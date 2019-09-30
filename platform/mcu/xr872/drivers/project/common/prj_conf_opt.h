@@ -196,19 +196,14 @@ extern "C" {
 #define PRJCONF_MMC_DETECT_MODE         CARD_ALWAYS_PRESENT
 #endif
 
-/* sound card0 (external audio codec) enable/disable */
-#ifndef PRJCONF_SOUNDCARD0_EN
-#define PRJCONF_SOUNDCARD0_EN           0
+/* Xradio internal codec sound card enable/disable */
+#ifndef PRJCONF_INTERNAL_SOUNDCARD_EN
+#define PRJCONF_INTERNAL_SOUNDCARD_EN   0
 #endif
 
-/* sound card1 (internal dmic) enable/disable */
-#ifndef PRJCONF_SOUNDCARD1_EN
-#define PRJCONF_SOUNDCARD1_EN           0
-#endif
-
-/* sound card2 (internal audio codec) enable/disable */
-#ifndef PRJCONF_SOUNDCARD2_EN
-#define PRJCONF_SOUNDCARD2_EN           0
+/* AC107 sound card enable/disable */
+#ifndef PRJCONF_AC107_SOUNDCARD_EN
+#define PRJCONF_AC107_SOUNDCARD_EN		0
 #endif
 
 /* audio control enable/disable */

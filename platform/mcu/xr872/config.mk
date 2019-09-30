@@ -1,7 +1,6 @@
 
-#ota,xip,lwip,compress function config
-no_with_lwip := 0
-no_with_xip := 0
-no_with_image_compress := 0
-no_with_ota := 0
-no_with_rom := 1
+#ota,xip,lwip, function config
+with_lwip := 0
+with_xip := 1
+with_ota := 1
+with_rom := 0

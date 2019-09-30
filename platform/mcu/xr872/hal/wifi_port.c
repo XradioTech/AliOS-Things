@@ -40,6 +40,7 @@
 #include "kernel/os/os.h"
 #include "common/framework/sys_ctrl/sys_ctrl.h"
 #include "smartlink/sc_assistant.h"
+#include "net/wlan/wlan_ext_req.h"
 
 #define WIFI_PORT_DEBUG 0
 #if WIFI_PORT_DEBUG
@@ -154,8 +155,17 @@ static void recv_mgnt_rawframe(uint8_t *data, uint32_t len, void *info)
 		frame->i_addr2[3],frame->i_addr2[4],frame->i_addr2[5],frame->i_addr3[0],frame->i_addr3[1],frame->i_addr3[2],
 		frame->i_addr3[3],frame->i_addr3[4],frame->i_addr3[5],frame->i_seq[0]|(frame->i_seq[1] << 8));
 #endif
-
+#if 0
 	struct ieee80211_frame *frame = (struct ieee80211_frame *)data;
+	if(ieee80211_is_probe_req(frame->i_fc[0])) {
+		printf("rx probe req\n");
+	} else if(ieee80211_is_data(frame->i_fc[0])) {
+		printf("rx data\n");
+	} else {
+		printf("other pkt fc 0x%02x\n", frame->i_fc[0]);
+	}
+#endif
+#if 0
 	if(frame) {
 		if((frame->i_addr2[0] == 0x00) && (frame->i_addr2[1] == 0x63) &&
 			(frame->i_addr2[2] == 0x39) && (frame->i_addr2[3] == 0x33) &&
@@ -172,7 +182,9 @@ static void recv_mgnt_rawframe(uint8_t *data, uint32_t len, void *info)
 	    }
 	}
 #endif
-	//WIFI_DEBUG("recv_mgnt_rawframe\n");
+#endif
+	WIFI_DEBUG("recv_mgnt_rawframe\n");
+	//printf("recv_mgnt_rawframe\n");
     g_mgnt_cb(data, len, info);
 }
 
@@ -420,7 +432,7 @@ int xr871_wlan_set_channel(int ch)
 {
 	struct netif *nif = g_wlan_netif;
 
-	//WIFI_DEBUG("wlan set monitor channel %d\n", ch);
+	printf("wlan set monitor channel %d\n", ch);
 	return wlan_monitor_set_channel(nif, ch);
 }
 
@@ -510,12 +522,44 @@ void xr871_wlan_register_mgnt_monitor_cb(monitor_data_cb_t fn)
 {
 	struct netif *nif = g_wlan_netif;
 
+	//sta connect ap, rx set
+	//1. Set Filter1
+	wlan_ext_frm_filter_set_t filter;
+	memset(&filter, 0, sizeof(wlan_ext_frm_filter_set_t));
+	filter.Filter1Cfg = 1;
+	filter.Filter1.FilterEnable = RCV_FRM_FILTER_FRAME_TYPE;
+	filter.Filter1.AndOperationMask = RCV_FRM_FILTER_FRAME_TYPE;
+	filter.Filter1.FrameType = FILTER_D11_SUB_MGMT_PBRQ;
+
+	//2. Send cmd to net
+	wlan_ext_request(g_wlan_netif, WLAN_EXT_CMD_SET_FRM_FILTER, (int)(&filter));
+
+	//3. Set param
+	wlan_ext_rcv_spec_frm_param_set_t rcv_param;
+	memset(&rcv_param, 0, sizeof(wlan_ext_rcv_spec_frm_param_set_t));
+	rcv_param.Enable = 1;
+	rcv_param.u32RecvSpecFrameCfg =  RECV_BROADCAST_FRAME_ENABLE;
+
+	//4. Send cmd to net
+	wlan_ext_request(g_wlan_netif, WLAN_EXT_CMD_SET_RCV_SPECIAL_FRM, (int)(&rcv_param));
+
+	//sta connect ap, tx raw pkt set
+	//1. Set param
+	wlan_ext_send_raw_frm_param_set_t send_param;
+	memset(&send_param, 0, sizeof(wlan_ext_send_raw_frm_param_set_t));
+	send_param.Enable = 1;
+	send_param.u16SendRawFrameCfg = 0;
+
+	//2. Send cmd to net
+	wlan_ext_request(g_wlan_netif, WLAN_EXT_CMD_SET_SEND_RAW_FRM_CFG, (int)(&send_param));
+
 	if (nif) {
 		//wlan_monitor_set_rx_cb(nif, NULL);
 		wlan_monitor_set_rx_cb(nif, recv_mgnt_rawframe);
 	}
 
 	WIFI_DEBUG("wlan register manage monitor callback: %p\n", fn);
+	//printf("wlan register manage monitor callback: %p\n", fn);
 	g_mgnt_cb = (wlan_monitor_rx_cb)fn;
 }
 
@@ -556,6 +600,7 @@ int xr871_wlan_send_80211_raw_frame(uint8_t *buf, int len)
 #endif
 	ret = wlan_send_raw_frame(nif, IEEE80211_FC_STYPE_PROBE_REQ, buf, len);
 
+	//printf("send raw frame,len %d\n", len);
 	WIFI_DEBUG("send raw frame,len %d\n", len);
 	if (ret != 0) {
 		WIFI_DEBUG("send raw frame fail\n");

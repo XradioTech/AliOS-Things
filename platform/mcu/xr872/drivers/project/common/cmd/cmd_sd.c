@@ -40,27 +40,54 @@
 
 static struct mmc_card *card;
 
-extern int32_t mmc_test(uint32_t cd_mode);
-extern int32_t mmc_test_init(void);
-extern int32_t mmc_test_exit(void);
-struct mmc_card *mmc_scan_init(void);
+extern int32_t mmc_test(uint32_t host_id, uint32_t cd_mode, uint32_t sdc_degmask, uint32_t card_dbgmask);
+extern int32_t mmc_test_init(uint32_t host_id, SDC_InitTypeDef *sdc_param, uint32_t scan);
+extern int32_t mmc_test_exit(uint16_t sd_id, uint16_t host_id);
+extern struct mmc_card *mmc_scan_init(uint16_t sd_id, uint16_t sdc_id, SDCard_InitTypeDef *card_param);
 
-/*
- * drv sd init
+/* drv sd init [<card_id> <debug_mask>]
+ * eg:
+ * 1. drv sd init
+ * 2. drv sd init 0 0x7f
  */
 static enum cmd_status cmd_sd_init_exec(char *cmd)
 {
-	mmc_test_init();
+	uint32_t cnt;
+	uint32_t card_id, debug_mask;
+	SDC_InitTypeDef sdc_param = { 0 };
+
+	cnt = cmd_sscanf(cmd, "%d 0x%x", &card_id, &debug_mask);
+	if (cnt != 2) {
+		mmc_test_init(0, NULL, 0);
+	} else {
+		sdc_param.cd_mode = CARD_ALWAYS_PRESENT;
+		sdc_param.debug_mask = debug_mask;
+		mmc_test_init(card_id, &sdc_param, 0);
+	}
 
 	return CMD_STATUS_OK;
 }
 
-/*
- * drv sd scan
+/* drv sd scan [<card_id> <host_id> <card_type> <debug_mask>]
+ * eg:
+ * 1. drv sd scan
+ * 2. drv sd scan 0 0 2 0x7f
  */
 static enum cmd_status cmd_sd_scan_exec(char *cmd)
 {
-	card = mmc_scan_init();
+	uint32_t cnt;
+	uint32_t card_id, host_id, type, debug_mask;
+	SDCard_InitTypeDef card_param = { 0 };
+
+	cnt = cmd_sscanf(cmd, "%d %d %d 0x%x", &card_id, &host_id, &type, &debug_mask);
+	if (cnt != 4) {
+		card = mmc_scan_init(0, 0, NULL);
+	} else {
+		card_param.debug_mask = debug_mask;
+		card_param.type = type;
+		card = mmc_scan_init(card_id, host_id, &card_param);
+	}
+
 	if (!card) {
 		CMD_ERR("scan card failed!\n");
 		return CMD_STATUS_OK;;
@@ -102,21 +129,47 @@ static enum cmd_status cmd_sd_read_exec(char *cmd)
 }
 
 /*
- * drv sd test
+ * eg:
+ * 1. drv sd test
+ * 2. drv sd test 0 3 0x3c 0x3c
+ * 3. drv sd test 0 2 0x3c 0x3c
  */
 static enum cmd_status cmd_sd_test_exec(char *cmd)
 {
-	mmc_test(0);
+	uint32_t cnt;
+	uint32_t host_id, cd_mode, sdc_degmask, card_dbgmask;
+
+	cnt = cmd_sscanf(cmd, "%d %d 0x%x 0x%x", &host_id, &cd_mode, &sdc_degmask, &card_dbgmask);
+	if (cnt != 4) {
+		CMD_DBG("use defaule argument %s\n", cmd);
+		host_id = 0;
+		cd_mode = CARD_ALWAYS_PRESENT;
+		sdc_degmask = ROM_WRN_MASK | ROM_ERR_MASK | ROM_ANY_MASK;
+		card_dbgmask = ROM_WRN_MASK | ROM_ERR_MASK | ROM_ANY_MASK;
+	}
+	mmc_test(host_id, cd_mode, sdc_degmask, card_dbgmask);
+	printf("%s,%d\n", __func__, __LINE__);
 
 	return CMD_STATUS_OK;
 }
 
 /*
- * drv sd deinit
+ * drv sd deinit [<card_id> <host_id>]
+ * eg.
+ *   1. sd deinit
+ *   2. sd deinit 0 0
  */
 static enum cmd_status cmd_sd_deinit_exec(char *cmd)
 {
-	mmc_test_exit();
+	uint32_t cnt;
+	uint32_t card_id, host_id;
+
+	cnt = cmd_sscanf(cmd, "%d %d", &card_id, &host_id);
+	if (cnt != 2) {
+		card_id = 0;
+		host_id = 0;
+	}
+	mmc_test_exit(card_id, host_id);
 
 	return CMD_STATUS_OK;
 }
@@ -127,7 +180,10 @@ struct sd_test_param {
 	uint8_t task_idx;
 	uint8_t random;
 	uint8_t task_num;
+	uint8_t card_dma_use;
 	uint16_t time_sec;
+	uint16_t host_debug_mask;
+	uint16_t card_debug_mask;
 	uint32_t start_sector;
 	uint32_t sector_num;
 };
@@ -148,10 +204,11 @@ static void cmd_sd_bench_task(void *arg)
 		goto out;
 	}
 
-	mmc_test_init();
-	card = mmc_scan_init();
+	mmc_test_init(0, NULL, 1);
+
+	card = mmc_card_open(0);
 	if (!card) {
-		CMD_ERR("scan card failed!\n");
+		CMD_ERR("card open failed!\n");
 		goto out;
 	}
 
@@ -234,7 +291,8 @@ next:
 
 out:
 	CMD_DBG("%s test end\n", __func__);
-	mmc_test_exit();
+	mmc_card_close(0);
+	mmc_test_exit(card->id, 0);
 	cmd_free(arg);
 	OS_ThreadDelete(NULL);
 }
@@ -253,6 +311,12 @@ static void cmd_sd_press_read_task(void *arg)
 	uint32_t random_sleep = param->random;
 	char *buf;
 	uint32_t start_sector = param->start_sector;
+
+	card = mmc_card_open(0);
+	if (!card) {
+		CMD_ERR("card open failed!\n");
+		goto fail;
+	}
 
 	if (param->task_idx == 0) {
 		buf = cmd_malloc(4096);
@@ -327,6 +391,8 @@ out:
 	CMD_DBG("%s id:%d test end\n", __func__, param->task_idx);
 	cmd_free(buf);
 exit:
+	mmc_card_close(0);
+fail:
 	cmd_free(param);
 	if (param->task_idx == 0)
 		OS_SemaphoreDelete(&sem_wait);
@@ -344,6 +410,12 @@ static void cmd_sd_press_write_task(void *arg)
 	uint32_t start_sector = param->start_sector;
 	uint32_t round = 0;
 	uint32_t total_num;
+
+	card = mmc_card_open(0);
+	if (!card) {
+		CMD_ERR("card open failed!\n");
+		goto fail;
+	}
 
 	buf = cmd_malloc(param->sector_num*512);
 	if (!buf)
@@ -421,8 +493,10 @@ static void cmd_sd_press_write_task(void *arg)
 	}
 
 out:
+	mmc_card_close(0);
 	CMD_DBG("%s id:%d test end\n", __func__, param->task_idx);
 	cmd_free(buf);
+fail:
 	cmd_free(param);
 	OS_ThreadDelete(NULL);
 }
@@ -465,6 +539,8 @@ static enum cmd_status cmd_sd_bench_exec(char *cmd)
 /*
  * drv sd press r=<threads_num> s=<Start_Sector> n=<sector_num> w=<threads_num>
  *              s=<Start_Sector> n=<sector_num> t=<secons>
+ * eg:
+ *    drv sd press r=2 s=200000 n=20 w=2 s=400000 n=20 t=600
  */
 static enum cmd_status cmd_sd_press_exec(char *cmd)
 {
@@ -510,7 +586,7 @@ static enum cmd_status cmd_sd_press_exec(char *cmd)
 		                    param,
 		                    OS_THREAD_PRIO_APP,
 		                    2 * 1024) != OS_OK) {
-			CMD_ERR("create sd bench test task failed\n");
+			CMD_ERR("create sd press read task:%d failed\n", i);
 			return CMD_STATUS_FAIL;
 		}
 		(void)cmd_sd_press_read_task;
@@ -539,7 +615,7 @@ static enum cmd_status cmd_sd_press_exec(char *cmd)
 				    param,
 				    OS_THREAD_PRIO_APP,
 				    2 * 1024) != OS_OK) {
-			CMD_ERR("create sd bench test task failed\n");
+			CMD_ERR("create sd press write task:%d failed\n", i);
 			return CMD_STATUS_FAIL;
 		}
 		OS_MSleep(2);
@@ -549,7 +625,7 @@ out:
 	return CMD_STATUS_OK;
 }
 
-static struct cmd_data g_sd_cmds[] = {
+static const struct cmd_data g_sd_cmds[] = {
 	{ "init",     cmd_sd_init_exec },
 	{ "deinit",   cmd_sd_deinit_exec },
 	{ "scan",     cmd_sd_scan_exec },

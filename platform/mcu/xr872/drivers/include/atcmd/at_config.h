@@ -37,6 +37,14 @@ extern "C" {
 #endif
 
 typedef struct {
+
+	at_di_t CIPMUX;
+	at_di_t apDhcp;
+	at_di_t staDhcp;
+	
+	at_di_t link_type[5]; // 0 TCP 1UDP
+	
+		
 	at_text_t nv_manuf[32]; /* ST TEXT[32] Manufacturer ID string */
 	at_text_t nv_model[32]; /* SPWF01Sxyz TEXT[32] Manufacturer model string */
 	at_text_t nv_serial[32]; /* 1214003 TEXT[32] Manufacturer serial number */
@@ -64,7 +72,7 @@ typedef struct {
 
 	at_di_t wifi_listen_interval; /* 0 INT Define the wakeup mode (0 = sleep up to the beacon_wakeup specified, 1 = sleep at least to the beacon_wakeup specified) */
 	at_di_t wifi_rts_threshold; /* 3000 INT Frame size over which RTS/CTS is used. Limit: from 0 to 3000 */
-	at_hex_t wifi_ssid[32]; /* 50:72:6F:64:75:63:74:69:6F:6E:31:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00 HEX[32] Desired SSID specified in hex. All 32 octets should be written. Note that wifi_ssid_len must also be set. */
+	at_hex_t wifi_ssid[33]; /* 50:72:6F:64:75:63:74:69:6F:6E:31:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00 HEX[32] Desired SSID specified in hex. All 32 octets should be written. Note that wifi_ssid_len must also be set. */
 	at_di_t wifi_ssid_len; /* 11 INT Length of the actual SSID in the 32 byte buffer */
 	at_di_t wifi_channelnum; /* 6 INT Channel number to use for MiniAP operation. The user must properly set the channel number to not violate IEEE 802.11 Wi-Fi/WLAN standards. */
 
@@ -102,7 +110,7 @@ typedef struct {
 	at_di_t wifi_wep_default_key; /* 0 INT Default WEP key used for authentication */
 	at_hex_t wifi_wpa_psk_raw[32]; /* 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00 HEX[32] Pre-calculated PSK key */
 
-	at_text_t wifi_wpa_psk_text[64]; /* a_psk_pass TEXT[64] WPA(2) PSK passphrase, if set the actual PSK will be generated from this.Used in STA, IBSS and MiniAP. */
+	at_text_t wifi_wpa_psk_text[65]; /* a_psk_pass TEXT[64] WPA(2) PSK passphrase, if set the actual PSK will be generated from this.Used in STA, IBSS and MiniAP. */
 	at_di_t ip_use_dhcp; /* 1 INT DHCP server on/off. Used in STA, IBSS and MiniAP.
 								  0=off (in STA mode: the variables ip_ipaddr, ip_netmask and ip_gw must be properly set to connect to the AP),
 								  1=on (in STA mode: the ipaddr, netmask and gw will be provided by the AP),

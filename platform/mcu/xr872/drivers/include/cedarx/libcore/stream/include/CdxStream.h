@@ -320,35 +320,35 @@ struct CdxStreamCreatorS
 
 struct CdxStreamOpsS
 {
-    cdx_int32 (*connect)(CdxStreamT * /*stream*/);
+    cdx_int32 (*cdxConnect)(CdxStreamT * /*stream*/);
 
-    CdxStreamProbeDataT *(*getProbeData)(CdxStreamT * /*stream*/);
+    CdxStreamProbeDataT *(*cdxGetProbeData)(CdxStreamT * /*stream*/);
 
-    cdx_int32 (*read)(CdxStreamT * /*stream*/, void * /*buf*/, cdx_uint32 /*len*/);
+    cdx_int32 (*cdxRead)(CdxStreamT * /*stream*/, void * /*buf*/, cdx_uint32 /*len*/);
 
-    cdx_int32 (*close)(CdxStreamT * /*stream*/);
+    cdx_int32 (*cdxClose)(CdxStreamT * /*stream*/);
 
-    cdx_int32 (*getIOState)(CdxStreamT * /*stream*/);
+    cdx_int32 (*cdxGetIOState)(CdxStreamT * /*stream*/);
 
-    cdx_uint32 (*attribute)(CdxStreamT * /*stream*/);
+    cdx_uint32 (*cdxAttribute)(CdxStreamT * /*stream*/);
 
-    cdx_int32 (*control)(CdxStreamT * /*stream*/, cdx_int32 /*cmd*/, void * /*param*/);
+    cdx_int32 (*cdxControl)(CdxStreamT * /*stream*/, cdx_int32 /*cmd*/, void * /*param*/);
 
     /*以上接口必须实现*/
 
-    cdx_int32 (*write)(CdxStreamT *, void * /*buf*/, cdx_uint32 /*len*/);
+    cdx_int32 (*cdxWrite)(CdxStreamT *, void * /*buf*/, cdx_uint32 /*len*/);
 
-    cdx_int32 (*getMetaData)(CdxStreamT *, const cdx_char * /*key*/, void ** /*pVal*/);
+    cdx_int32 (*cdxGetMetaData)(CdxStreamT *, const cdx_char * /*key*/, void ** /*pVal*/);
 
-    cdx_int32 (*seek)(CdxStreamT * /*stream*/, cdx_int64 /*offset*/, cdx_int32 /*whence*/);
+    cdx_int32 (*cdxSeek)(CdxStreamT * /*stream*/, cdx_int64 /*offset*/, cdx_int32 /*whence*/);
 
-    cdx_int32 (*seekToTime)(CdxStreamT * /*stream*/, cdx_int64 /*time us*/);
+    cdx_int32 (*cdxSeekToTime)(CdxStreamT * /*stream*/, cdx_int64 /*time us*/);
 
-    cdx_bool (*eos)(CdxStreamT * /*stream*/);
+    cdx_bool (*cdxEos)(CdxStreamT * /*stream*/);
 
-    cdx_int64 (*tell)(CdxStreamT * /*stream*/);
+    cdx_int64 (*cdxTell)(CdxStreamT * /*stream*/);
 
-    cdx_int64 (*size)(CdxStreamT * /*stream*/);
+    cdx_int64 (*cdxSize)(CdxStreamT * /*stream*/);
 
     //cdx_int32 (*forceStop)(CdxStreamT * /*stream*/);
 
@@ -385,24 +385,24 @@ static inline cdx_int32 CdxStreamConnect(CdxStreamT *stream)
 {
     CDX_CHECK(stream);
     CDX_CHECK(stream->ops);
-    CDX_CHECK(stream->ops->connect);
-    return stream->ops->connect(stream);
+    CDX_CHECK(stream->ops->cdxConnect);
+    return stream->ops->cdxConnect(stream);
 }
 
 static inline CdxStreamProbeDataT *CdxStreamGetProbeData(CdxStreamT *stream)
 {
     CDX_CHECK(stream);
     CDX_CHECK(stream->ops);
-    CDX_CHECK(stream->ops->getProbeData);
-    return stream->ops->getProbeData(stream);
+    CDX_CHECK(stream->ops->cdxGetProbeData);
+    return stream->ops->cdxGetProbeData(stream);
 }
 
 static inline cdx_int32 CdxStreamRead(CdxStreamT *stream, void *buf, cdx_int32 len)
 {
     CDX_CHECK(stream);
     CDX_CHECK(stream->ops);
-    CDX_CHECK(stream->ops->read);
-    return stream->ops->read(stream, buf, len);
+    CDX_CHECK(stream->ops->cdxRead);
+    return stream->ops->cdxRead(stream, buf, len);
 }
 
 static inline cdx_int32 CdxStreamWrite(CdxStreamT *stream, void *buf, cdx_int32 len)
@@ -410,31 +410,31 @@ static inline cdx_int32 CdxStreamWrite(CdxStreamT *stream, void *buf, cdx_int32 
     CDX_CHECK(stream);
     CDX_CHECK(stream->ops);
 
-    return stream->ops->write ? stream->ops->write(stream, buf, len) : -1;
+    return stream->ops->cdxWrite ? stream->ops->cdxWrite(stream, buf, len) : -1;
 }
 
 static inline cdx_int32 CdxStreamClose(CdxStreamT *stream)
 {
     CDX_CHECK(stream);
     CDX_CHECK(stream->ops);
-    CDX_CHECK(stream->ops->close);
-    return stream->ops->close(stream);
+    CDX_CHECK(stream->ops->cdxClose);
+    return stream->ops->cdxClose(stream);
 }
 
 static inline cdx_int32 CdxStreamGetIoState(CdxStreamT *stream)
 {
     CDX_CHECK(stream);
     CDX_CHECK(stream->ops);
-    CDX_CHECK(stream->ops->getIOState);
-    return stream->ops->getIOState(stream);
+    CDX_CHECK(stream->ops->cdxGetIOState);
+    return stream->ops->cdxGetIOState(stream);
 }
 
 static inline cdx_uint32 CdxStreamAttribute(CdxStreamT *stream)
 {
     CDX_CHECK(stream);
     CDX_CHECK(stream->ops);
-    CDX_CHECK(stream->ops->attribute);
-    return stream->ops->attribute(stream);
+    CDX_CHECK(stream->ops->cdxAttribute);
+    return stream->ops->cdxAttribute(stream);
 }
 
 static inline cdx_int32 CdxStreamControl(CdxStreamT *stream,
@@ -442,8 +442,8 @@ static inline cdx_int32 CdxStreamControl(CdxStreamT *stream,
 {
     CDX_CHECK(stream);
     CDX_CHECK(stream->ops);
-    CDX_CHECK(stream->ops->control);
-    return stream->ops->control(stream, cmd, param);
+    CDX_CHECK(stream->ops->cdxControl);
+    return stream->ops->cdxControl(stream, cmd, param);
 }
 
 //#define STREAM_METADATA_ORGINAL_URI     "stream.orginalUri"
@@ -455,8 +455,8 @@ static inline cdx_int32 CdxStreamGetMetaData(CdxStreamT *stream,
 {
     CDX_CHECK(stream);
     CDX_CHECK(stream->ops);
-    return stream->ops->getMetaData ?
-            stream->ops->getMetaData(stream, key, pVal) :
+    return stream->ops->cdxGetMetaData ?
+            stream->ops->cdxGetMetaData(stream, key, pVal) :
             -1;
 }
 
@@ -466,7 +466,7 @@ static inline cdx_int32 CdxStreamSeek(CdxStreamT *stream, cdx_int64 offset,
     CDX_CHECK(stream);
     CDX_CHECK(stream->ops);
 
-    return stream->ops->seek ? stream->ops->seek(stream, offset, whence) : -1;
+    return stream->ops->cdxSeek ? stream->ops->cdxSeek(stream, offset, whence) : -1;
 }
 
 static inline cdx_int32 CdxStreamSeekToTime(CdxStreamT *stream, cdx_int64 timeUs)
@@ -474,7 +474,7 @@ static inline cdx_int32 CdxStreamSeekToTime(CdxStreamT *stream, cdx_int64 timeUs
     CDX_CHECK(stream);
     CDX_CHECK(stream->ops);
 
-    return stream->ops->seekToTime ? stream->ops->seekToTime(stream, timeUs) : -1;
+    return stream->ops->cdxSeekToTime ? stream->ops->cdxSeekToTime(stream, timeUs) : -1;
 }
 
 static inline cdx_bool CdxStreamEos(CdxStreamT *stream)
@@ -482,7 +482,7 @@ static inline cdx_bool CdxStreamEos(CdxStreamT *stream)
     CDX_CHECK(stream);
     CDX_CHECK(stream->ops);
 
-    return stream->ops->eos ? stream->ops->eos(stream) : CDX_FALSE;
+    return stream->ops->cdxEos ? stream->ops->cdxEos(stream) : CDX_FALSE;
 }
 
 static inline cdx_int64 CdxStreamTell(CdxStreamT *stream)
@@ -490,7 +490,7 @@ static inline cdx_int64 CdxStreamTell(CdxStreamT *stream)
     CDX_CHECK(stream);
     CDX_CHECK(stream->ops);
 
-    return stream->ops->tell ? stream->ops->tell(stream) : -1;
+    return stream->ops->cdxTell ? stream->ops->cdxTell(stream) : -1;
 }
 /*
 CDX_INTERFACE cdx_int32 CdxStreamForceStop(CdxStreamT *stream)
@@ -507,7 +507,7 @@ static inline cdx_int64 CdxStreamSize(CdxStreamT *stream)
     CDX_CHECK(stream);
     CDX_CHECK(stream->ops);
 
-    return stream->ops->size ? stream->ops->size(stream) : (-1LL);
+    return stream->ops->cdxSize ? stream->ops->cdxSize(stream) : (-1LL);
 }
 
 #define CdxStreamSeekAble(stream) \

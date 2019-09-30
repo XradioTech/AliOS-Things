@@ -376,23 +376,23 @@ struct CdxParserCreatorS
 
 struct CdxParserOpsS
 {
-    cdx_int32 (*control)(CdxParserT *, cdx_int32 /* cmd */, void * /* param */);
+    cdx_int32 (*cdxControl)(CdxParserT *, cdx_int32 /* cmd */, void * /* param */);
 
-    cdx_int32 (*prefetch)(CdxParserT *, CdxPacketT * /* pkt */);
+    cdx_int32 (*cdxPrefetch)(CdxParserT *, CdxPacketT * /* pkt */);
 
-    cdx_int32 (*read)(CdxParserT *, CdxPacketT * /* pkt */);
+    cdx_int32 (*cdxRead)(CdxParserT *, CdxPacketT * /* pkt */);
 
-    cdx_int32 (*getMediaInfo)(CdxParserT *, CdxMediaInfoT * /* MediaInfo */);
+    cdx_int32 (*cdxGetMediaInfo)(CdxParserT *, CdxMediaInfoT * /* MediaInfo */);
 
-    cdx_int32 (*seekTo)(CdxParserT *, cdx_int64 /* timeUs */);
+    cdx_int32 (*cdxSeekTo)(CdxParserT *, cdx_int64 /* timeUs */);
 
-    cdx_uint32 (*attribute)(CdxParserT *); /*return falgs define as open's falgs*/
+    cdx_uint32 (*cdxAttribute)(CdxParserT *); /*return falgs define as open's falgs*/
 
-    cdx_int32 (*getStatus)(CdxParserT *); /*return enum CdxPrserStatusE*/
+    cdx_int32 (*cdxGetStatus)(CdxParserT *); /*return enum CdxPrserStatusE*/
 
-    cdx_int32 (*close)(CdxParserT *);
+    cdx_int32 (*cdxClose)(CdxParserT *);
 
-    cdx_int32 (*init)(CdxParserT *);
+    cdx_int32 (*cdxInit)(CdxParserT *);
 };
 
 struct CdxParserS
@@ -433,24 +433,24 @@ static inline cdx_int32 CdxParserControl(CdxParserT *parser, cdx_int32 cmd, void
 {
     CDX_CHECK(parser);
     CDX_CHECK(parser->ops);
-    CDX_CHECK(parser->ops->control);
-    return parser->ops->control(parser, cmd, param);
+    CDX_CHECK(parser->ops->cdxControl);
+    return parser->ops->cdxControl(parser, cmd, param);
 }
 
 static inline cdx_int32 CdxParserPrefetch(CdxParserT *parser, CdxPacketT *pkt)
 {
     CDX_CHECK(parser);
     CDX_CHECK(parser->ops);
-    CDX_CHECK(parser->ops->prefetch);
-    return parser->ops->prefetch(parser, pkt);
+    CDX_CHECK(parser->ops->cdxPrefetch);
+    return parser->ops->cdxPrefetch(parser, pkt);
 }
 
 static inline cdx_int32 CdxParserRead(CdxParserT *parser, CdxPacketT *pkt)
 {
     CDX_CHECK(parser);
     CDX_CHECK(parser->ops);
-    CDX_CHECK(parser->ops->read);
-    return parser->ops->read(parser, pkt);
+    CDX_CHECK(parser->ops->cdxRead);
+    return parser->ops->cdxRead(parser, pkt);
 }
 
 static void PrintMediaInfo(CdxMediaInfoT *mediaInfo)
@@ -656,8 +656,8 @@ static inline cdx_int32 CdxParserGetMediaInfo(CdxParserT *parser, CdxMediaInfoT 
     int ret;
     CDX_CHECK(parser);
     CDX_CHECK(parser->ops);
-    CDX_CHECK(parser->ops->getMediaInfo);
-    ret = parser->ops->getMediaInfo(parser, mediaInfo);
+    CDX_CHECK(parser->ops->cdxGetMediaInfo);
+    ret = parser->ops->cdxGetMediaInfo(parser, mediaInfo);
     PrintMediaInfo(mediaInfo);
 #ifdef __ANDROID__
     FilterForbiddenStream(mediaInfo);
@@ -669,40 +669,40 @@ static inline cdx_int32 CdxParserSeekTo(CdxParserT *parser, cdx_int64 timeUs)
 {
     CDX_CHECK(parser);
     CDX_CHECK(parser->ops);
-    CDX_CHECK(parser->ops->seekTo);
-    return parser->ops->seekTo(parser, timeUs);
+    CDX_CHECK(parser->ops->cdxSeekTo);
+    return parser->ops->cdxSeekTo(parser, timeUs);
 }
 
 static inline cdx_uint32 CdxParserAttribute(CdxParserT *parser)
 {
     CDX_CHECK(parser);
     CDX_CHECK(parser->ops);
-    CDX_CHECK(parser->ops->attribute);
-    return parser->ops->attribute(parser);
+    CDX_CHECK(parser->ops->cdxAttribute);
+    return parser->ops->cdxAttribute(parser);
 }
 
 static inline cdx_int32 CdxParserGetStatus(CdxParserT *parser)
 {
     CDX_CHECK(parser);
     CDX_CHECK(parser->ops);
-    CDX_CHECK(parser->ops->getStatus);
-    return parser->ops->getStatus(parser);
+    CDX_CHECK(parser->ops->cdxGetStatus);
+    return parser->ops->cdxGetStatus(parser);
 }
 
 static inline cdx_int32 CdxParserClose(CdxParserT *parser)
 {
     CDX_CHECK(parser);
     CDX_CHECK(parser->ops);
-    CDX_CHECK(parser->ops->close);
-    return parser->ops->close(parser);
+    CDX_CHECK(parser->ops->cdxClose);
+    return parser->ops->cdxClose(parser);
 }
 
 static inline cdx_int32 CdxParserInit(CdxParserT *parser)
 {
     CDX_CHECK(parser);
     CDX_CHECK(parser->ops);
-    CDX_CHECK(parser->ops->init);
-    return parser->ops->init(parser);
+    CDX_CHECK(parser->ops->cdxInit);
+    return parser->ops->cdxInit(parser);
 }
 enum {
     PROBE_SPECIFIC_DATA_ERROR =-3,

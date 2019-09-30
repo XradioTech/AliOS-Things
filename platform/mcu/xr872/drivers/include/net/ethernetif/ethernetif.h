@@ -51,6 +51,7 @@ err_t ethernetif_input(struct netif *nif, struct pbuf *p);
 err_t ethernetif_raw_input(struct netif *nif, uint8_t *data, u16_t len);
 #endif
 enum wlan_mode ethernetif_get_mode(struct netif *nif);
+void *ethernetif_get_state(struct netif *nif);
 
 #ifdef __cplusplus
 }

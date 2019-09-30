@@ -66,7 +66,7 @@ static enum cmd_status cmd_efpg_start(void)
 	cmd_write_respond(CMD_STATUS_OK, "OK");
 
 	UART_ID uart_id = console_get_uart_id();
-	if (uart_id == UART_NUM) {
+	if (uart_id >= UART_NUM) {
 		CMD_ERR("get uart id failed\n");
 		return CMD_STATUS_ACKED;
 	}
@@ -134,6 +134,7 @@ static enum cmd_status cmd_efpg_get_exec(char *cmd)
 	return CMD_STATUS_OK;
 }
 
+
 static enum cmd_status cmd_efpg_read_ua_exec(char *cmd)
 {
 	uint8_t* buf;
@@ -161,8 +162,7 @@ static enum cmd_status cmd_efpg_read_ua_exec(char *cmd)
 	return CMD_STATUS_OK;
 }
 
-
-static struct cmd_data g_efpg_cmds[] = {
+static const struct cmd_data g_efpg_cmds[] = {
     { "get", cmd_efpg_get_exec},
     { "read_user_area", cmd_efpg_read_ua_exec},
 };
@@ -174,4 +174,3 @@ enum cmd_status cmd_efpg_exec(char *cmd)
 
 	return cmd_exec(cmd, g_efpg_cmds, cmd_nitems(g_efpg_cmds));
 }
-

@@ -43,11 +43,10 @@ extern "C" {
  */
 
 /* chip clock */
-#define BOARD_HOSC_CLOCK        HOSC_CLOCK_40M
 #define BOARD_LOSC_EXTERNAL     0   /* 0: inter 32k, 1: external 32k */
 #define BOARD_CPU_CLK_SRC       PRCM_CPU_CLK_SRC_SYSCLK
 #if defined(__CONFIG_CHIP_XR872)
-#define BOARD_CPU_CLK_FACTOR    PRCM_SYS_CLK_FACTOR_160M
+#define BOARD_CPU_CLK_FACTOR    PRCM_SYS_CLK_FACTOR_240M
 #elif defined(__CONFIG_CHIP_XR808)
 #define BOARD_CPU_CLK_FACTOR    PRCM_SYS_CLK_FACTOR_160M
 #endif
@@ -72,17 +71,6 @@ extern "C" {
 #define BOARD_SPI_MCLK          (48 * 1000 * 1000)
 #define BOARD_SPI_CS_LEVEL      0
 #define BOARD_SPI_PORT          SPI0
-
-/* sound card0 */
-#define BOARD_SOUNDCARD0_I2C_ID         I2C0_ID
-#define BOARD_SOUNDCARD0_I2C_ADDR_MODE  I2C_ADDR_MODE_7BIT
-#define BOARD_SOUNDCARD0_I2C_CLK        400000
-//#define BOARD_SOUNDCARD0_CODEC_WRITE    HAL_I2C_Master_Transmit_Mem_IT
-//#define BOARD_SOUNDCARD0_CODEC_READ     HAL_I2C_Master_Receive_Mem_IT
-#define BOARD_SOUNDCARD0_CODEC_WRITE    NULL
-#define BOARD_SOUNDCARD0_CODEC_READ     NULL
-
-#define BOARD_SOUNDCARD0_AUTO_DETECT	1
 
 #ifdef __cplusplus
 }

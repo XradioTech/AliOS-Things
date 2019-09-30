@@ -27,13 +27,16 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if PRJCONF_NET_EN
+
 #include "cmd_util.h"
 #include "cmd_sntp.h"
 #include "net/sntp/sntp.h"
 
 static OS_Thread_t g_sntp_thread;
 #define SNTP_THREAD_STACK_SIZE		(1 * 1024)
-#define SNTP_THREAD_EXIT OS_ThreadDelete
+#define SNTP_THREAD_EXIT			OS_ThreadDelete
+#define SNTP_YEAR_OFFSET			(2000)
 
 void sntp_run(void *arg)
 {
@@ -45,8 +48,8 @@ void sntp_run(void *arg)
 
 	sntp_time *time = (sntp_time *)sntp_obtain_time();
 	CMD_LOG(1, "<net> <sntp> <response : success>\n");
-	CMD_LOG(1,"sntp(%u  %u  %u ",time->week, time->mon, time->day);
-        CMD_LOG(1,"%u:%u:%u %u)\n", time->hour, time->min, time->sec, time->year);
+	CMD_LOG(1,"sntp(%u-%02u-%02u ", time->year + SNTP_YEAR_OFFSET, time->mon, time->day);
+        CMD_LOG(1,"%02u:%02u:%02u)\n", time->hour, time->min, time->sec);
 exit:
         SNTP_THREAD_EXIT(&g_sntp_thread);
 
@@ -77,3 +80,5 @@ enum cmd_status cmd_sntp_exec(char *cmd)
 	sntp_start();
         return CMD_STATUS_OK;
 }
+
+#endif /* PRJCONF_NET_EN */

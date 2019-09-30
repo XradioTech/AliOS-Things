@@ -26,19 +26,21 @@
  *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef __TLS_H_H
-#define __TLS_H_H
+#ifndef _CMD_TLS_TLS_H
+#define _CMD_TLS_TLS_H
+
+#if PRJCONF_NET_EN
 
 #define MBEDTLS_CLIENT_SERVER
 
 #if defined (MBEDTLS_CLIENT)
-#include "net/mbedtls/configs/config-xr-mini-cli.h"
+#include "mbedtls/configs/config-xr-mini-cli.h"
 #endif
 #if defined (MBEDTLS_CLIENT_SERVER)
-#include "net/mbedtls/configs/config-xr-mini-cliserv.h"
+#include "mbedtls/configs/config-xr-mini-cliserv.h"
 #endif
 #if defined (MBEDTLS_SERVER)
-#include "net/mbedtls/configs/config-xr-mini-serv.h"
+#include "mbedtls/configs/config-xr-mini-serv.h"
 #endif
 
 #if defined(MBEDTLS_PLATFORM_C)
@@ -111,5 +113,5 @@ extern const size_t mbedtls_custom_cas_pem_len;
 int tls_start(mbedtls_test_param *param);
 int tls_thread_stop();
 
-#endif /* __TLS_H_H */
-
+#endif /* PRJCONF_NET_EN */
+#endif /* _CMD_TLS_TLS_H */

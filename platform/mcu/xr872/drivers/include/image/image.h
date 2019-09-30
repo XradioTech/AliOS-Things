@@ -121,6 +121,7 @@ typedef struct section_header {
 } section_header_t;
 
 #define IMAGE_HEADER_SIZE           sizeof(section_header_t)
+#define IMAGE_ATTR_FLAG_SIGN        (1 << 2)
 #define IMAGE_ATTR_FLAG_COMPRESS    (1 << 4)
 
 /**

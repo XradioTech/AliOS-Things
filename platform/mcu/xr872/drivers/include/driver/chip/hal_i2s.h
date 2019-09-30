@@ -38,7 +38,7 @@
 #include <stdbool.h>
 #include "driver/chip/hal_def.h"
 #include "driver/chip/hal_gpio.h"
-#include "driver/chip/hal_audio.h"
+#include "driver/chip/hal_snd_card.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -469,11 +469,11 @@ typedef enum {
   * @brief i2s data init structure definition
   */
 typedef struct {
-	uint32_t			  sampleRate;   /*!< Specifies the sampling rate of the transmitted data.    */
-	I2S_StreamDir         direction;    /*!< Specifies the direction of the transmitted data.    */
-	I2S_SampleResolution  resolution;   /*!< Specifies the sampling accuracy of the transmitted data.    */
-	uint32_t              channels;     /*!< Specifies the number of channels to transmit data.    */
-	uint32_t              bufSize;      /*!< Specifies the buffer size of the transmitted data.    */
+	uint32_t		 sampleRate;   /*!< Specifies the sampling rate of the transmitted data.    */
+	Audio_Stream_Dir direction;    /*!< Specifies the direction of the transmitted data.    */
+	enum pcm_format  resolution;   /*!< Specifies the sampling accuracy of the transmitted data.    */
+	uint32_t         channels;     /*!< Specifies the number of channels to transmit data.    */
+	uint32_t         bufSize;      /*!< Specifies the buffer size of the transmitted data.    */
 } I2S_DataParam;
 
 /**
@@ -489,9 +489,9 @@ typedef struct {
   */
 typedef struct {
 	bool          i2sFormat;      /*!< Specifies the I2S operating format.    */
-	PCM_ClkMode   clkMode;        /*!< Specifies the I2S clk mode.    */
-	PCM_TranFmt   transferFormat; /*!< Specifies the I2S transfer format.    */
-	PCM_SignalInv signalInterval; /*!< Specifies the idle state of the I2S clock.    */
+	I2s_Role 	  clkMode;        /*!< Specifies the I2S clk mode.    */
+	I2s_Format    transferFormat; /*!< Specifies the I2S transfer format.    */
+	I2s_Polarity  signalInterval; /*!< Specifies the idle state of the I2S clock.    */
 	uint32_t      lrckPeriod;     /*!< Specifies The lrck division factor.    */
 	I2S_FrameMode frameMode;      /*!< Specifies the frame format.    */
 	I2S_TxMLS     txMsbFirst;     /*!< Specifies high first pass or low first pass when transmission data.    */
@@ -510,10 +510,10 @@ typedef struct {
 	I2S_HWParam *hwParam; 		/*!< I2S Hardware init structure.    */
 } I2S_Param;
 
-HAL_Status HAL_I2S_Init(I2S_Param *param);
+HAL_Status HAL_I2S_Init(void *param);
 void HAL_I2S_DeInit();
-HAL_Status HAL_I2S_Open(I2S_DataParam *param);
-HAL_Status HAL_I2S_Close(uint32_t dir);
+HAL_Status HAL_I2S_Open(void *param);
+HAL_Status HAL_I2S_Close(Audio_Stream_Dir dir);
 int32_t HAL_I2S_Read_DMA(uint8_t *buf, uint32_t size);
 int32_t HAL_I2S_Write_DMA(uint8_t *buf, uint32_t size);
 void HAL_I2S_REG_DEBUG();

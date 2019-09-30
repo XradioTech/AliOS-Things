@@ -42,7 +42,7 @@
 #include "sys_ctrl/sys_ctrl.h"
 #include "fwk_debug.h"
 
-#if (PRJCONF_SOUNDCARD0_EN || PRJCONF_SOUNDCARD1_EN || PRJCONF_SOUNDCARD2_EN)
+#if PRJCONF_INTERNAL_SOUNDCARD_EN || PRJCONF_AC107_SOUNDCARD_EN
 #include "audio/manager/audio_manager.h"
 #include "audio/pcm/audio_pcm.h"
 #if PRJCONF_AUDIO_CTRL_EN
@@ -53,7 +53,7 @@
 #include "console/console.h"
 #include "command.h"
 #endif
-#if (PRJCONF_CE_EN && PRJCONF_PRNG_INIT_SEED)
+#if (PRJCONF_CE_EN && PRJCONF_PRNG_INIT_SEED) || (PRJCONF_NET_EN)
 #include "efpg/efpg.h"
 #endif
 #include "driver/chip/hal_icache.h"
@@ -70,11 +70,15 @@
 #include "cedarx/cedarx.h"
 #endif
 
-#define PLATFORM_SHOW_INFO	0	/* for internal debug only */
+#define PLATFORM_SHOW_DEBUG_INFO	1	/* for internal debug only */
 
-#if PLATFORM_SHOW_INFO
 static void platform_show_info(void)
 {
+	uint8_t dbg_en = 0;
+
+#if PLATFORM_SHOW_DEBUG_INFO
+	dbg_en = 1;
+#endif /* PLATFORM_SHOW_INFO */
 
 	extern uint8_t __text_start__[];
 	extern uint8_t __text_end__[];
@@ -95,44 +99,78 @@ static void platform_show_info(void)
 	extern uint8_t __ram_table_lma_end__[];
 #endif
 
-	FWK_LOG(1, "__text_start__ %p\n", __text_start__);
-	FWK_LOG(1, "__text_end__   %p\n", __text_end__);
-	FWK_LOG(1, "__etext        %p\n", __etext);
-	FWK_LOG(1, "__data_start__ %p\n", __data_start__);
-	FWK_LOG(1, "__data_end__   %p\n", __data_end__);
-	FWK_LOG(1, "__bss_start__  %p\n", __bss_start__);
-	FWK_LOG(1, "__bss_end__    %p\n", __bss_end__);
-	FWK_LOG(1, "__end__        %p\n", __end__);
-	FWK_LOG(1, "end            %p\n", end);
-	FWK_LOG(1, "__HeapLimit    %p\n", __HeapLimit);
-	FWK_LOG(1, "__StackLimit   %p\n", __StackLimit);
-	FWK_LOG(1, "__StackTop     %p\n", __StackTop);
-	FWK_LOG(1, "__stack        %p\n", __stack);
-	FWK_LOG(1, "_estack        %p\n", _estack);
-#ifdef __CONFIG_ROM
-	FWK_LOG(1, "__ram_table_lma_start__ %p\n", __ram_table_lma_start__);
-	FWK_LOG(1, "__ram_table_lma_end__ %p\n", __ram_table_lma_end__);
+#if PRJCONF_NET_EN
+	uint8_t mac_addr[6] = {0};
+	struct sysinfo *sys_info = NULL;
 #endif
-	FWK_LOG(1, "\n");
+
+	FWK_LOG(1, "\nplatform information ===============================================\n");
+	FWK_LOG(1, "XRADIO Skylark SDK "SDK_VERSION_STR" "SDK_STAGE_STR" "__DATE__" "__TIME__"\n\n");
+
+	FWK_LOG(dbg_en, "__text_start__ %p\n", __text_start__);
+	FWK_LOG(dbg_en, "__text_end__   %p\n", __text_end__);
+	FWK_LOG(dbg_en, "__etext        %p\n", __etext);
+	FWK_LOG(dbg_en, "__data_start__ %p\n", __data_start__);
+	FWK_LOG(dbg_en, "__data_end__   %p\n", __data_end__);
+	FWK_LOG(dbg_en, "__bss_start__  %p\n", __bss_start__);
+	FWK_LOG(dbg_en, "__bss_end__    %p\n", __bss_end__);
+	FWK_LOG(dbg_en, "__end__        %p\n", __end__);
+	FWK_LOG(dbg_en, "end            %p\n", end);
+	FWK_LOG(dbg_en, "__HeapLimit    %p\n", __HeapLimit);
+	FWK_LOG(dbg_en, "__StackLimit   %p\n", __StackLimit);
+	FWK_LOG(dbg_en, "__StackTop     %p\n", __StackTop);
+	FWK_LOG(dbg_en, "__stack        %p\n", __stack);
+	FWK_LOG(dbg_en, "_estack        %p\n", _estack);
+#ifdef __CONFIG_ROM
+	FWK_LOG(dbg_en, "__ram_table_lma_start__ %p\n", __ram_table_lma_start__);
+	FWK_LOG(dbg_en, "__ram_table_lma_end__ %p\n", __ram_table_lma_end__);
+#endif
+	FWK_LOG(dbg_en, "\n");
 
 	FWK_LOG(1, "heap space [%p, %p), size %u\n\n",
 	           __end__, _estack - PRJCONF_MSP_STACK_SIZE,
 	           _estack - __end__ - PRJCONF_MSP_STACK_SIZE);
 
-	FWK_LOG(1, "cpu  clock %9u Hz\n", HAL_GetCPUClock());
-	FWK_LOG(1, "ahb1 clock %9u Hz\n", HAL_GetAHB1Clock());
-	FWK_LOG(1, "ahb2 clock %9u Hz\n", HAL_GetAHB2Clock());
-	FWK_LOG(1, "apb  clock %9u Hz\n", HAL_GetAPBClock());
-	FWK_LOG(1, "dev  clock %9u Hz\n", HAL_GetDevClock());
+	FWK_LOG(1,      "cpu  clock %9u Hz\n", HAL_GetCPUClock());
+	FWK_LOG(dbg_en, "ahb1 clock %9u Hz\n", HAL_GetAHB1Clock());
+	FWK_LOG(dbg_en, "ahb2 clock %9u Hz\n", HAL_GetAHB2Clock());
+	FWK_LOG(dbg_en, "apb  clock %9u Hz\n", HAL_GetAPBClock());
+	FWK_LOG(dbg_en, "dev  clock %9u Hz\n", HAL_GetDevClock());
 #if (__CONFIG_CHIP_ARCH_VER == 2)
-	FWK_LOG(1, "apbs clock %9u Hz\n", HAL_GetAPBSClock());
-	FWK_LOG(1, "dev2 clock %9u Hz\n", HAL_GetDev2Clock());
+	FWK_LOG(dbg_en, "apbs clock %9u Hz\n", HAL_GetAPBSClock());
+	FWK_LOG(dbg_en, "dev2 clock %9u Hz\n", HAL_GetDev2Clock());
 #endif
-	FWK_LOG(1, "HF   clock %9u Hz\n", HAL_GetHFClock());
-	FWK_LOG(1, "LF   clock %9u Hz\n", HAL_GetLFClock());
+	FWK_LOG(1,      "HF   clock %9u Hz\n", HAL_GetHFClock());
+	FWK_LOG(dbg_en, "LF   clock %9u Hz\n", HAL_GetLFClock());
 	FWK_LOG(1, "\n");
+
+#if ((defined(__CONFIG_XIP)) || (defined(__CONFIG_PSRAM)) || (defined(__CONFIG_SECURE_BOOT)))
+	FWK_LOG(1, "sdk option:\n");
+#if (defined(__CONFIG_XIP))
+	FWK_LOG(1, "    %-14s: enable\n", "XIP");
+#endif
+#if (defined(__CONFIG_PSRAM))
+	FWK_LOG(1, "    %-14s: enable\n", "PSRAM");
+#endif
+#if (defined(__CONFIG_SECURE_BOOT))
+	FWK_LOG(1, "    %-14s: enable\n", "Security Boot");
+#endif
+	FWK_LOG(1, "\n");
+#endif
+
+#if PRJCONF_NET_EN
+	FWK_LOG(1, "mac address:\n");
+	efpg_read(EFPG_FIELD_MAC, mac_addr);
+	FWK_LOG(1, "    %-14s: %02x:%02x:%02x:%02x:%02x:%02x\n", "efuse",
+		mac_addr[0], mac_addr[1], mac_addr[2],
+		mac_addr[3], mac_addr[4], mac_addr[5]);
+	sys_info = sysinfo_get();
+	FWK_LOG(1, "    %-14s: %02x:%02x:%02x:%02x:%02x:%02x\n", "in use",
+		sys_info->mac_addr[0], sys_info->mac_addr[1], sys_info->mac_addr[2],
+		sys_info->mac_addr[3], sys_info->mac_addr[4], sys_info->mac_addr[5]);
+#endif
+	FWK_LOG(1, "====================================================================\n\n");
 }
-#endif /* PLATFORM_SHOW_INFO */
 
 #ifdef __CONFIG_XIP
 __nonxip_text
@@ -260,6 +298,10 @@ __weak void platform_cedarx_init(void)
 	CedarxDecoderRegisterMP3();
 	CedarxDecoderRegisterWAV();
 
+	SoundStreamListInit();
+	SoundStreamRegisterCard();
+	SoundStreamRegisterReverb();
+
 	/* for media recorder */
 	CedarxWriterListInit();
 	CedarxWriterRegisterFile();
@@ -277,19 +319,26 @@ __weak void platform_cedarx_init(void)
 #endif
 
 #if (__CONFIG_CHIP_ARCH_VER == 2)
-#if defined(__CONFIG_PSRAM)
+#if ((__CONFIG_CACHE_POLICY & 0xF) != 0)
 DCache_Config g_dcache_cfg = {
     .vc_en = 1,
     .wrap_en = 1,
-    .way_mode = DCACHE_ASSOCIATE_MODE_DIRECT,
+    .way_mode = ((__CONFIG_CACHE_POLICY & 0xF) >> 1),
+    #if (((__CONFIG_CACHE_POLICY>>4) & 0xF) != 0) /*icache & dcache both enable*/
     .mixed_mode = DCACHE_MIXED_MODE_ID,
+    #elif ((__CONFIG_CACHE_POLICY & 0xF) != 0) /*dcache enable only*/
+    .mixed_mode = DCACHE_MIXED_MODE_D,
+    #endif
 };
 #endif
+
+#if (((__CONFIG_CACHE_POLICY>>4) & 0xF) != 0)
 ICache_Config g_icache_cfg = {
     .vc_en = 0,
     .wrap_en = 0,
-    .way_mode = ICACHE_ASSOCIATE_MODE_FOUR_WAY,
+    .way_mode = (((__CONFIG_CACHE_POLICY>>4) & 0xF) >> 1),
 };
+#endif
 #endif
 
 __nonxip_text
@@ -308,11 +357,11 @@ void platform_cache_init(void)
         HAL_ICache_Init(&cache_cfg);
     #endif
 #else
-    #if (defined(__CONFIG_XIP) || defined(__CONFIG_PSRAM))
+    #if (((__CONFIG_CACHE_POLICY>>4) & 0xF) != 0)
     HAL_ICache_Init(&g_icache_cfg);
-    #if defined(__CONFIG_PSRAM)
-    HAL_Dcache_Init(&g_dcache_cfg);
     #endif
+    #if ((__CONFIG_CACHE_POLICY & 0xF) != 0)
+    HAL_Dcache_Init(&g_dcache_cfg);
     #endif
 #endif
 }
@@ -321,16 +370,16 @@ void platform_cache_init(void)
 __nonxip_text
 __weak void platform_init_level0(void)
 {
-	//pm_start();
+	pm_start();
 
 	HAL_Flash_Init(PRJCONF_IMG_FLASH);
-
 	image_init(PRJCONF_IMG_FLASH, PRJCONF_IMG_ADDR, PRJCONF_IMG_MAX_SIZE);
-
 #if (defined(__CONFIG_XIP) || defined(__CONFIG_PSRAM))
     platform_cache_init();
 #endif
-#if (defined(__CONFIG_PSRAM))
+
+/*psram have to enable dcache*/
+#if ((defined(__CONFIG_PSRAM)) && ((__CONFIG_CACHE_POLICY & 0xF) != 0))
 	platform_psram_init();
 #endif
 #if (defined(__CONFIG_XIP))
@@ -400,22 +449,13 @@ __weak void platform_init_level2(void)
  	board_sdcard_init(sdcard_detect_callback);
 #endif
 
-#if (PRJCONF_SOUNDCARD0_EN || PRJCONF_SOUNDCARD1_EN || PRJCONF_SOUNDCARD2_EN)
-	aud_mgr_init();
+#if PRJCONF_INTERNAL_SOUNDCARD_EN || PRJCONF_AC107_SOUNDCARD_EN
+	board_soundcard_init();
+
+	audio_manager_init();
 	snd_pcm_init();
-  #if PRJCONF_SOUNDCARD0_EN
   #if PRJCONF_AUDIO_CTRL_EN
 	audio_ctrl_init();
-	board_soundcard0_init(audio_detect_callback);
-  #else
-	board_soundcard0_init(NULL);
-  #endif
-  #endif
-  #if PRJCONF_SOUNDCARD1_EN
-	board_soundcard1_init();
-  #endif
-  #if PRJCONF_SOUNDCARD2_EN
-	board_soundcard2_init();
   #endif
 #endif
 
@@ -427,11 +467,8 @@ __weak void platform_init_level2(void)
 __nonxip_text
 void platform_init(void)
 {
-	FWK_NX_LOG(1, "XRADIO SDK "SDK_VERSION_STR" "SDK_STAGE_STR"\n");
 	platform_init_level0();
-#if PLATFORM_SHOW_INFO
-	platform_show_info();
-#endif
 	platform_init_level1();
 	platform_init_level2();
+	platform_show_info();
 }

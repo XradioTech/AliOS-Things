@@ -23,12 +23,12 @@ typedef struct CdxWriterCreatorS CdxWriterCreatorT;
 typedef struct CdxWriterS CdxWriterT;
 
 struct CdxWriterOps{
-    int (*connect)(CdxWriterT *writer);
-    int (*read)(CdxWriterT *writer, void *buf, int size);
-    int (*write)(CdxWriterT *writer, void *buf, int size);
-    long (*seek)(CdxWriterT *writer, long moffset, int mwhere);
-    long (*tell)(CdxWriterT *writer);
-    int  (*close)(CdxWriterT *writer);
+    int (*cdxConnect)(CdxWriterT *writer);
+    int (*cdxRead)(CdxWriterT *writer, void *buf, int size);
+    int (*cdxWrite)(CdxWriterT *writer, void *buf, int size);
+    long (*cdxSeek)(CdxWriterT *writer, long moffset, int mwhere);
+    long (*cdxTell)(CdxWriterT *writer);
+    int  (*cdxClose)(CdxWriterT *writer);
 };
 
 struct CdxWriterS
@@ -45,48 +45,48 @@ static inline int CdxWriterConnect(CdxWriterT *w)
 {
     CDX_CHECK(w);
     CDX_CHECK(w->ops);
-    CDX_CHECK(w->ops->connect);
-    return w->ops->connect(w);
+    CDX_CHECK(w->ops->cdxConnect);
+    return w->ops->cdxConnect(w);
 }
 
 static inline int CdxWriterRead(CdxWriterT *w, void *buf, int size)
 {
     CDX_CHECK(w);
     CDX_CHECK(w->ops);
-    CDX_CHECK(w->ops->read);
-    return w->ops->read(w, buf, size);
+    CDX_CHECK(w->ops->cdxRead);
+    return w->ops->cdxRead(w, buf, size);
 }
 
 static inline int CdxWriterWrite(CdxWriterT *w, void *buf, int size)
 {
     CDX_CHECK(w);
     CDX_CHECK(w->ops);
-    CDX_CHECK(w->ops->write);
-    return w->ops->write(w, buf, size);
+    CDX_CHECK(w->ops->cdxWrite);
+    return w->ops->cdxWrite(w, buf, size);
 }
 
 static inline int CdxWriterSeek(CdxWriterT *w, long moffset, int mwhere)
 {
     CDX_CHECK(w);
     CDX_CHECK(w->ops);
-    CDX_CHECK(w->ops->seek);
-    return w->ops->seek(w, moffset, mwhere);
+    CDX_CHECK(w->ops->cdxSeek);
+    return w->ops->cdxSeek(w, moffset, mwhere);
 }
 
 static inline int CdxWriterTell(CdxWriterT *w)
 {
     CDX_CHECK(w);
     CDX_CHECK(w->ops);
-    CDX_CHECK(w->ops->tell);
-    return w->ops->tell(w);
+    CDX_CHECK(w->ops->cdxTell);
+    return w->ops->cdxTell(w);
 }
 
 static inline int CdxWriterClose(CdxWriterT *w)
 {
     CDX_CHECK(w);
     CDX_CHECK(w->ops);
-    CDX_CHECK(w->ops->close);
-    return w->ops->close(w);
+    CDX_CHECK(w->ops->cdxClose);
+    return w->ops->cdxClose(w);
 }
 
 int CdxWriterOpen(char *url, CdxWriterT **writer);

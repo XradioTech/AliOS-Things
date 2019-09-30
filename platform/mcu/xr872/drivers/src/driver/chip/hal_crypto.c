@@ -106,18 +106,18 @@ uint8_t CE_GetOutputAvailCnt(CE_T *ce)
 __CE_STATIC_INLINE__
 void CE_SetInputThreshold(CE_T *ce, uint8_t threshold)
 {
-	if((threshold & ~CE_FCSR_TXFIFO_INT_TRIG_LEVEL_MASK) == 0) {
-        CRYPTO_PRINT(CRYPTO_ERR, "input threshold error\n");
-    }
+//	if((threshold & ~CE_FCSR_RXFIFO_INT_TRIG_LEVEL_MASK) == 0) {
+//        CRYPTO_PRINT(CRYPTO_ERR, "input threshold error\n");
+//    }
 	HAL_MODIFY_REG(ce->FCSR, CE_FCSR_RXFIFO_INT_TRIG_LEVEL_MASK, threshold << CE_FCSR_RXFIFO_INT_TRIG_LEVEL_SHIFT);
 }
 
 __CE_STATIC_INLINE__
 void CE_SetOutputThreshold(CE_T *ce, uint8_t threshold)
 {
-	if((threshold & ~CE_FCSR_TXFIFO_INT_TRIG_LEVEL_MASK) == 0) {
-        CRYPTO_PRINT(CRYPTO_ERR, "onput threshold error\n");
-    }
+//	if((threshold & ~CE_FCSR_TXFIFO_INT_TRIG_LEVEL_MASK) == 0) {
+//        CRYPTO_PRINT(CRYPTO_ERR, "onput threshold error\n");
+//    }
 	HAL_MODIFY_REG(ce->FCSR, CE_FCSR_TXFIFO_INT_TRIG_LEVEL_MASK, threshold << CE_FCSR_TXFIFO_INT_TRIG_LEVEL_SHIFT);
 }
 

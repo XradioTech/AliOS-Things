@@ -31,6 +31,7 @@
 #include "cmd_rtc.h"
 #include "driver/chip/hal_rtc.h"
 #include <time.h>
+#include <sys/time.h>
 
 #define	CMD_YEAR0			 	1900 /* the first year for struct tm::tm_year */
 #define	CMD_IS_LEAP_YEAR(year)	(!((year) % 4) && (((year) % 100) || !((year) % 400)))
@@ -47,12 +48,12 @@ enum cmd_rtc_alarm {
 	CMD_RTC_ALARM_WDAY
 };
 
-const int8_t g_cmd_mday[2][12] = {
+static const int8_t g_cmd_mday[2][12] = {
 	{ 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }, /* normal year */
 	{ 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }	/* leap year */
 };
 
-const char *g_cmd_wday_str[] = {
+static const char *g_cmd_wday_str[] = {
 	"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 };
 
@@ -66,6 +67,7 @@ static enum cmd_status cmd_rtc_set_exec(char *cmd)
 	struct tm t;
 	time_t clock;
 	int leap;
+	struct timeval tv;
 
 	cnt = cmd_sscanf(cmd, "%d-%d-%d,%d:%d:%d",
 	                 &year, &month, &mday, &hour, &minute, &second);
@@ -113,11 +115,15 @@ static enum cmd_status cmd_rtc_set_exec(char *cmd)
 	t.tm_min = minute;
 	t.tm_sec = second;
 	clock = mktime(&t);
-	gmtime_r(&clock, &t);
+	localtime_r(&clock, &t);
 
 	t.tm_mon += 1;
 	HAL_RTC_SetYYMMDD(leap, t.tm_year, t.tm_mon, t.tm_mday);
 	HAL_RTC_SetDDHHMMSS(CMD_WDAY_TM2RTC(t.tm_wday), t.tm_hour, t.tm_min, t.tm_sec);
+
+	tv.tv_sec = clock;
+	tv.tv_usec = 0;
+	settimeofday(&tv, NULL);
 
 	CMD_DBG("%d-%02d-%02d %s %02d:%02d:%02d, leap %d\n",
 		    t.tm_year + CMD_YEAR0, t.tm_mon, t.tm_mday,
@@ -267,13 +273,62 @@ static enum cmd_status cmd_rtc_wday_alarm_stop_exec(char *cmd)
 	return CMD_STATUS_OK;
 }
 
-static struct cmd_data g_rtc_cmds[] = {
+/*
+ * drv rtc tz-set <tz>
+ */
+static enum cmd_status cmd_rtc_tz_set_exec(char *cmd)
+{
+	int tz;
+	int32_t cnt;
+	char str[8];
+
+	cnt = cmd_sscanf(cmd, "%d", &tz);
+	if (cnt != 1) {
+		return CMD_STATUS_INVALID_ARG;
+	}
+
+	if (tz < -12 || tz > 12) {
+		CMD_ERR("invalid tz %u\n", tz);
+		return CMD_STATUS_INVALID_ARG;
+	}
+
+	cmd_snprintf(str, sizeof(str), "GMT%+d", -tz);
+
+	if (setenv("TZ", str, 1) == 0) {
+		tzset();
+		cmd_write_respond(CMD_STATUS_OK, "TZ=%s", str);
+		return CMD_STATUS_ACKED;
+	} else {
+		return CMD_STATUS_FAIL;
+	}
+}
+
+/*
+ * drv rtc tz-get
+ */
+static enum cmd_status cmd_rtc_tz_get_exec(char *cmd)
+{
+	const char *str;
+
+	str = getenv("TZ");
+
+	if (str != NULL) {
+		cmd_write_respond(CMD_STATUS_OK, "TZ=%s", str);
+		return CMD_STATUS_ACKED;
+	} else {
+		return CMD_STATUS_FAIL;
+	}
+}
+
+static const struct cmd_data g_rtc_cmds[] = {
 	{ "set",				cmd_rtc_set_exec },
 	{ "get", 				cmd_rtc_get_exec },
 	{ "sec-alarm-start",	cmd_rtc_sec_alarm_start_exec },
 	{ "sec-alarm-stop",		cmd_rtc_sec_alarm_stop_exec},
 	{ "wday-alarm-start",	cmd_rtc_wday_alarm_start_exec },
 	{ "wday-alarm-stop",	cmd_rtc_wday_alarm_stop_exec },
+	{ "tz-set",				cmd_rtc_tz_set_exec },
+	{ "tz-get",				cmd_rtc_tz_get_exec },
 };
 
 enum cmd_status cmd_rtc_exec(char *cmd)

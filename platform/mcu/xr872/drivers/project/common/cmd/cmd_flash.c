@@ -48,7 +48,7 @@ static enum cmd_status cmd_flash_start_exec(char *cmd)
 static enum cmd_status cmd_flash_stop_exec(char *cmd)
 {
 	/* deinie driver */
-	if (HAL_Flash_Close(0) != HAL_OK) {
+	if (HAL_Flash_Close(MFLASH) != HAL_OK) {
 		CMD_ERR("flash driver close failed\n");
 		return CMD_STATUS_FAIL;
 	}
@@ -94,7 +94,7 @@ static enum cmd_status cmd_flash_erase_exec(char *cmd)
 	}
 
 	/* erase */
-	HAL_Flash_MemoryOf(MFLASH, size_type, addr, &addr);
+	//HAL_Flash_MemoryOf(MFLASH, size_type, addr, &addr);
 	if (HAL_Flash_Erase(MFLASH, size_type, addr, 1) != HAL_OK) {
 		CMD_ERR("flash erase failed\n");
 		return CMD_STATUS_FAIL;
@@ -142,6 +142,24 @@ static enum cmd_status cmd_flash_write_exec(char *cmd)
 		return CMD_STATUS_INVALID_ARG;
 	}
 
+	cmd_write_respond(CMD_STATUS_OK, "OK");
+
+	if(size == 0) {// special handle
+		wbuf = cmd_malloc(size+5);
+		if (wbuf == NULL) {
+			CMD_ERR("no memory\n");
+			return CMD_STATUS_FAIL;
+		}
+		memset(wbuf, 0, (size+5));
+		wbuf[0] = 0x1;
+
+		if (HAL_Flash_Write(MFLASH, addr, wbuf, size) != HAL_OK) {
+			CMD_ERR("flash write failed\n");
+		}
+		cmd_free(wbuf);
+		return CMD_STATUS_ACKED;
+	}
+
 	wbuf = cmd_malloc(size);
 	if (wbuf == NULL) {
 		CMD_ERR("no memory\n");
@@ -155,12 +173,8 @@ static enum cmd_status cmd_flash_write_exec(char *cmd)
 		return CMD_STATUS_FAIL;
 	}
 
-
-	cmd_write_respond(CMD_STATUS_OK, "OK");
-
 	cmd_raw_mode_enable();
 	cmd_raw_mode_read(wbuf, size, 30000);
-
 
 	/* write */
 	if (HAL_Flash_Write(MFLASH, addr, wbuf, size) != HAL_OK) {
@@ -186,6 +200,7 @@ static enum cmd_status cmd_flash_read_exec(char *cmd)
 	uint8_t *buf;
 	uint32_t addr;
 	uint32_t size;
+	char *pre_str = "read buf:";
 
 	/* get param */
 	cnt = cmd_sscanf(cmd, "a=0x%x s=%u", &addr, &size);
@@ -196,6 +211,22 @@ static enum cmd_status cmd_flash_read_exec(char *cmd)
 		return CMD_STATUS_INVALID_ARG;
 	}
 
+	cmd_write_respond(CMD_STATUS_OK, "OK");
+
+	if (size == 0) {// special handle
+		buf = cmd_malloc(size+5);
+		if (buf == NULL) {
+			CMD_ERR("no memory\n");
+			cmd_free(buf);
+			return CMD_STATUS_FAIL;
+		}
+
+		if (HAL_Flash_Read(MFLASH, addr, buf, size) != HAL_OK) {
+			CMD_ERR("spi driver read failed\n");
+		}
+		cmd_free(buf);
+		return CMD_STATUS_ACKED;
+	}
 
 	/* read */
 	buf = cmd_malloc(size);
@@ -205,17 +236,13 @@ static enum cmd_status cmd_flash_read_exec(char *cmd)
 		return CMD_STATUS_FAIL;
 	}
 
-	cmd_write_respond(CMD_STATUS_OK, "OK");
-
 	if (HAL_Flash_Read(MFLASH, addr, buf, size) != HAL_OK) {
 		CMD_ERR("spi driver read failed\n");
 	}
 
-	cmd_raw_mode_enable();
-	cmd_msleep(1000);
-	cmd_raw_mode_write(buf, size);
-	cmd_raw_mode_disable();
-
+	cmd_print_uint8_array(buf, size);
+	cmd_raw_mode_write((uint8_t *)pre_str, strlen(pre_str));
+    cmd_raw_mode_write(buf, size);
 	cmd_free(buf);
 	return CMD_STATUS_ACKED;
 }
@@ -257,12 +284,99 @@ static enum cmd_status cmd_flash_overwrite_exec(char *cmd)
 		CMD_ERR("flash write not success %d\n", ret);
 	}
 
-	cmd_raw_mode_write(wbuf, size);
 	cmd_raw_mode_disable();
 
 	cmd_free(wbuf);
 
 	return CMD_STATUS_ACKED;
+}
+
+/*
+ *FLASH_READ_NORMAL_MODE	= 1 << 0,     ->1
+ *FLASH_READ_FAST_MODE	= 1 << 1,         ->2
+ *FLASH_READ_DUAL_O_MODE	= 1 << 2,     ->4
+ *FLASH_READ_DUAL_IO_MODE = 1 << 3,       ->8
+ *FLASH_READ_QUAD_O_MODE	= 1 << 4,     ->16
+ *FLASH_READ_QUAD_IO_MODE = 1 << 5,       ->32
+ *FLASH_READ_QPI_MODE 	= 1 << 6,         ->64
+*/
+static enum cmd_status cmd_flash_set_rmode_exec(char *cmd)
+{
+	uint32_t cnt;
+	uint32_t rmod;
+	char rmod_str[10];
+
+	/* get param */
+	cnt = cmd_sscanf(cmd, "rmod=%9s", rmod_str);
+
+	/* check param */
+	if (cnt != 1) {
+		CMD_ERR("invalid param number %d\n", cnt);
+		return CMD_STATUS_INVALID_ARG;
+	}
+
+	if (cmd_strcmp(rmod_str, "normal") == 0) {
+		rmod = 0x1;
+	} else if (cmd_strcmp(rmod_str, "fast") == 0) {
+		rmod = 0x2;
+	} else if (cmd_strcmp(rmod_str, "dual_o") == 0) {
+		rmod = 0x4;
+	} else if (cmd_strcmp(rmod_str, "dual_io") == 0) {
+		rmod = 0x8;
+	} else if (cmd_strcmp(rmod_str, "quad_o") == 0) {
+		rmod = 0x10;//16
+	} else if (cmd_strcmp(rmod_str, "quad_io") == 0) {
+		rmod = 0x20;//32
+	} else if (cmd_strcmp(rmod_str, "qpi") == 0) {
+		rmod = 0x40;//64
+	} else {
+		CMD_ERR("invalid rmod %s\n", rmod_str);
+		return CMD_STATUS_INVALID_ARG;
+	}
+
+	if (HAL_Flash_Ioctl(MFLASH, FLASH_SET_READ_MODE, rmod) != HAL_OK) {
+		CMD_ERR("set flash read mode failed\n");
+		return CMD_STATUS_FAIL;
+	}
+
+	return CMD_STATUS_OK;
+}
+
+/*
+ *FLASH_PAGEPROGRAM	= 1 << 0,                 ->1
+ *FLASH_QUAD_PAGEPROGRAM	= 1 << 1,         ->2
+*/
+static enum cmd_status cmd_flash_set_program_mode_exec(char *cmd)
+{
+	/* deinie driver */
+	uint32_t cnt;
+	uint32_t wmod;
+	char wmod_str[10];
+
+	/* get param */
+	cnt = cmd_sscanf(cmd, "wmod=%9s", wmod_str);
+
+	/* check param */
+	if (cnt != 1) {
+		CMD_ERR("invalid param number %d\n", cnt);
+		return CMD_STATUS_INVALID_ARG;
+	}
+
+	if (cmd_strcmp(wmod_str, "page") == 0) {
+		wmod = 0x1;
+	} else if (cmd_strcmp(wmod_str, "quad_page") == 0) {
+		wmod = 0x2;
+	} else {
+		CMD_ERR("invalid wmod %s\n", wmod_str);
+		return CMD_STATUS_INVALID_ARG;
+	}
+
+	if (HAL_Flash_Ioctl(MFLASH, FLASH_SET_PAGEPROGRAM_MODE, wmod) != HAL_OK) {
+		CMD_ERR("set flash pageprogram mode failed\n");
+		return CMD_STATUS_FAIL;
+	}
+
+	return CMD_STATUS_OK;
 }
 
 /*
@@ -274,20 +388,18 @@ static enum cmd_status cmd_flash_overwrite_exec(char *cmd)
  * 			write {addr} "{str}"
  * 			read {str/hex} {addr} {size} // recommanded that size should not too large
  */
-static struct cmd_data g_flash_cmds[] = {
+static const struct cmd_data g_flash_cmds[] = {
 	{ "start",	cmd_flash_start_exec	},
 	{ "stop",	cmd_flash_stop_exec		},
 	{ "erase",	cmd_flash_erase_exec	},
 	{ "write",	cmd_flash_write_exec	},
 	{ "read",	cmd_flash_read_exec		},
 	{ "overwrite",	cmd_flash_overwrite_exec		},
+	{ "set_rmod", cmd_flash_set_rmode_exec },
+	{ "set_wmod", cmd_flash_set_program_mode_exec },
 };
 
 enum cmd_status cmd_flash_exec(char *cmd)
 {
 	return cmd_exec(cmd, g_flash_cmds, cmd_nitems(g_flash_cmds));
 }
-
-
-
-

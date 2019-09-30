@@ -228,6 +228,86 @@ HAL_Status HAL_Flash_Read(uint32_t flash, uint32_t addr, uint8_t *data, uint32_t
 	return ret;
 }
 
+extern HAL_Status __HAL_Flash_Init(uint32_t flash);
+
+#ifdef CONFIG_PM
+static int PM_FlashSuspend(struct soc_device *dev, enum suspend_state_t state)
+{
+    struct FlashDev *fdev;
+    struct FlashDrv *drv;
+    struct FlashChip *chip;
+	switch (state) {
+	case PM_MODE_SLEEP:
+	case PM_MODE_STANDBY:
+		break;
+	case PM_MODE_HIBERNATION:
+        fdev = getFlashDev((uint32_t)dev->platform_data);
+        drv = fdev->drv;
+        chip = fdev->chip;
+        if (fdev->usercnt != 0)
+            return -1;
+		drv->open(chip);
+		chip->reset(chip);
+		chip->control(chip, DEFAULT_FLASH_POWERDOWN, NULL);
+		drv->close(chip);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static int PM_FlashResume(struct soc_device *dev, enum suspend_state_t state)
+{
+    struct FlashDev *fdev;
+    struct FlashDrv *drv;
+    struct FlashChip *chip;
+	switch (state) {
+	case PM_MODE_SLEEP:
+	case PM_MODE_STANDBY:
+		break;
+	case PM_MODE_HIBERNATION:
+        fdev = getFlashDev((uint32_t)dev->platform_data);
+        drv = fdev->drv;
+        chip = fdev->chip;
+		drv->open(chip);
+		if (fdev->rmode & (FLASH_READ_QUAD_O_MODE | FLASH_READ_QUAD_IO_MODE | FLASH_READ_QPI_MODE))
+		{
+			chip->switchReadMode(chip, fdev->rmode);
+			if (fdev->rmode & FLASH_READ_QPI_MODE)
+				chip->enableQPIMode(chip);
+		}
+		drv->close(chip);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static struct soc_device_driver flash_drv = {
+	.name = "Flash",
+    .suspend_noirq = PM_FlashSuspend,
+    .resume_noirq = PM_FlashResume,
+};
+#endif
+HAL_Status HAL_Flash_Init(uint32_t flash)
+{
+    HAL_Status ret;
+    ret = __HAL_Flash_Init(flash);
+    if(ret != HAL_OK)
+        return ret;
+#ifdef CONFIG_PM
+    struct FlashDev *dev = getFlashDev(flash);
+    pm_unregister_ops(dev->pm);
+    dev->pm->driver = &flash_drv;
+    pm_register_ops(dev->pm);
+#endif/*CONFIG_PM*/
+    return HAL_OK;
+}
+
 #endif
 
 #if FLASH_SPI_ENABLE // check when ROM code ###############!!!!!

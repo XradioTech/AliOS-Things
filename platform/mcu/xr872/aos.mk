@@ -26,8 +26,18 @@ $(NAME)_SOURCES += hal/soc/flash.c \
                    hal/wifi_port.c \
                    hal/wifi.c \
                    hal/hal.c \
-                   hal/fota_port.c \
                    hal/os_semaphore.c
+
+#$(NAME)_SOURCES += hal/soc/flash.c \
+#                   hal/soc/sd.c \
+#                   hal/soc/uart.c \
+#                   hal/soc/wdg.c \
+#                   hal/hal.c \
+#                   hal/os_semaphore.c
+
+ifeq ($(with_ota), 1)
+$(NAME)_SOURCES += hal/fota_port.c
+endif
 
 include $(SOURCE_ROOT)/platform/mcu/xr872/sdk_files.mk
 
@@ -75,32 +85,31 @@ GLOBAL_CFLAGS += -mcpu=cortex-m4     \
 
 GLOBAL_CFLAGS  += -D__CONFIG_OS_USE_YUNOS
 GLOBAL_CFLAGS  += -D__CONFIG_CPU_CM4F
-#GLOBAL_CFLAGS  += -D__CONFIG_ARCH_DUAL_CORE
 GLOBAL_CFLAGS  += -D__CONFIG_ARCH_APP_CORE
 GLOBAL_CFLAGS  += -D__CONFIG_LIBC_REDEFINE_GCC_INT32_TYPE
-#GLOBAL_CFLAGS  += -D__CONFIG_LIBC_PRINTF_FLOAT
-#GLOBAL_CFLAGS  += -D__CONFIG_LIBC_SCANF_FLOAT
-#GLOBAL_CFLAGS  += -D__CONFIG_MALLOC_USE_STDLIB
 GLOBAL_CFLAGS  += -D__CONFIG_MBUF_IMPL_MODE=0
-#GLOBAL_CFLAGS  += -D__PRJ_CONFIG_WLAN_STA_AP
 GLOBAL_CFLAGS  += -D__CONFIG_WLAN_STA
 GLOBAL_CFLAGS  += -D__CONFIG_WLAN_MONITOR
 GLOBAL_DEFINES += __CONFIG_CHIP_ARCH_VER=2
-
+GLOBAL_DEFINES += __CONFIG_HOSC_TYPE=40
+GLOBAL_DEFINES += __CONFIG_CACHE_POLICY=0x02
 GLOBAL_CFLAGS  += -D__CONFIG_PM
 
-GLOBAL_CFLAGS  += -D__CONFIG_CHIP_XR872
-ifneq ($(no_with_rom),1)
+#GLOBAL_CFLAGS  += -D__CONFIG_LIBC_PRINTF_FLOAT
+#GLOBAL_CFLAGS  += -D__CONFIG_LIBC_SCANF_FLOAT
+#GLOBAL_CFLAGS  += -D__CONFIG_MALLOC_USE_STDLIB
+#GLOBAL_CFLAGS  += -D__PRJ_CONFIG_WLAN_STA_AP
+#GLOBAL_CFLAGS  += -D__CONFIG_SECTION_ATTRIBUTE_XIP 
+#GLOBAL_CFLAGS  += -D__CONFIG_SECTION_ATTRIBUTE_NONXIP
+#GLOBAL_CFLAGS  += -D__CONFIG_SECTION_ATTRIBUTE_SRAM
+
+
+ifeq ($(with_rom),1)
 GLOBAL_CFLAGS  += -D__CONFIG_ROM
 endif
-ifneq ($(no_with_xip),1)
-#GLOBAL_CFLAGS  += -D__PRJ_CONFIG_XIP
-GLOBAL_CFLAGS  += -D__CONFIG_XIP
-endif
 
-ifneq ($(no_with_image_compress),1)
-GLOBAL_CFLAGS  += -D__CONFIG_BIN_COMPRESS
-GLOBAL_CFLAGS  += -D__PRJ_CONFIG_IMG_COMPRESS
+ifeq ($(with_xip),1)
+GLOBAL_CFLAGS  += -D__CONFIG_XIP
 endif
 
 GLOBAL_LDFLAGS += -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=softfp

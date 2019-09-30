@@ -120,13 +120,15 @@ static HAL_Status EFUSE_Init(void)
 		timingParam = EFUSE_TIMING_PARAM_24M;
 	} else if (clk == HOSC_CLOCK_26M) {
 		timingParam = EFUSE_TIMING_PARAM_26M;
+	} else if (clk == HOSC_CLOCK_40M) {
+		timingParam = EFUSE_TIMING_PARAM_40M;
+	} else if (clk == HOSC_CLOCK_52M) {
+		timingParam = EFUSE_TIMING_PARAM_52M;
 	} else {
 		HAL_ERR("unsupport HOSC %u\n", clk);
 		return HAL_ERROR;
 	}
-
-	EFUSE_SetTimingParam(timingParam);
-
+    EFUSE_SetTimingParam(timingParam);
 	return HAL_OK;
 }
 
@@ -197,6 +199,7 @@ HAL_Status HAL_EFUSE_Read(uint32_t start_bit, uint32_t bit_num, uint8_t *data)
         sid_data[i] = (sid_data[i] >> word_shift) | (sid_data[i+1] << (32-word_shift));
     }
     sid_data[i] = (sid_data[i] >> word_shift);
+    ((uint8_t*)sid_data)[(bit_num-1)/8] &= ((1<<(bit_num%8==0?8:bit_num%8)) -1);
     memcpy(data, (uint8_t*)sid_data, (bit_num+7)/8);
 
     free(sid_data);
@@ -269,6 +272,7 @@ HAL_Status HAL_EFUSE_Write(uint32_t start_bit, uint32_t bit_num, uint8_t *data)
 	uint32_t   *efuse_word = (uint32_t *)&buf;
 	uint32_t	bit_cnt = bit_num;
 
+    data[(bit_num-1)/8] &= ((1<<(bit_num%8==0?8:bit_num%8)) -1);
 	HAL_Memcpy(&efuse_word[1], p_data, sizeof(efuse_word[1]));
 	if (bit_cnt < 32)
 		efuse_word[1] &= (1U << bit_cnt) - 1;

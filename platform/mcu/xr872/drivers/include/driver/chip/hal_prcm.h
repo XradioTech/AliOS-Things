@@ -364,6 +364,15 @@ typedef enum {
 #endif
 
 /*
+ * bit field definition of PRCM->DCXO_CTRL (R/W)
+ */
+#define PRCM_FREQ_OFFSET_SHIFT		20	/* R/W, R */
+#define PRCM_FREQ_OFFSET_MASK		(0x7f << PRCM_FREQ_OFFSET_SHIFT)
+
+#define PRCM_ICTRL_OFFSET_SHIFT		12	/* R/W, R */
+#define PRCM_ICTRL_OFFSET_MASK		(0x1f << PRCM_ICTRL_OFFSET_SHIFT)
+
+/*
  * bit field definition of
  *   - PRCM->SYS_CLK1_CTRL (R/W)
  *   - PRCM->SYS_CLK2_CTRL (R)
@@ -776,7 +785,7 @@ typedef enum {
 #if (__CONFIG_CHIP_ARCH_VER == 1)
 #define PRCM_SYS_WS_PWR_FLAGS_MASK		0x3FU
 #elif (__CONFIG_CHIP_ARCH_VER == 2)
-#define PRCM_SYS_WS_PWR_FLAGS_MASK		(0x3FU | (0x1FFFU << 8) | (0x1 << 21) |(0x1FU << 24))
+#define PRCM_SYS_WS_PWR_FLAGS_MASK		(0x3FU)
 
 #define PRCM_SYS_WLAN_SRAM_116K_SWM5_BIT        HAL_BIT(28)
 #define PRCM_SYS_SRAM_32K_SWM4_BIT              HAL_BIT(27)
@@ -1229,6 +1238,12 @@ void HAL_PRCM_SetRTCLDOVoltage(PRCM_RTCLDORetentionVolt retenVolt, PRCM_RTCLDOWo
 void HAL_PRCM_EnableTOPLDOLQModeEnable(uint8_t enable);
 void HAL_PRCM_EnableSysLDOLQModeEnable(uint8_t enable);
 void HAL_PRCM_EnableLDOModeSWSelEnable(uint8_t enable);
+void HAL_PRCM_EnableWakeupIOx(uint8_t ioIndex, uint8_t enable);
+void HAL_PRCM_SetWakeupDebClk0(uint8_t val);
+void HAL_PRCM_SetWakeupDebClk1(uint8_t val);
+void HAL_PRCM_SetWakeupIOxDebSrc(uint8_t ioIndex, uint8_t val);
+void HAL_PRCM_SetWakeupIOxDebounce(uint8_t ioIndex, uint8_t val);
+
 #endif
 
 #ifdef __cplusplus

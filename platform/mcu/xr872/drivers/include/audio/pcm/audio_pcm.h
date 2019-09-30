@@ -27,55 +27,21 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef AUDIO_PCM_H_H
-#define AUDIO_PCM_H_H
+#ifndef _AUDIO_PCM_H_
+#define _AUDIO_PCM_H_
 
-#include "driver/chip/hal_codec.h"
+#include "driver/chip/hal_snd_card.h"
 
-#define PCM_OUT CODEC_DIR_OUT
-#define PCM_IN  CODEC_DIR_IN
 
-enum pcm_format {
-        PCM_FORMAT_S16_LE = PCM_RES_S16_LE,
-        PCM_FORMAT_S32_LE = PCM_RES_S32_LE,
-        PCM_FORMAT_S8	  = PCM_RES_S8,
-        PCM_FORMAT_S24_LE = PCM_RES_S24_LE,
-        PCM_FORMAT_MAX    = PCM_RES_MAX,
-};
+int snd_pcm_init(void);
+int snd_pcm_deinit(void);
+int snd_pcm_write(Snd_Card_Num card_num, void *data, uint32_t count);
+int snd_pcm_read(Snd_Card_Num card_num, void *data, uint32_t count);
+int snd_pcm_flush(Snd_Card_Num card_num);
+int snd_pcm_open(Snd_Card_Num card_num, Audio_Stream_Dir stream_dir, struct pcm_config *pcm_cfg);
+int snd_pcm_close(Snd_Card_Num card_num, Audio_Stream_Dir stream_dir);
 
-enum audio_card {
-        SOUND_CARD_EXTERNAL_AUDIOCODEC = AUDIO_CARD_EXTERNAL_CODEC,   /* PLAY CAP*/
-        SOUND_CARD_INTERNAL_DMIC  	   = AUDIO_CARD_INTERNAL_DMIC,    /* CAP */
-#if (__CONFIG_CHIP_ARCH_VER == 2)
-        SOUND_CARD_INTERNAL_AUDIOCODEC = AUDIO_CARD_INTERNAL_CODEC,
-#endif
-};
-
-/* Configuration*/
-struct pcm_config {
-        unsigned int    channels;
-        unsigned int    rate;
-        unsigned int    period_size;	/* sample count */
-        unsigned int    period_count;	/* set it to 2 */
-        enum pcm_format format;
-		unsigned int	mix_mode;
-};
-
-#if (__CONFIG_CHIP_ARCH_VER == 1)
-#define AUDIO_CARD0 SOUND_CARD_EXTERNAL_AUDIOCODEC
-#define AUDIO_CARD1 SOUND_CARD_INTERNAL_DMIC
-#elif (__CONFIG_CHIP_ARCH_VER == 2)
-#define AUDIO_CARD0 SOUND_CARD_INTERNAL_AUDIOCODEC
-#define AUDIO_CARD1 SOUND_CARD_INTERNAL_DMIC
-#define AUDIO_CARD2 SOUND_CARD_EXTERNAL_AUDIOCODEC
-#endif
-
-int snd_pcm_init();
-int snd_pcm_deinit();
-int snd_pcm_write(struct pcm_config *config, unsigned int card, void *data, unsigned int count);
-int snd_pcm_read(struct pcm_config *config, unsigned int card, void *data, unsigned int count);
-int snd_pcm_flush(struct pcm_config *config, unsigned int card);
-int snd_pcm_open(struct pcm_config *config, unsigned int card, unsigned int flags);
-int snd_pcm_close(unsigned int card, unsigned int flags);
 
 #endif
+
+

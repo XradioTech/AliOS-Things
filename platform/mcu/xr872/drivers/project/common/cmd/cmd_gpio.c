@@ -31,87 +31,143 @@
 #include "cmd_gpio.h"
 #include "driver/chip/hal_gpio.h"
 
+static void _gpio_cd_irq(void *arg)
+{
+	GPIO_PinState state;
+	uint32_t pin_config = (uint32_t)arg;
+	uint32_t port, pin, event;
+
+	port = (pin_config >> 16) & 0x0ff;
+	pin = (pin_config >> 8) & 0x0ff;
+	event = pin_config & 0x0ff;
+	state = HAL_GPIO_ReadPin(port, pin);
+
+	CMD_DBG("gpio irq state:%d event:%d\n", state, event);
+}
+
 /*
- * drv gpio config <port> <pin> <mode> <pull> <level>
- * eg. drv gpio config a 6 1 1 1
+ * drv gpio config <gpio> m=<mode> p=<pull> l=<level> [e=<event>]
+ * eg. drv gpio config pa6 m=1 p=1 l=1
+ * eg. drv gpio config pa6 m=1 p=1 l=1 e=0
  */
 static enum cmd_status cmd_gpio_config_exec(char *cmd)
 {
 	int32_t cnt;
 	char port;
-	uint32_t pin, mode, pull, level;
+	char gpio[3];
+	uint32_t pin, mode, pull, level, event;
 	GPIO_InitParam param;
 
-	cnt = cmd_sscanf(cmd, "%c %d %d %d %d", &port, &pin, &mode, &pull, &level);
-	if (cnt != 5 || pull > GPIO_CTRL_PULL_MAX) {
-		CMD_ERR("err cmd:%s, expect: <Port> <Pin> <Mode> <Pull> <Level>\n", cmd);
-		return CMD_STATUS_INVALID_ARG;
+	cnt = cmd_sscanf(cmd, "%2s%d m=%d p=%d l=%d e=%d", gpio, &pin, &mode, &pull, &level, &event);
+	if (cnt != 6 || pull > GPIO_CTRL_PULL_MAX) {
+		cnt = cmd_sscanf(cmd, "%2s%d m=%d p=%d l=%d", gpio, &pin, &mode, &pull, &level);
+		if (cnt != 5 || pull > GPIO_CTRL_PULL_MAX) {
+			goto err;
+		}
 	}
 
-	if (port == 'A' || port == 'a')
+	if (mode == GPIOx_Pn_F6_EINT && cnt != 6) {
+		goto err;
+	}
+
+	if (cmd_strcmp(gpio, "PA") == 0 || cmd_strcmp(gpio, "pa")  == 0)
 		port = GPIO_PORT_A;
-	else if (port == 'B' || port == 'b')
+	else if (cmd_strcmp(gpio, "PB") == 0 || cmd_strcmp(gpio, "pb")  == 0)
 		port = GPIO_PORT_B;
+#if (__CONFIG_CHIP_ARCH_VER == 2)
+	else if (cmd_strcmp(gpio, "PC") == 0 || cmd_strcmp(gpio, "pc")  == 0)
+		port = GPIO_PORT_C;
+#endif
 	else
-		return CMD_STATUS_INVALID_ARG;
+		goto err;
 	param.mode = mode;
 	param.driving = level;
 	param.pull = pull;
 	HAL_GPIO_Init(port, pin, &param);
 
+	if (mode == GPIOx_Pn_F6_EINT) {
+		GPIO_IrqParam Irq_param;
+
+		Irq_param.event = event;
+		Irq_param.callback = _gpio_cd_irq;
+		Irq_param.arg = (void *)((port << 16) | (pin << 8) | event);
+		HAL_GPIO_EnableIRQ(port, pin, &Irq_param);
+	}
+
 	return CMD_STATUS_OK;
-}
+
+err:
+	CMD_ERR("err cmd:%s, expect: <GPIO> m=<Mode> p=<Pull> l=<Level> [e=<Event>]\n", cmd);
+	return CMD_STATUS_INVALID_ARG;}
 
 /*
- * drv gpio deconfig <port> <pin>
- * eg. drv gpio deconfig a 6
+ * drv gpio deconfig <gpio> [m=<mode>]
+ * eg. drv gpio deconfig pa6
+ * eg. drv gpio deconfig pa6 m=6
  */
 static enum cmd_status cmd_gpio_deconfig_exec(char *cmd)
 {
 	int32_t cnt;
 	char port;
-	uint32_t pin;
+	char gpio[3];
+	uint32_t pin, mode;
 
-	cnt = cmd_sscanf(cmd, "%c %d", &port, &pin);
-	if (cnt != 2) {
-		CMD_ERR("err cmd:%s, expect: p=<Port_Num> m=<Mode> p=<Pull>\n", cmd);
-		return CMD_STATUS_INVALID_ARG;
+	cnt = cmd_sscanf(cmd, "%2s%d m=%d", gpio, &pin, &mode);
+	if (cnt != 3) {
+		cnt = cmd_sscanf(cmd, "%2s%d", gpio, &pin);
+		if (cnt != 2) {
+			CMD_ERR("err cmd:%s, expect: <gpio> m=<Mode>\n", cmd);
+			return CMD_STATUS_INVALID_ARG;
+		}
 	}
 
-	if (port == 'A' || port == 'a')
+	if (cmd_strcmp(gpio, "PA") == 0 || cmd_strcmp(gpio, "pa")  == 0)
 		port = GPIO_PORT_A;
-	else if (port == 'B' || port == 'b')
+	else if (cmd_strcmp(gpio, "PB") == 0 || cmd_strcmp(gpio, "pb")	== 0)
 		port = GPIO_PORT_B;
+#if (__CONFIG_CHIP_ARCH_VER == 2)
+	else if (cmd_strcmp(gpio, "PC") == 0 || cmd_strcmp(gpio, "pc")	== 0)
+		port = GPIO_PORT_C;
+#endif
 	else
 		return CMD_STATUS_INVALID_ARG;
 
 	HAL_GPIO_DeInit(port, pin);
 
+	if (mode == GPIOx_Pn_F6_EINT) {
+		HAL_GPIO_DisableIRQ(port, pin);
+	}
+
 	return CMD_STATUS_OK;
 }
 
 /*
- * drv gpio read <port> <pin>
- * eg. drv gpio read a 6
+ * drv gpio read <gpio>
+ * eg. drv gpio read pa6
  */
 static enum cmd_status cmd_gpio_read_exec(char *cmd)
 {
 	enum cmd_status ret = CMD_STATUS_OK;
 	int32_t cnt;
 	char port;
+	char gpio[3];
 	uint32_t pin, state;
 
-	cnt = cmd_sscanf(cmd, "%c %d", &port, &pin);
+	cnt = cmd_sscanf(cmd, "%2s%d", gpio, &pin);
 
-	if (port == 'A' || port == 'a')
+	if (cmd_strcmp(gpio, "PA") == 0 || cmd_strcmp(gpio, "pa")  == 0)
 		port = GPIO_PORT_A;
-	else if (port == 'B' || port == 'b')
+	else if (cmd_strcmp(gpio, "PB") == 0 || cmd_strcmp(gpio, "pb")	== 0)
 		port = GPIO_PORT_B;
+#if (__CONFIG_CHIP_ARCH_VER == 2)
+	else if (cmd_strcmp(gpio, "PC") == 0 || cmd_strcmp(gpio, "pc")	== 0)
+		port = GPIO_PORT_C;
+#endif
 	else
 		ret = CMD_STATUS_INVALID_ARG;
 
 	if (cnt != 2 || ret == CMD_STATUS_INVALID_ARG) {
-		CMD_ERR("err cmd:%s, expect: p=<Port_Num> m=<Mode> p=<Pull>\n", cmd);
+		CMD_ERR("err cmd:%s, expect: <gpio>\n", cmd);
 		return ret;
 	}
 
@@ -122,25 +178,30 @@ static enum cmd_status cmd_gpio_read_exec(char *cmd)
 }
 
 /*
- * drv gpio write <port> <pin> <value>
- * eg. drv gpio write a 6 0
+ * drv gpio write <gpio> v=<value>
+ * eg. drv gpio write pa6 v=0
  */
 static enum cmd_status cmd_gpio_write_exec(char *cmd)
 {
 	int32_t cnt;
 	char port;
+	char gpio[3];
 	uint32_t pin, state;
 
-	cnt = cmd_sscanf(cmd, "%c %d %d", &port, &pin, &state);
+	cnt = cmd_sscanf(cmd, "%2s%d v=%d", gpio, &pin, &state);
 	if (cnt != 3) {
-		CMD_ERR("err cmd:%s, expect: p=<Port_Num> m=<Mode> p=<Pull>\n", cmd);
+		CMD_ERR("err cmd:%s, expect: <gpio> v=<value>\n", cmd);
 		return CMD_STATUS_INVALID_ARG;
 	}
 
-	if (port == 'A' || port == 'a')
+	if (cmd_strcmp(gpio, "PA") == 0 || cmd_strcmp(gpio, "pa")  == 0)
 		port = GPIO_PORT_A;
-	else if (port == 'B' || port == 'b')
+	else if (cmd_strcmp(gpio, "PB") == 0 || cmd_strcmp(gpio, "pb")	== 0)
 		port = GPIO_PORT_B;
+#if (__CONFIG_CHIP_ARCH_VER == 2)
+	else if (cmd_strcmp(gpio, "PC") == 0 || cmd_strcmp(gpio, "pc")	== 0)
+		port = GPIO_PORT_C;
+#endif
 	else
 		return CMD_STATUS_INVALID_ARG;
 
@@ -149,11 +210,11 @@ static enum cmd_status cmd_gpio_write_exec(char *cmd)
 	return CMD_STATUS_OK;
 }
 
-static struct cmd_data g_gpio_cmds[] = {
-	{ "config",	cmd_gpio_config_exec },
-	{ "deconfig", 	cmd_gpio_deconfig_exec },
-	{ "read",	cmd_gpio_read_exec },
-	{ "write",	cmd_gpio_write_exec },
+static const struct cmd_data g_gpio_cmds[] = {
+	{ "config",     cmd_gpio_config_exec },
+	{ "deconfig",   cmd_gpio_deconfig_exec },
+	{ "read",       cmd_gpio_read_exec },
+	{ "write",      cmd_gpio_write_exec },
 };
 
 enum cmd_status cmd_gpio_exec(char *cmd)

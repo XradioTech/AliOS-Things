@@ -74,17 +74,16 @@
 
 #endif /* __CONFIG_SECTION_ATTRIBUTE_NONXIP */
 
-
 static void audio_ctrl_msg_process(uint32_t event, uint32_t data, void *arg)
 {
 	switch (EVENT_SUBTYPE(event)) {
 		case AUDIO_CTRL_MSG_LINEIN_INSERT:
 			AU_INFO("start LINEIN\n");
-			aud_mgr_handler(AUDIO_DEVICE_MANAGER_PATH, AUDIO_IN_DEV_LINEIN, 1);
+			audio_manager_handler(AUDIO_SND_CARD_DEFAULT, AUDIO_MANAGER_SET_ROUTE, AUDIO_IN_DEV_LINEIN, 1);
 			break;
 		case AUDIO_CTRL_MSG_LINEIN_REMOVE:
 			AU_INFO("end LINEIN\n");
-			aud_mgr_handler(AUDIO_DEVICE_MANAGER_PATH, AUDIO_IN_DEV_LINEIN, 0);
+			audio_manager_handler(AUDIO_SND_CARD_DEFAULT, AUDIO_MANAGER_SET_ROUTE, AUDIO_IN_DEV_LINEIN, 0);
 			break;
 		default:
 			break;

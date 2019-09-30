@@ -901,24 +901,21 @@ HAL_Status HAL_SPI_Open(SPI_Port port, SPI_CS cs, SPI_Config *config, uint32_t m
 	}
 
 	SPI_Disable(spi);
-
-	if (HAL_Memcmp(config, &hdl->config, sizeof(*config))) {
-		HAL_Memcpy(&hdl->config, config, sizeof(*config));
-		SPI_SetMode(spi, config->mode);
-		SPI_SetFirstTransmitBit(spi, config->firstBit);
-		SPI_SetSclkMode(spi, config->sclkMode);
-		ret = SPI_SetClkDiv(spi, hdl->mclk, config->sclk);
-		if (ret != HAL_OK) {
-			if (config->opMode == SPI_OPERATION_MODE_DMA) {
-				HAL_DMA_DeInit(hdl->rx_dmaChannel);
-				HAL_DMA_DeInit(hdl->tx_dmaChannel);
-				HAL_DMA_Release(hdl->rx_dmaChannel);
-				HAL_DMA_Release(hdl->tx_dmaChannel);
-			}
-			goto init_failed;
+	HAL_Memcpy(&hdl->config, config, sizeof(*config));
+	SPI_SetMode(spi, config->mode);
+	SPI_SetFirstTransmitBit(spi, config->firstBit);
+	SPI_SetSclkMode(spi, config->sclkMode);
+	ret = SPI_SetClkDiv(spi, hdl->mclk, config->sclk);
+	if (ret != HAL_OK) {
+		if (config->opMode == SPI_OPERATION_MODE_DMA) {
+			HAL_DMA_DeInit(hdl->rx_dmaChannel);
+			HAL_DMA_DeInit(hdl->tx_dmaChannel);
+			HAL_DMA_Release(hdl->rx_dmaChannel);
+			HAL_DMA_Release(hdl->tx_dmaChannel);
 		}
-		SPI_SetDuplex(spi, SPI_TCTRL_DHB_HALF_DUPLEX);
+		goto init_failed;
 	}
+	SPI_SetDuplex(spi, SPI_TCTRL_DHB_HALF_DUPLEX);
 
 /*	if (config->csMode == SPI_CS_MODE_AUTO)
 		SPI_AutoChipSelect(spi, cs, 1, hdl->cs_idle);

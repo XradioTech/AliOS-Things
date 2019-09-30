@@ -148,6 +148,8 @@ typedef struct XPlayerBufferConfig
 	int maxBitStreamBufferSize;
 	int maxBitStreamFrameCount;
 	int maxPcmBufferSize;
+	int maxMovStszBufferSize;
+	int maxMovStcoBufferSize;
 } XPlayerBufferConfig;
 
 typedef struct PlayerContext XPlayer;

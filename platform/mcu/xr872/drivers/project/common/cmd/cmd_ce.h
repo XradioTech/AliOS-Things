@@ -33,7 +33,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 enum cmd_status cmd_crypto_exec(char *cmd);
 
 #ifdef __cplusplus

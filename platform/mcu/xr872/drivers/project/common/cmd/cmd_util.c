@@ -32,7 +32,7 @@
 
 
 /* cmd format: <command-name> <arg>... */
-enum cmd_status cmd_exec(char *cmd, struct cmd_data *cdata, int count)
+enum cmd_status cmd_exec(char *cmd, const struct cmd_data *cdata, int count)
 {
 	int i;
 	char *args;
@@ -53,7 +53,7 @@ enum cmd_status cmd_exec(char *cmd, struct cmd_data *cdata, int count)
 }
 
 /* cmd2 format: <command-name>[ <arg>...] */
-enum cmd_status cmd2_exec(char *cmd, struct cmd2_data *cdata, int count)
+enum cmd_status cmd2_exec(char *cmd, const struct cmd2_data *cdata, int count)
 {
 	int i;
 
@@ -192,4 +192,23 @@ int32_t cmd_raw_mode_write(uint8_t *buf, int32_t size)
 	} else {
 		return -1;
 	}
+}
+void cmd_print_uint8_array(uint8_t *buf, int32_t size)
+{
+	for(int i=0; i<size; i++) {
+		if(i%8 == 0) printf("  ");
+		if(i%32 == 0) printf("\n");
+		printf("%02x ", buf[i]);
+	}
+	printf("\n");
+}
+
+void cmd_print_uint32_array(uint32_t *buf, int32_t size)
+{
+	for(int i=0; i<size; i++) {
+		if(i%8 == 0) printf("  ");
+		if(i%32 == 0) printf("\n");
+		printf("%08x ", buf[i]);
+	}
+	printf("\n");
 }

@@ -27,6 +27,8 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if PRJCONF_NET_EN
+
 #include "cmd_util.h"
 #include "cmd_dhcpd.h"
 #include "net/udhcp/usr_dhcpd.h"
@@ -100,7 +102,7 @@ enum cmd_status dhcpd_set_max_leases_exec(char *cmd)
 	}
 
 	leases = cmd_atoi(argv[0]);
-	if (leases > 254) {
+	if (leases < 0 || leases > 254) {
 		CMD_ERR("invalid dhcp cmd, leases=%s", argv[0]);
 		return CMD_STATUS_INVALID_ARG;
 	}
@@ -137,7 +139,7 @@ enum cmd_status dhcpd_set_lease_time_exec(char *cmd)
 /*
  * dhcp commands
  */
-static struct cmd_data g_dhcpd_cmds[] = {
+static const struct cmd_data g_dhcpd_cmds[] = {
 	{ "start",	    dhcpd_start_exec },
 	{ "stop",	    dhcpd_stop_exec },
 	{ "ippool",	    dhcpd_set_ippool_exec },
@@ -149,3 +151,5 @@ enum cmd_status cmd_dhcpd_exec(char *cmd)
 {
 	return cmd_exec(cmd, g_dhcpd_cmds, cmd_nitems(g_dhcpd_cmds));
 }
+
+#endif /* PRJCONF_NET_EN */

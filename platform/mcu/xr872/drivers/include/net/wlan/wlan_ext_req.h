@@ -81,6 +81,7 @@ typedef enum wlan_ext_cmd {
     WLAN_EXT_CMD_SET_MBUF_LIMIT,
     WLAN_EXT_CMD_SET_AMPDU_REORDER_AGE,
     WLAN_EXT_CMD_SET_SCAN_FREQ,
+    WLAN_EXT_CMD_SET_RX_STACK_SIZE,
 } wlan_ext_cmd_t;
 
 /**

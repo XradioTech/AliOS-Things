@@ -27,6 +27,8 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __CONFIG_BOOTLOADER
+
 #include "efpg_i.h"
 #include "efpg_debug.h"
 #include "efpg/efpg.h"
@@ -197,3 +199,4 @@ int efpg_read_ua(uint32_t start, uint32_t num, uint8_t *data)
 	return 0;
 }
 
+#endif /* __CONFIG_BOOTLOADER */

@@ -62,7 +62,8 @@
 
 static struct arm_CMX_core_regs vault_arm_registers;
 
-#define PM_TIMEOFDAY_SAVE() timeofday_save()
+//#define PM_TIMEOFDAY_SAVE() timeofday_save()
+#define PM_TIMEOFDAY_SAVE()
 
 #ifdef CONFIG_PM_DEBUG
 #include "sys/xr_debug.h"
@@ -90,6 +91,24 @@ void pm_set_dump_addr(uint32_t addr, uint32_t len, uint32_t idx)
 {
 }
 #endif
+
+/**
+ * @brief shutdown sram region when standby mode, else retention
+ *
+ * @param sramN pm_sram_N or combination
+ * enum pm_sram_N {
+ *  PM_SRAM_0   = PRCM_SYS_SRAM_32K_SWM4_BIT,           //sram 0x200000 ~ 0x207FFF
+ *  PM_SRAM_1   = PRCM_SYS_SRAM_32K_SWM3_BIT,           //sram 0x208000 ~ 0x20FFFF
+ *  PM_SRAM_2   = PRCM_SYS_SRAM_352K_SWM2_BIT,          //sram 0x210000 ~ 0x25FFFF
+ *};
+ *
+ * @retval None.
+ * @example pm_standby_sram_retention_only(PM_SRAM_0 | PM_SRAM_1)
+ */
+void pm_standby_sram_retention_only(uint32_t sramN)
+{
+    HAL_MODIFY_REG(PRCM->SYS1_SLEEP_CTRL, (0x7 << 25), ((~sramN) & (0x7 << 25)));
+}
 
 static int __suspend_begin(enum suspend_state_t state)
 {
@@ -206,6 +225,12 @@ static void __suspend_enter(enum suspend_state_t state)
 	} else {
         HAL_PRCM_SetSys1WakeupPowerFlags(0x6);
         HAL_PRCM_SetSys1SleepPowerFlags(0x1E);
+#if ((((__CONFIG_CACHE_POLICY>>4) & 0xF) + (__CONFIG_CACHE_POLICY& 0xF)) == 5)
+        HAL_SET_BIT(PRCM->SYS1_SLEEP_CTRL, PRCM_SYS_CACHE_SRAM_SWM1_BIT);
+#endif
+#ifndef __CONFIG_WLAN
+        HAL_SET_BIT(PRCM->SYS1_SLEEP_CTRL, PRCM_SYS_WLAN_SRAM_116K_SWM5_BIT);
+#endif
 		__record_dbg_status(PM_SUSPEND_ENTER | 9);
 		__cpu_suspend(state);
 	}
@@ -473,11 +498,6 @@ int pm_enter_mode(enum suspend_state_t state)
 			}
 			state_use--;
 		}
-	}
-
-	if (!HAL_Wakeup_CheckIOMode()) {
-		PM_LOGE("some wakeup io not EINT mode\n");
-		return -1;
 	}
 #endif
 

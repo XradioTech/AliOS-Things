@@ -28,19 +28,28 @@
  */
 
 #include "cmd_util.h"
-#include "sys/ota.h"
+#include "ota/ota.h"
+#include "common/framework/fs_ctrl.h"
 
 /*
  * ota file <url>
  * ota http <url>
  */
 
-#if OTA_OPT_PROTOCOL_FILE
+#if (OTA_OPT_PROTOCOL_FILE && PRJCONF_MMC_EN)
 enum cmd_status cmd_ota_file_exec(char *cmd)
 {
+	uint32_t *verify_value;
+	ota_verify_t verify_type;
+	ota_verify_data_t verify_data;
+
 	if (cmd[0] == '\0') {
 		CMD_ERR("OTA empty file url\n");
 		return CMD_STATUS_INVALID_ARG;
+	}
+
+	if (fs_ctrl_mount(FS_MNT_DEV_TYPE_SDCARD, 0) != 0) {
+		return CMD_STATUS_FAIL;
 	}
 
 	cmd_write_respond(CMD_STATUS_OK, "OK");
@@ -50,7 +59,15 @@ enum cmd_status cmd_ota_file_exec(char *cmd)
 		return CMD_STATUS_ACKED;
 	}
 
-	if (ota_verify_image(OTA_VERIFY_NONE, NULL)  != OTA_STATUS_OK) {
+	if (ota_get_verify_data(&verify_data) != OTA_STATUS_OK) {
+		verify_type = OTA_VERIFY_NONE;
+		verify_value = NULL;
+	} else {
+		verify_type = verify_data.ov_type;
+		verify_value = (uint32_t*)(verify_data.ov_data);
+	}
+
+	if (ota_verify_image(verify_type, verify_value)  != OTA_STATUS_OK) {
 		CMD_ERR("OTA file verify image failed\n");
 		return CMD_STATUS_ACKED;
 	}
@@ -61,9 +78,13 @@ enum cmd_status cmd_ota_file_exec(char *cmd)
 }
 #endif /* OTA_OPT_PROTOCOL_FILE */
 
-#if OTA_OPT_PROTOCOL_HTTP
+#if (OTA_OPT_PROTOCOL_HTTP && PRJCONF_NET_EN)
 enum cmd_status cmd_ota_http_exec(char *cmd)
 {
+	uint32_t *verify_value;
+	ota_verify_t verify_type;
+	ota_verify_data_t verify_data;
+
 	if (cmd[0] == '\0') {
 		CMD_ERR("OTA empty http url\n");
 		return CMD_STATUS_INVALID_ARG;
@@ -76,7 +97,15 @@ enum cmd_status cmd_ota_http_exec(char *cmd)
 		return CMD_STATUS_ACKED;
 	}
 
-	if (ota_verify_image(OTA_VERIFY_NONE, NULL)  != OTA_STATUS_OK) {
+	if (ota_get_verify_data(&verify_data) != OTA_STATUS_OK) {
+		verify_type = OTA_VERIFY_NONE;
+		verify_value = NULL;
+	} else {
+		verify_type = verify_data.ov_type;
+		verify_value = (uint32_t*)(verify_data.ov_data);
+	}
+
+	if (ota_verify_image(verify_type, verify_value)  != OTA_STATUS_OK) {
 		CMD_ERR("OTA http verify image failed\n");
 		return CMD_STATUS_ACKED;
 	}
@@ -87,11 +116,11 @@ enum cmd_status cmd_ota_http_exec(char *cmd)
 }
 #endif /* OTA_OPT_PROTOCOL_HTTP */
 
-static struct cmd_data g_ota_cmds[] = {
-#if OTA_OPT_PROTOCOL_FILE
+static const struct cmd_data g_ota_cmds[] = {
+#if (OTA_OPT_PROTOCOL_FILE && PRJCONF_MMC_EN)
     { "file",	cmd_ota_file_exec},
 #endif
-#if OTA_OPT_PROTOCOL_HTTP
+#if (OTA_OPT_PROTOCOL_HTTP && PRJCONF_NET_EN)
     { "http",	cmd_ota_http_exec},
 #endif
 };

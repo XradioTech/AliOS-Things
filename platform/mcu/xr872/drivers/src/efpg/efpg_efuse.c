@@ -69,8 +69,6 @@ typedef enum efpg_region_mode {
 	EFPG_REGION_WRITE,
 } efpg_region_mode_t;
 
-#define EFPG_REGION_ATOMIC_FLAG_MASK	0x3
-#define EFPG_REGION_ATOMIC_FLAG_BITS	2
 
 typedef struct efpg_region_info {
 	uint16_t flag_start;
@@ -80,6 +78,8 @@ typedef struct efpg_region_info {
 	uint8_t *buf;			/* temp buffer for write to save read back data */
 	uint8_t  buf_len;		/* MUST equal to ((data_bits + 7) / 8) */
 } efpg_region_info_t;
+
+#if (__CONFIG_CHIP_ARCH_VER == 1)
 
 #define EFPG_BITS_TO_BYTE_CNT(bits)		(((bits) + 7) / 8)
 
@@ -98,6 +98,9 @@ static int efpg_bit_cmp(uint8_t *b1, uint8_t *b2, uint16_t n)
 	}
 	return 0;
 }
+
+#define EFPG_REGION_ATOMIC_FLAG_MASK	0x3
+#define EFPG_REGION_ATOMIC_FLAG_BITS	2
 
 static uint16_t efpg_read_region(efpg_region_info_t *info, uint8_t *data)
 {
@@ -204,20 +207,312 @@ static uint16_t efpg_rw_mac(efpg_region_mode_t mode, uint8_t *data)
 	}
 }
 
-static __inline uint16_t efpg_read_mac(uint8_t *data)
+uint16_t efpg_read_mac(uint8_t *data)
 {
 	EFPG_DBG("%s()\n", __func__);
 	return efpg_rw_mac(EFPG_REGION_READ, data);
 }
 
-static __inline uint16_t efpg_write_mac(uint8_t *data)
+uint16_t efpg_write_mac(uint8_t *data)
 {
 	EFPG_DBG("%s()\n", __func__);
 	return efpg_rw_mac(EFPG_REGION_WRITE, data);
 }
 
+#elif (__CONFIG_CHIP_ARCH_VER == 2)
+uint16_t efpg_read_mac(uint8_t *data)
+{
+    uint8_t idx = 0;
+	uint8_t flag;
+	uint32_t start_bit;
 
-static uint16_t efpg_read_hosc(uint8_t *data)
+	/* flag */
+	if (HAL_EFUSE_Read(EFPG_MAC_FLAG_START, EFPG_MAC_FLAG_NUM, (uint8_t *)&flag) != HAL_OK) {
+		return EFPG_ACK_RW_ERR;
+	}
+    flag &= ((1 << EFPG_MAC_FLAG_NUM) -1);
+	EFPG_DBG("r start %d, bits %d, flag 0x%x\n", EFPG_MAC_FLAG_START, EFPG_MAC_FLAG_NUM, flag);
+	if ((flag == 0) || (flag > 7)) {
+		EFPG_WARN("%s(), flag (%d, %d) = 0x%x is invalid\n", __func__, EFPG_MAC_FLAG_START, EFPG_MAC_FLAG_NUM, flag);
+		return EFPG_ACK_NODATA_ERR;
+	}
+
+    while ((flag & 0x1) != 0) {
+        flag = flag >> 1;
+        idx++;
+    }
+
+    /* data */
+	start_bit = EFPG_MAC_ADDR_START + (idx-1) * EFPG_MAC_ADDR_NUM;
+	EFPG_DBG("r data, start %d, bits %d\n", start_bit, EFPG_MAC_ADDR_NUM);
+	if (HAL_EFUSE_Read(start_bit, EFPG_MAC_ADDR_NUM, data) != HAL_OK) {
+		return EFPG_ACK_RW_ERR;
+	}
+
+	return EFPG_ACK_OK;
+}
+
+uint16_t efpg_write_mac(uint8_t *w_data)
+{
+    uint8_t idx = 0;
+	uint8_t flag;
+	uint32_t start_bit;
+    uint8_t r_data[6];
+    uint8_t w_tmp;
+
+    /*read flag */
+	if (HAL_EFUSE_Read(EFPG_MAC_FLAG_START, EFPG_MAC_FLAG_NUM, (uint8_t *)&flag) != HAL_OK) {
+		return EFPG_ACK_RW_ERR;
+	}
+    flag &= ((1 << EFPG_MAC_FLAG_NUM) -1);
+    EFPG_DBG("w start %d, bits %d, flag 0x%x\n", EFPG_MAC_FLAG_START, EFPG_MAC_FLAG_NUM, flag);
+    if(flag < 8) {
+        if(flag == 0) {
+            w_tmp = 1<<idx;
+            if((HAL_EFUSE_Write(EFPG_MAC_FLAG_START, EFPG_MAC_FLAG_NUM, &w_tmp) != HAL_OK)  ||
+                (HAL_EFUSE_Read(EFPG_MAC_FLAG_START, EFPG_MAC_FLAG_NUM, r_data) != HAL_OK) ||
+                (w_tmp != (r_data[0] & w_tmp))) {
+                    return EFPG_ACK_RW_ERR;
+            }
+        } else {
+            while ((flag & 0x1) != 0) {
+                flag = flag >> 1;
+                idx++;
+            }
+            idx--;
+        }
+
+        while(idx < 3) {
+            /*will try compare old mac data with new*/
+            start_bit = EFPG_MAC_ADDR_START + idx * EFPG_MAC_ADDR_NUM;
+            if(HAL_EFUSE_Read(start_bit, EFPG_MAC_ADDR_NUM, r_data) == HAL_OK) {
+                int i = 0;
+                for(; i<6; i++) {
+                    if(((r_data[i] ^ w_data[i]) & r_data[i]) != 0) {
+                        break;
+                    }
+                }
+                if(i == 6) {
+                    if((HAL_EFUSE_Write(start_bit, EFPG_MAC_ADDR_NUM, w_data) == HAL_OK) &&
+                        (HAL_EFUSE_Read(start_bit, EFPG_MAC_ADDR_NUM, r_data) == HAL_OK) &&
+                        (memcmp(w_data, r_data, 6) == 0)) {
+                            return EFPG_ACK_OK;
+                    }
+                }
+            }
+
+            if(++idx > 2) {
+                EFPG_WARN("mac have not space\n");
+                return EFPG_ACK_RW_ERR;
+            }
+            /*update mac flag as next*/
+            w_tmp = 1<<idx;
+            if((HAL_EFUSE_Write(EFPG_MAC_FLAG_START, EFPG_MAC_FLAG_NUM, &w_tmp) != HAL_OK)  ||
+                (HAL_EFUSE_Read(EFPG_MAC_FLAG_START, EFPG_MAC_FLAG_NUM, r_data) != HAL_OK) ||
+                (w_tmp != (r_data[0] & w_tmp))) {
+                    return EFPG_ACK_RW_ERR;
+            }
+        }
+    }
+
+	EFPG_WARN("flag (%d, %d) = 0x%x is invalid\n", EFPG_MAC_FLAG_START, EFPG_MAC_FLAG_NUM, flag);
+	return EFPG_ACK_NODATA_ERR;
+}
+
+uint16_t efpg_read_dcxo(uint8_t *data)
+{
+    uint8_t idx = 0;
+	uint8_t flag;
+	uint32_t start_bit;
+
+	/* flag */
+	if (HAL_EFUSE_Read(EFPG_DCXO_TRIM_FLAG_START, EFPG_DCXO_TRIM_FLAG_NUM, (uint8_t *)&flag) != HAL_OK) {
+		return EFPG_ACK_RW_ERR;
+	}
+    flag &= ((1 << EFPG_DCXO_TRIM_FLAG_NUM) -1);
+	EFPG_DBG("r start %d, bits %d, flag 0x%x\n", EFPG_DCXO_TRIM_FLAG_START, EFPG_DCXO_TRIM_FLAG_NUM, flag);
+	if ((flag == 0) || (flag > 7)) {
+		EFPG_WARN("%s(), flag (%d, %d) = 0x%x is invalid\n", __func__, EFPG_DCXO_TRIM_FLAG_START, EFPG_DCXO_TRIM_FLAG_NUM, flag);
+		return EFPG_ACK_NODATA_ERR;
+	}
+    while ((flag & 0x1) != 0) {
+        flag = flag >> 1;
+        idx++;
+    }
+    start_bit = EFPG_DCXO_TRIM1_START + (idx-1) * EFPG_DCXO_TRIM1_NUM;
+
+    /* data */
+	EFPG_DBG("r data, start %d, bits %d\n", start_bit, EFPG_DCXO_TRIM1_NUM);
+	if (HAL_EFUSE_Read(start_bit, EFPG_DCXO_TRIM1_NUM, data) != HAL_OK) {
+		return EFPG_ACK_RW_ERR;
+	}
+
+	return EFPG_ACK_OK;
+}
+
+uint16_t efpg_write_dcxo(uint8_t *w_data)
+{
+    uint8_t idx = 0;
+	uint8_t flag;
+	uint32_t start_bit;
+    uint8_t r_data[1];
+    uint8_t w_tmp;
+
+    /*read flag */
+	if (HAL_EFUSE_Read(EFPG_DCXO_TRIM_FLAG_START, EFPG_DCXO_TRIM_FLAG_NUM, (uint8_t *)&flag) != HAL_OK) {
+		return EFPG_ACK_RW_ERR;
+	}
+    flag &= ((1 << EFPG_DCXO_TRIM_FLAG_NUM) -1);
+    EFPG_DBG("w start %d, bits %d, flag 0x%x\n", EFPG_DCXO_TRIM_FLAG_START, EFPG_DCXO_TRIM_FLAG_NUM, flag);
+    if(flag < 8) {
+        if(flag == 0) {
+            idx = 0;
+            w_tmp = 1<<idx;
+            if((HAL_EFUSE_Write(EFPG_DCXO_TRIM_FLAG_START, EFPG_DCXO_TRIM_FLAG_NUM, &w_tmp) != HAL_OK)  ||
+                (HAL_EFUSE_Read(EFPG_DCXO_TRIM_FLAG_START, EFPG_DCXO_TRIM_FLAG_NUM, r_data) != HAL_OK) ||
+                (w_tmp != (r_data[0] & w_tmp))) {
+                    return EFPG_ACK_RW_ERR;
+            }
+        } else {
+            while ((flag & 0x1) != 0) {
+                flag = flag >> 1;
+                idx++;
+            }
+            idx--;
+        }
+
+        while(idx < 3) {
+            /*will try compare old mac data with new*/
+            start_bit = EFPG_DCXO_TRIM1_START + idx * EFPG_DCXO_TRIM1_NUM;
+            if(HAL_EFUSE_Read(start_bit, EFPG_DCXO_TRIM1_NUM, r_data) == HAL_OK) {
+                if(((r_data[0] ^ w_data[0]) & r_data[0]) == 0) {
+                    if((HAL_EFUSE_Write(start_bit, EFPG_DCXO_TRIM1_NUM, w_data) == HAL_OK) &&
+                        (HAL_EFUSE_Read(start_bit, EFPG_DCXO_TRIM1_NUM, r_data) == HAL_OK) &&
+                        (w_data[0] == r_data[0])) {
+                            return EFPG_ACK_OK;
+                    }
+                }
+            }
+
+            if(++idx > 2) {
+                EFPG_WARN("dcxo have not space\n");
+                return EFPG_ACK_RW_ERR;
+            }
+            /*update mac flag as next*/
+            w_tmp = 1<<idx;
+            if((HAL_EFUSE_Write(EFPG_DCXO_TRIM_FLAG_START, EFPG_DCXO_TRIM_FLAG_NUM, &w_tmp) != HAL_OK)  ||
+                (HAL_EFUSE_Read(EFPG_DCXO_TRIM_FLAG_START, EFPG_DCXO_TRIM_FLAG_NUM, r_data) != HAL_OK) ||
+                (w_tmp != (r_data[0] & w_tmp))) {
+                    return EFPG_ACK_RW_ERR;
+            }
+        }
+    }
+
+	EFPG_WARN("flag (%d, %d) = 0x%x is invalid\n", EFPG_DCXO_TRIM_FLAG_START, EFPG_DCXO_TRIM_FLAG_NUM, flag);
+	return EFPG_ACK_NODATA_ERR;
+}
+
+
+uint16_t efpg_read_pout(uint8_t *data)
+{
+    uint8_t idx = 0;
+	uint8_t flag;
+	uint32_t start_bit;
+
+	/* flag */
+	if (HAL_EFUSE_Read(EFPG_POUT_CAL_FLAG_START, EFPG_POUT_CAL_FLAG_NUM, (uint8_t *)&flag) != HAL_OK) {
+		return EFPG_ACK_RW_ERR;
+	}
+    flag &= ((1 << EFPG_POUT_CAL_FLAG_NUM) -1);
+	EFPG_DBG("r start %d, bits %d, flag 0x%x\n", EFPG_POUT_CAL_FLAG_START, EFPG_POUT_CAL_FLAG_NUM, flag);
+	if ((flag == 0) || (flag > 7)) {
+		EFPG_WARN("%s(), flag (%d, %d) = 0x%x is invalid\n", __func__, EFPG_POUT_CAL_FLAG_START, EFPG_POUT_CAL_FLAG_NUM, flag);
+		return EFPG_ACK_NODATA_ERR;
+	}
+    while ((flag & 0x1) != 0) {
+        flag = flag >> 1;
+        idx++;
+    }
+    start_bit = EFPG_POUT_CAL1_START + (idx-1) * EFPG_POUT_CAL1_NUM;
+
+    /* data */
+	EFPG_DBG("r data, start %d, bits %d\n", start_bit, EFPG_POUT_CAL1_NUM);
+	if (HAL_EFUSE_Read(start_bit, EFPG_POUT_CAL1_NUM, data) != HAL_OK) {
+		return EFPG_ACK_RW_ERR;
+	}
+
+	return EFPG_ACK_OK;
+}
+
+uint16_t efpg_write_pout(uint8_t *w_data)
+{
+    uint8_t idx = 0;
+	uint8_t flag;
+	uint32_t start_bit;
+    uint8_t r_data[EFPG_POUT_BUF_LEN];
+    uint8_t w_tmp;
+
+    /*read flag */
+	if (HAL_EFUSE_Read(EFPG_POUT_CAL_FLAG_START, EFPG_POUT_CAL_FLAG_NUM, (uint8_t *)&flag) != HAL_OK) {
+		return EFPG_ACK_RW_ERR;
+	}
+    flag &= ((1 << EFPG_POUT_CAL_FLAG_NUM) -1);
+    EFPG_DBG("w start %d, bits %d, flag 0x%x\n", EFPG_POUT_CAL_FLAG_START, EFPG_POUT_CAL_FLAG_NUM, flag);
+    if(flag < 8) {
+        if(flag == 0) {
+            idx = 0;
+            w_tmp = 1<<idx;
+            if((HAL_EFUSE_Write(EFPG_POUT_CAL_FLAG_START, EFPG_POUT_CAL_FLAG_NUM, &w_tmp) != HAL_OK)  ||
+                (HAL_EFUSE_Read(EFPG_POUT_CAL_FLAG_START, EFPG_POUT_CAL_FLAG_NUM, r_data) != HAL_OK) ||
+                (w_tmp != (r_data[0] & w_tmp))) {
+                    return EFPG_ACK_RW_ERR;
+            }
+        } else {
+            while ((flag & 0x1) != 0) {
+                flag = flag >> 1;
+                idx++;
+            }
+            idx--;
+        }
+
+        while(idx < 3) {
+            /*will try compare old mac data with new*/
+            start_bit = EFPG_POUT_CAL1_START + idx * EFPG_POUT_CAL1_NUM;
+            if(HAL_EFUSE_Read(start_bit, EFPG_POUT_CAL1_NUM, r_data) == HAL_OK) {
+                r_data[EFPG_POUT_BUF_LEN-1] &= ((1<<(EFPG_POUT_CAL1_NUM%8)) -1);
+                if((((r_data[0] ^ w_data[0]) & r_data[0]) == 0) &&
+                    (((r_data[1] ^ w_data[1]) & r_data[1]) == 0) &&
+                    (((r_data[2] ^ w_data[2]) & r_data[2]) == 0)) {
+                    if((HAL_EFUSE_Write(start_bit, EFPG_POUT_CAL1_NUM, w_data) == HAL_OK) &&
+                        (HAL_EFUSE_Read(start_bit, EFPG_POUT_CAL1_NUM, r_data) == HAL_OK)) {
+                            r_data[EFPG_POUT_BUF_LEN-1] &= ((1<<(EFPG_POUT_CAL1_NUM%8)) -1);
+                            if(memcmp(w_data, r_data, EFPG_POUT_BUF_LEN) == 0) {
+                                return EFPG_ACK_OK;
+                            }
+                    }
+                }
+            }
+            if(++idx > 2) {
+                EFPG_WARN("pout have not space\n");
+                return EFPG_ACK_RW_ERR;
+            }
+            /*update mac flag as next*/
+            w_tmp = 1<<idx;
+            if((HAL_EFUSE_Write(EFPG_POUT_CAL_FLAG_START, EFPG_POUT_CAL_FLAG_NUM, &w_tmp) != HAL_OK)  ||
+                (HAL_EFUSE_Read(EFPG_POUT_CAL_FLAG_START, EFPG_POUT_CAL_FLAG_NUM, r_data) != HAL_OK) ||
+                (w_tmp != (r_data[0] & w_tmp))) {
+                    return EFPG_ACK_RW_ERR;
+            }
+        }
+    }
+
+	EFPG_WARN("flag (%d, %d) = 0x%x is invalid\n", EFPG_POUT_CAL_FLAG_START, EFPG_POUT_CAL_FLAG_NUM, flag);
+	return EFPG_ACK_NODATA_ERR;
+}
+
+#endif
+
+uint16_t efpg_read_hosc(uint8_t *data)
 {
 	if (HAL_EFUSE_Read(EFPG_HOSC_TYPE_START, EFPG_HOSC_TYPE_NUM, data) != HAL_OK)
 		return EFPG_ACK_RW_ERR;
@@ -225,7 +520,7 @@ static uint16_t efpg_read_hosc(uint8_t *data)
 	return EFPG_ACK_OK;
 }
 
-static uint16_t efpg_read_boot(uint8_t *data)
+uint16_t efpg_read_boot(uint8_t *data)
 {
 	uint8_t tmp = 0;
 	uint8_t byte_cnt;
@@ -270,7 +565,7 @@ static uint16_t efpg_read_boot(uint8_t *data)
 	return EFPG_ACK_OK;
 }
 
-static uint16_t efpg_read_chipid(uint8_t *data)
+uint16_t efpg_read_chipid(uint8_t *data)
 {
 	if (HAL_EFUSE_Read(EFPG_CHIPID_1ST_START, EFPG_CHIPID_1ST_NUM, data) != HAL_OK)
 		return EFPG_ACK_RW_ERR;
@@ -278,7 +573,7 @@ static uint16_t efpg_read_chipid(uint8_t *data)
 	return EFPG_ACK_OK;
 }
 
-static uint16_t efpg_read_user_area(uint16_t start, uint16_t num, uint8_t *data)
+uint16_t efpg_read_user_area(uint16_t start, uint16_t num, uint8_t *data)
 {
 	if ((start >= EFPG_USER_AREA_NUM)
 		|| (num == 0)
@@ -296,7 +591,7 @@ static uint16_t efpg_read_user_area(uint16_t start, uint16_t num, uint8_t *data)
 	return EFPG_ACK_OK;
 }
 
-static uint16_t efpg_write_hosc(uint8_t *data)
+uint16_t efpg_write_hosc(uint8_t *data)
 {
 	uint8_t buf[EFPG_HOSC_BUF_LEN] = {0};
 
@@ -313,7 +608,7 @@ static uint16_t efpg_write_hosc(uint8_t *data)
 	return EFPG_ACK_OK;
 }
 
-static uint16_t efpg_write_boot(uint8_t *data)
+uint16_t efpg_write_boot(uint8_t *data)
 {
 	uint8_t tmp;
 	uint8_t err_cnt = 0;
@@ -394,8 +689,7 @@ static uint16_t efpg_write_boot(uint8_t *data)
 	return EFPG_ACK_OK;
 }
 
-
-static uint16_t efpg_write_chipid(uint8_t *data)
+uint16_t efpg_write_chipid(uint8_t *data)
 {
 	uint8_t buf[EFPG_CHIPID_BUF_LEN] = {0};
 
@@ -409,7 +703,7 @@ static uint16_t efpg_write_chipid(uint8_t *data)
 	return EFPG_ACK_DI_ERR;
 }
 
-static uint16_t efpg_write_user_area(uint16_t start, uint16_t num, uint8_t *data)
+uint16_t efpg_write_user_area(uint16_t start, uint16_t num, uint8_t *data)
 {
 	if ((start >= EFPG_USER_AREA_NUM)
 		|| (num == 0)
@@ -434,6 +728,10 @@ uint16_t efpg_read_field(efpg_field_t field, uint8_t *data, uint16_t start_bit_a
 		return efpg_read_hosc(data);
 	case EFPG_FIELD_BOOT:
 		return efpg_read_boot(data);
+	case EFPG_FIELD_DCXO:
+		return efpg_read_dcxo(data);
+	case EFPG_FIELD_POUT:
+		return efpg_read_pout(data);
 	case EFPG_FIELD_MAC:
 		return efpg_read_mac(data);
 	case EFPG_FIELD_CHIPID:
@@ -446,6 +744,7 @@ uint16_t efpg_read_field(efpg_field_t field, uint8_t *data, uint16_t start_bit_a
 	}
 }
 
+
 uint16_t efpg_write_field(efpg_field_t field, uint8_t *data, uint16_t start_bit_addr, uint16_t bit_len)
 {
 	switch (field) {
@@ -453,6 +752,10 @@ uint16_t efpg_write_field(efpg_field_t field, uint8_t *data, uint16_t start_bit_
 		return efpg_write_hosc(data);
 	case EFPG_FIELD_BOOT:
 		return efpg_write_boot(data);
+	case EFPG_FIELD_DCXO:
+		return efpg_write_dcxo(data);
+	case EFPG_FIELD_POUT:
+		return efpg_write_pout(data);
 	case EFPG_FIELD_MAC:
 		return efpg_write_mac(data);
 	case EFPG_FIELD_CHIPID:
@@ -464,3 +767,4 @@ uint16_t efpg_write_field(efpg_field_t field, uint8_t *data, uint16_t start_bit_
 		return EFPG_ACK_RW_ERR;
 	}
 }
+

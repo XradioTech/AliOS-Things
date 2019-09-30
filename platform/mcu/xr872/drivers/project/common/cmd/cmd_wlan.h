@@ -30,13 +30,13 @@
 #ifndef _CMD_WLAN_H_
 #define _CMD_WLAN_H_
 
+#if PRJCONF_NET_EN
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#ifdef __PRJ_CONFIG_WLAN_STA_AP
 enum cmd_status cmd_wlan_mode_exec(char *cmd);
-#endif
 enum cmd_status cmd_wlan_sta_exec(char *cmd);
 enum cmd_status cmd_wlan_ap_exec(char *cmd);
 
@@ -44,4 +44,5 @@ enum cmd_status cmd_wlan_ap_exec(char *cmd);
 }
 #endif
 
+#endif /* PRJCONF_NET_EN */
 #endif /* _CMD_WLAN_H_ */

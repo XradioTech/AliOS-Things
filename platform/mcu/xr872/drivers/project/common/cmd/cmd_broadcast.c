@@ -27,6 +27,8 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if PRJCONF_NET_EN
+
 #include "cmd_util.h"
 #include "lwip/sockets.h"
 #include "common/framework/net_ctrl.h"
@@ -251,7 +253,7 @@ enum cmd_status broadcast_send_exec(char *cmd)
 /*
  * dhcp commands
  */
-static struct cmd_data g_broadcast_cmds[] = {
+static const struct cmd_data g_broadcast_cmds[] = {
 	{ "recv",    broadcast_recv_exec },
 	{ "send",    broadcast_send_exec },
 	{ "state",   broadcast_state_exec },
@@ -263,3 +265,5 @@ enum cmd_status cmd_broadcast_exec(char *cmd)
 {
 	return cmd_exec(cmd, g_broadcast_cmds, cmd_nitems(g_broadcast_cmds));
 }
+
+#endif /* PRJCONF_NET_EN */

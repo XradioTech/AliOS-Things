@@ -27,38 +27,43 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if PRJCONF_NET_EN
+
 #include "cmd_util.h"
 #include "cmd_mqtt.h"
 #include "net/mqtt/MQTTClient-C/MQTTClient.h"
 
 
 static MQTTPacket_connectData connectData = MQTTPacket_connectData_initializer;
-static char *client_name;
-static uint8_t *send_buf;
-static uint8_t *recv_buf;
 static Client client;
 static Network network;
 
-#define MAX_SUB_TOPICS 5
-static char *sub_topic[MAX_SUB_TOPICS];
+#define MQTT_BUF_SIZE (1024)
 
-#define CMD_MQTT_BG_THREAD_STACK_SIZE (1024)
+static char server_address[16];
+static char server_port[6];
+static int mqtt_ssl = 0;
+
+static char *sub_topic[MAX_MESSAGE_HANDLERS];
+
+
+#define CMD_MQTT_BG_THREAD_STACK_SIZE (1024 * 6)
 static OS_Thread_t mqtt_bg_thread;
-
-static OS_Mutex_t lock;
-
+static int mqtt_bg_thread_run_flag = 0;
 
 static enum cmd_status cmd_mqtt_init_exec(char *cmd)
 {
-	int32_t cnt;
-	uint32_t buf_size;
+	int cnt;
 	uint32_t alive_interval;
 	uint32_t clean;
-	char *tmp;
+	char client_id_temp[100] = {0}; //just for test, client id max is 65535 in 3.1.1
+	char *client_id;
+	char *send_buf;
+	char *recv_buf;
 
 	/* get param */
-	cnt = cmd_sscanf(cmd, "bufsize=%u alive=%u clean=%u",
-			 &buf_size, &alive_interval, &clean);
+	cnt = cmd_sscanf(cmd, "alive=%u clean=%u clientid=%99s",
+						&alive_interval, &clean, client_id_temp);
 
 	/* check param */
 	if (cnt != 3) {
@@ -71,71 +76,53 @@ static enum cmd_status cmd_mqtt_init_exec(char *cmd)
 		return CMD_STATUS_INVALID_ARG;
 	}
 
-	if (OS_MutexCreate(&lock) != OS_OK)
-		return CMD_STATUS_FAIL;;
+	client_id = cmd_malloc(cmd_strlen(client_id_temp) + 1);
 
-	if ((tmp = cmd_strrchr(cmd, '\"')) == NULL)
-		return CMD_STATUS_INVALID_ARG;
-	*tmp = '\0';
-	if ((tmp = cmd_strchr(cmd, '\"')) == NULL)
-		return CMD_STATUS_INVALID_ARG;
-	tmp++;
+	cmd_memcpy(client_id, client_id_temp, cmd_strlen(client_id_temp) + 1);
+	CMD_DBG("client id = %s\n", client_id);
 
-	client_name = cmd_malloc(cmd_strlen(tmp) + 1);
-
-	cmd_memcpy(client_name, tmp, cmd_strlen(tmp) + 1);
-	CMD_DBG("client name = %s\n", client_name);
-
-	connectData.clientID.cstring = client_name;
+	connectData.clientID.cstring = client_id;
 	connectData.keepAliveInterval = alive_interval;
 	connectData.cleansession = clean;
+	connectData.MQTTVersion = 4; //Version of MQTT 3.1.1
 
-	send_buf = cmd_malloc(buf_size);
+	send_buf = cmd_malloc(MQTT_BUF_SIZE);
 	if (send_buf == NULL) {
 		CMD_ERR("no memory\n");
-		OS_MutexDelete(&lock);
 		return CMD_STATUS_FAIL;
 	}
-	recv_buf = cmd_malloc(buf_size);
+	recv_buf = cmd_malloc(MQTT_BUF_SIZE);
 	if (recv_buf == NULL) {
 		cmd_free(send_buf);
 		CMD_ERR("no memory\n");
-		OS_MutexDelete(&lock);
 		return CMD_STATUS_FAIL;
 	}
 
 	NewNetwork(&network);
-	MQTTClient(&client, &network, 6000, send_buf, buf_size, recv_buf, buf_size);
-
-
+	MQTTClient(&client, &network, 6000, (unsigned char*)send_buf, MQTT_BUF_SIZE,
+				(unsigned char*)recv_buf, MQTT_BUF_SIZE);
 
 	return CMD_STATUS_OK;
 }
 
 static enum cmd_status cmd_mqtt_will_exec(char *cmd)
 {
-	int32_t cnt;
-	char *topic;
-	uint8_t *buf;
-	char *tmp;
+	int cnt;
 	uint32_t qos;
 	uint32_t retain;
-	uint32_t size;
+
+	char topic_temp[50] = {0};//just for test, topic may be longer than 50
+	char *topic;
+
+	char message_temp[50] = {0};//just for test, message may be longer than 50
+	char *message;
 
 	/* get param */
-	cnt = cmd_sscanf(cmd, "qos=%u retain=%u",
-			 &qos, &retain);
-
-	if ((tmp = cmd_strrchr(cmd, '\"')) == NULL)
-		return CMD_STATUS_INVALID_ARG;
-	*tmp = '\0';
-	cnt += cmd_sscanf(tmp + 2, "size=%u", &size);
-	if ((tmp = cmd_strchr(cmd, '\"')) == NULL)
-		return CMD_STATUS_INVALID_ARG;
-	tmp++;
+	cnt = cmd_sscanf(cmd, "qos=%u retain=%u topic=%49s message=%49s",
+							&qos, &retain, topic_temp, message_temp);
 
 	/* check param */
-	if (cnt != 3) {
+	if (cnt != 4) {
 		CMD_ERR("invalid param number %d\n", cnt);
 		return CMD_STATUS_INVALID_ARG;
 	}
@@ -150,76 +137,61 @@ static enum cmd_status cmd_mqtt_will_exec(char *cmd)
 		return CMD_STATUS_INVALID_ARG;
 	}
 
-	topic = tmp;
-	CMD_DBG("topic name = %s\n", topic);
+	CMD_DBG("will topic name = %s\n", topic_temp);
+	CMD_DBG("will message = %s\n", message_temp);
 
-	buf = cmd_malloc(size);
-	if (buf == NULL) {
+	topic = cmd_malloc(cmd_strlen(topic_temp) + 1);
+	if (topic == NULL) {
 		CMD_ERR("no memory\n");
 		return CMD_STATUS_FAIL;
 	}
-
-
-	cmd_write_respond(CMD_STATUS_OK, "OK");
-	cmd_raw_mode_enable();
-	cmd_raw_mode_read(buf, size, 30000);
-	cmd_raw_mode_disable();
+	message = cmd_malloc(cmd_strlen(message_temp) + 1);
+	if (message == NULL) {
+		CMD_ERR("no memory\n");
+		cmd_free(topic);
+		return CMD_STATUS_FAIL;
+	}
+	cmd_memcpy(topic, topic_temp, cmd_strlen(topic_temp) + 1);
+	cmd_memcpy(message, message_temp, cmd_strlen(message_temp) + 1);
 
 	//will function
 	connectData.willFlag = 1;
-	connectData.will.message.lenstring.data = (char *)buf;
-	connectData.will.message.lenstring.len = size;
-	connectData.will.qos = qos;
-	connectData.will.retained = retain;
 	connectData.will.topicName.cstring = topic;
-
-	cmd_free(buf);
+	connectData.will.message.cstring = message;
+	connectData.will.retained = retain;
+	connectData.will.qos = qos;
 
 	return CMD_STATUS_ACKED;
 }
 
 static enum cmd_status cmd_mqtt_user_exec(char *cmd)
 {
-	char *tmp;
-	uint32_t size;
+	char *user_name;
 
-	if ((tmp = cmd_strrchr(cmd, '\"')) == NULL)
-		return CMD_STATUS_INVALID_ARG;
-	*tmp = '\0';
-	if ((tmp = cmd_strchr(cmd, '\"')) == NULL)
-		return CMD_STATUS_INVALID_ARG;
-	tmp++;
+	user_name = cmd_malloc(cmd_strlen(cmd) + 1);
+	if (user_name == NULL) {
+		CMD_ERR("no memory\n");
+		return CMD_STATUS_FAIL;
+	}
+	cmd_memcpy(user_name, cmd, cmd_strlen(cmd) + 1);
 
-	if ((size = cmd_strlen(tmp)) == 0)
-		return CMD_STATUS_INVALID_ARG;
-	size++;
-
-	connectData.username.lenstring.data = cmd_malloc(size);
-	connectData.username.lenstring.len = size;
-	memcpy(connectData.username.lenstring.data, tmp, size);
+	connectData.username.cstring = user_name;
 
 	return CMD_STATUS_OK;
 }
 
 static enum cmd_status cmd_mqtt_password_exec(char *cmd)
 {
-	char *tmp;
-	uint32_t size;
+	char *password;
 
-	if ((tmp = cmd_strrchr(cmd, '\"')) == NULL)
-		return CMD_STATUS_INVALID_ARG;
-	*tmp = '\0';
-	if ((tmp = cmd_strchr(cmd, '\"')) == NULL)
-		return CMD_STATUS_INVALID_ARG;
-	tmp++;
+	password = cmd_malloc(cmd_strlen(cmd) + 1);
+	if (password == NULL) {
+		CMD_ERR("no memory\n");
+		return CMD_STATUS_FAIL;
+	}
+	cmd_memcpy(password, cmd, cmd_strlen(cmd) + 1);
 
-	if ((size = cmd_strlen(tmp)) == 0)
-		return CMD_STATUS_INVALID_ARG;
-	size++;
-
-	connectData.password.lenstring.data = cmd_malloc(size);
-	connectData.password.lenstring.len = size;
-	memcpy(connectData.password.lenstring.data, tmp, size);
+	connectData.password.cstring = password;
 
 	return CMD_STATUS_OK;
 }
@@ -227,56 +199,92 @@ static enum cmd_status cmd_mqtt_password_exec(char *cmd)
 
 static void cmd_mqtt_bg(void *arg)
 {
-	int rc;
+	int ret = 0;
 
-	while (1) {
-		OS_MutexLock(&lock, 0xffffffffU);
-		if ((rc = MQTTYield(&client, 3000)) != 0)
-			CMD_WRN("Return code from yield is %d\n", rc);
-		OS_MutexUnlock(&lock);
+	if (mqtt_ssl) {
+		/* this test has no ca cert, no client cert, no client pk, no client pwd */
+		ret = TLSConnectNetwork(&network, server_address, server_port, NULL, 0, NULL, 0, NULL, 0, NULL, 0);
+		if (ret != 0) {
+			CMD_ERR("Return code from network ssl connect is -0x%04x\n", -ret);
+			goto exit;
+		}
+	} else {
+		ret = ConnectNetwork(&network, server_address, atoi(server_port));
+		if (ret != 0) {
+			CMD_ERR("Return code from network connect is %d\n", ret);
+			goto exit;
+		}
 	}
 
+	if ((ret = MQTTConnect(&client, &connectData)) != 0) {
+		CMD_ERR("Return code from MQTT connect is %d\n", ret);
+		goto exit;
+	}
+	CMD_DBG("MQTT Connected\n");
+
+	while (mqtt_bg_thread_run_flag) {
+		if ((ret = MQTTYield(&client, 3000)) != 0) {
+			CMD_WRN("Return code from yield is %d\n", ret);
+
+reconnect:
+			/* reconnect */
+			if (!mqtt_bg_thread_run_flag)
+				break;
+
+			if (client.isconnected) {
+				if ((ret = MQTTDisconnect(&client)) != 0)
+					CMD_ERR("Return code from MQTT disconnect is %d\n", ret);
+				network.disconnect(&network);
+			}
+
+			if (mqtt_ssl) {
+				ret = TLSConnectNetwork(&network, server_address, server_port, NULL, 0, NULL, 0, NULL, 0, NULL, 0);
+				if (ret != 0) {
+					CMD_ERR("Return code from network ssl connect is -0x%04x\n", -ret);
+					goto reconnect;
+				}
+			} else {
+				ret = ConnectNetwork(&network, server_address, atoi(server_port));
+				if (ret != 0) {
+					CMD_ERR("Return code from network connect is %d\n", ret);
+					goto reconnect;
+				}
+			}
+
+			if ((ret = MQTTConnect(&client, &connectData)) != 0) {
+				CMD_ERR("Return code from MQTT connect is %d\n", ret);
+			}
+		}
+		OS_MSleep(10);
+	}
+
+exit:
+	CMD_DBG("MQTT mqtt_bg_thread exit\n");
+	OS_ThreadDelete(&mqtt_bg_thread);
 }
 
 static enum cmd_status cmd_mqtt_connect_exec(char *cmd)
 {
-	int32_t cnt;
-	char addr_str[15];
-	uint32_t port;
-	int32_t rc;
-	uint32_t i;
+	int cnt;
 
 	/* get param */
-	cnt = cmd_sscanf(cmd, "server=%15s port=%u",
-			 addr_str, &port);
+	cnt = cmd_sscanf(cmd, "server=%15s port=%5s ssl=%u", server_address, server_port, &mqtt_ssl);
 
 	/* check param */
-	if (cnt != 2) {
+	if (cnt != 3) {
 		CMD_ERR("invalid param number %d\n", cnt);
 		return CMD_STATUS_INVALID_ARG;
 	}
 
-	i = 10;
-	char* address = addr_str;
-	while ((rc = ConnectNetwork(&network, address, port)) != 0)
-	{
-		CMD_WRN("Return code from network connect is %d\n", rc);
-		cmd_msleep(2000);
-		if (!(i--))
-			return CMD_STATUS_FAIL;
-	}
-
-	if ((rc = MQTTConnect(&client, &connectData)) != 0) {
-		CMD_ERR("Return code from MQTT connect is %d\n", rc);
+	if (OS_ThreadIsValid(&mqtt_bg_thread)) {
+		CMD_ERR(" mqtt background thread has exist\n");
 		return CMD_STATUS_FAIL;
 	}
-	else
-		CMD_DBG("MQTT Connected\n");
 
-
+	mqtt_bg_thread_run_flag = 1;
 
 	if (OS_ThreadCreate(&mqtt_bg_thread,
-		                "",
+		                "mqtt_bg",
 		                cmd_mqtt_bg,
 		                NULL,
 		                OS_PRIORITY_NORMAL,
@@ -285,39 +293,30 @@ static enum cmd_status cmd_mqtt_connect_exec(char *cmd)
 		return CMD_STATUS_FAIL;
 	}
 
-
 	return CMD_STATUS_OK;
 }
 
 void mqtt_msg_cb(MessageData* data)
 {
-	cmd_write_event(CMD_EVENT_MQTT_MSG_RECV, "[topic: %.*s] %.*s", data->topicName->lenstring.len,
+	CMD_DBG("[topic: %.*s] %.*s\n", data->topicName->lenstring.len,
 					data->topicName->lenstring.data, data->message->payloadlen,
 					(char *)data->message->payload);
 }
 
 static enum cmd_status cmd_mqtt_subscribe_exec(char *cmd)
 {
-	int32_t cnt;
-	uint32_t i;
-	char *tmp;
+	int cnt;
 	uint32_t qos;
 	int rc;
 
+	char topic_temp[50] = {0};//just for test, topic may be longer than 50
+	char *topic;
+
 	/* get param */
-	cnt = cmd_sscanf(cmd, "qos=%u",
-			 &qos);
-
-	if ((tmp = cmd_strrchr(cmd, '\"')) == NULL)
-		return CMD_STATUS_INVALID_ARG;
-	*tmp = '\0';
-	if ((tmp = cmd_strchr(cmd, '\"')) == NULL)
-		return CMD_STATUS_INVALID_ARG;
-	tmp++;
-
+	cnt = cmd_sscanf(cmd, "qos=%u topic=%49s", &qos, topic_temp);
 
 	/* check param */
-	if (cnt != 1) {
+	if (cnt != 2) {
 		CMD_ERR("invalid param number %d\n", cnt);
 		return CMD_STATUS_INVALID_ARG;
 	}
@@ -327,99 +326,82 @@ static enum cmd_status cmd_mqtt_subscribe_exec(char *cmd)
 		return CMD_STATUS_INVALID_ARG;
 	}
 
-	i = 0;
-	while (sub_topic[i] != NULL) {
-		i++;
-		if (i >= MAX_SUB_TOPICS) {
-			CMD_WRN("Subscribe topics is max\n");
-			return CMD_STATUS_FAIL;
+	topic = cmd_malloc(cmd_strlen(topic_temp) + 1);
+	cmd_memcpy(topic, topic_temp, cmd_strlen(topic_temp) + 1);
+
+	/* must save topic when subscribe and free topic when unsubscribe */
+	int i = 0;
+	for (i = 0; i < MAX_MESSAGE_HANDLERS; i++) {
+		if (sub_topic[i] == NULL) {
+			sub_topic[i] = topic;
+			break;
 		}
 	}
 
-	sub_topic[i] = cmd_malloc(cmd_strlen(tmp) + 1);
-	cmd_memcpy(sub_topic[i], tmp, cmd_strlen(tmp) + 1);
-
-	if (OS_MutexLock(&lock, 60000) != OS_OK)
-		return CMD_STATUS_FAIL;
-
-	if ((rc = MQTTSubscribe(&client, sub_topic[i], qos, mqtt_msg_cb)) != 0) {
-		CMD_ERR("Return code from MQTT subscribe is %d\n", rc);
+	if (i >= MAX_MESSAGE_HANDLERS) {
+		CMD_ERR("Subscribe topic limit %d\n", MAX_MESSAGE_HANDLERS);
+		cmd_free(topic);
 		return CMD_STATUS_FAIL;
 	}
 
-	OS_MutexUnlock(&lock);
+	if ((rc = MQTTSubscribe(&client, sub_topic[i], qos, mqtt_msg_cb)) != 0) {
+		CMD_ERR("Return code from MQTT subscribe is %d\n", rc);
+		cmd_free(sub_topic[i]);
+		sub_topic[i] = NULL;
+		return CMD_STATUS_FAIL;
+	}
 
 	return CMD_STATUS_OK;
 }
 
 static enum cmd_status cmd_mqtt_unsubscribe_exec(char *cmd)
 {
-	uint32_t i;
-	char *tmp;
+	int cnt;
+	char topic_temp[50] = {0};//just for test, topic may be longer than 50
 	int rc;
 
 	/* get param */
-	if ((tmp = cmd_strrchr(cmd, '\"')) == NULL)
-		return CMD_STATUS_INVALID_ARG;
-	*tmp = '\0';
-	if ((tmp = cmd_strchr(cmd, '\"')) == NULL)
-		return CMD_STATUS_INVALID_ARG;
-	tmp++;
+	cnt = cmd_sscanf(cmd, "topic=%49s", topic_temp);
 
-	i = 0;
-	while (i < MAX_SUB_TOPICS) {
-		if ((sub_topic[i] != NULL) && (!cmd_memcmp(sub_topic[i], tmp, cmd_strlen(tmp) + 1)))
-			break;
-		i++;
+	/* check param */
+	if (cnt != 1) {
+		CMD_ERR("invalid param number %d\n", cnt);
+		return CMD_STATUS_INVALID_ARG;
 	}
 
-	if (OS_MutexLock(&lock, 60000) != OS_OK)
-		return CMD_STATUS_FAIL;
-
-	if ((rc = MQTTUnsubscribe(&client, tmp/*sub_topic[i]*/)) != 0) {
+	if ((rc = MQTTUnsubscribe(&client, topic_temp)) != 0) {
 		CMD_ERR("Return code from MQTT unsubscribe is %d\n", rc);
 		return CMD_STATUS_FAIL;
+	} else {
+		/* free topic when unsubscribe */
+		for (int i = 0; i < MAX_MESSAGE_HANDLERS; i++) {
+			if (sub_topic[i] != NULL && !cmd_strncmp(sub_topic[i], topic_temp, cmd_strlen(topic_temp))) {
+				cmd_free(sub_topic[i]);
+				sub_topic[i] = NULL;
+			}
+		}
 	}
-
-	if (i == MAX_SUB_TOPICS)
-		CMD_WRN("Unsubscribe topics is inexist\n");
-	else {
-		cmd_free(sub_topic[i]);
-		sub_topic[i] = NULL;
-	}
-
-	OS_MutexUnlock(&lock);
 
 	return CMD_STATUS_OK;
 }
 
 static enum cmd_status cmd_mqtt_publish_exec(char *cmd)
 {
-	int32_t cnt;
+	int cnt;
 	MQTTMessage message;
-	char *topic;
-	uint8_t *buf;
-	char *tmp;
 	uint32_t qos;
 	uint32_t retain;
-	uint32_t size;
 	int rc;
 
+	char topic_temp[50] = {0};//just for test, topic may be longer than 50
+	char message_temp[50] = {0};//just for test, message may be longer than 50
+
 	/* get param */
-	cnt = cmd_sscanf(cmd, "qos=%u retain=%u",
-			 &qos, &retain);
-
-	if ((tmp = cmd_strrchr(cmd, '\"')) == NULL)
-		return CMD_STATUS_INVALID_ARG;
-	*tmp = '\0';
-  	cnt += cmd_sscanf(tmp + 2, "size=%u", &size);
-	if ((tmp = cmd_strchr(cmd, '\"')) == NULL)
-		return CMD_STATUS_INVALID_ARG;
-	tmp++;
-
+	cnt = cmd_sscanf(cmd, "qos=%u retain=%u topic=%49s message=%49s",
+			 				&qos, &retain, topic_temp, message_temp);
 
 	/* check param */
-	if (cnt != 3) {
+	if (cnt != 4) {
 		CMD_ERR("invalid param number %d\n", cnt);
 		return CMD_STATUS_INVALID_ARG;
 	}
@@ -434,85 +416,37 @@ static enum cmd_status cmd_mqtt_publish_exec(char *cmd)
 		return CMD_STATUS_INVALID_ARG;
 	}
 
-	topic = tmp;
-	CMD_DBG("topic name = %s\n", topic);
-
-	buf = cmd_malloc(size);
-	if (buf == NULL) {
-		CMD_ERR("no memory\n");
-		return CMD_STATUS_FAIL;
-	}
-
-
-	cmd_write_respond(CMD_STATUS_OK, "OK");
-	cmd_raw_mode_enable();
-	cmd_raw_mode_read(buf, size, 30000);
+//	CMD_DBG("topic name = %s\n", topic_temp);
+//	CMD_DBG("message = %s\n", message_temp);
 
 	message.qos = qos;
 	message.retained = retain;
-	message.payload = buf;
-	message.payloadlen = size;
+	message.payload = message_temp;
+	message.payloadlen = cmd_strlen(message_temp);
 
-	if (OS_MutexLock(&lock, 60000) != OS_OK)
-		return CMD_STATUS_FAIL;
-
-	if ((rc = MQTTPublish(&client, topic, &message)) != 0)
+	if ((rc = MQTTPublish(&client, topic_temp, &message)) != 0)
 		CMD_ERR("Return code from MQTT publish is %d\n", rc);
 	else
 		CMD_DBG("MQTT publish is success\n");
 
-	OS_MutexUnlock(&lock);
-
-	cmd_raw_mode_write((uint8_t *)&rc, sizeof(rc));
-	cmd_raw_mode_disable();
-
-	cmd_free(buf);
-
 	return CMD_STATUS_ACKED;
-
 }
 
 static enum cmd_status cmd_mqtt_disconnect_exec(char *cmd)
 {
-	int32_t cnt;
-	uint32_t tcponly;
 	int rc;
-	uint32_t i;
 
-	/* get param */
-	cnt = cmd_sscanf(cmd, "tcponly=%u",
-			 &tcponly);
+	mqtt_bg_thread_run_flag	= 0;
+	while(OS_ThreadIsValid(&mqtt_bg_thread))
+		OS_MSleep(10); //wait thread exit
 
-	/* check param */
-	if (cnt != 1) {
-		CMD_ERR("invalid param number %d\n", cnt);
-		return CMD_STATUS_INVALID_ARG;
-	}
-
-	if (tcponly > 1) {
-		CMD_ERR("invalid tcponly %d\n", tcponly);
-		return CMD_STATUS_INVALID_ARG;
-	}
-
-
-	OS_ThreadDelete(&mqtt_bg_thread);
-
-	i = 0;
-	while (i < MAX_SUB_TOPICS) {
-		if (sub_topic[i] != NULL) {
-			cmd_free(sub_topic[i]);
-			sub_topic[i] = NULL;
-		}
-		i++;
-	}
-
-	if (tcponly == 0) {
-		if ((rc = MQTTDisconnect(&client)) != 0){
+	if (client.isconnected) {
+		if ((rc = MQTTDisconnect(&client)) != 0) {
 			CMD_ERR("Return code from MQTT disconnect is %d\n", rc);
 			network.disconnect(&network);
 			return CMD_STATUS_FAIL;
 		}
-	} else {
+
 		network.disconnect(&network);
 	}
 
@@ -521,39 +455,82 @@ static enum cmd_status cmd_mqtt_disconnect_exec(char *cmd)
 
 static enum cmd_status cmd_mqtt_deinit_exec(char *cmd)
 {
+	if (client.buf) {
+		cmd_free(client.buf);
+		client.buf = NULL;
+		client.buf_size = 0;
+	}
 
+	if (client.readbuf) {
+		cmd_free(client.readbuf);
+		client.readbuf = NULL;
+		client.readbuf_size = 0;
+	}
 
+	if (connectData.clientID.cstring) {
+		cmd_free(connectData.clientID.cstring);
+		connectData.clientID.cstring = NULL;
+	}
+	if (connectData.clientID.lenstring.len != 0) {
+		cmd_free(connectData.clientID.lenstring.data);
+		connectData.clientID.lenstring = (MQTTLenString){0, NULL};
+	}
 
-	if (connectData.username.lenstring.len != 0)
+	if (connectData.will.topicName.cstring) {
+		cmd_free(connectData.will.topicName.cstring);
+		connectData.will.topicName.cstring = NULL;
+	}
+	if (connectData.will.topicName.lenstring.len != 0) {
+		cmd_free(connectData.will.topicName.lenstring.data);
+		connectData.will.topicName.lenstring = (MQTTLenString){0, NULL};
+	}
+
+	if (connectData.username.cstring) {
+		cmd_free(connectData.username.cstring);
+		connectData.username.cstring = NULL;
+	}
+	if (connectData.username.lenstring.len != 0) {
 		cmd_free(connectData.username.lenstring.data);
-	if (connectData.password.lenstring.len != 0)
+		connectData.username.lenstring = (MQTTLenString){0, NULL};
+	}
+
+	if (connectData.password.cstring) {
+		cmd_free(connectData.password.cstring);
+		connectData.password.cstring = NULL;
+	}
+	if (connectData.password.lenstring.len != 0) {
 		cmd_free(connectData.password.lenstring.data);
+		connectData.password.lenstring = (MQTTLenString){0, NULL};
+	}
 
-	cmd_free(send_buf);
-	cmd_free(recv_buf);
-	cmd_free(client_name);
-
-	OS_MutexDelete(&lock);
+	for (int i = 0; i < MAX_MESSAGE_HANDLERS; i++) {
+		if (sub_topic[i]) {
+			cmd_free(sub_topic[i]);
+			sub_topic[i] = NULL;
+		}
+	}
 
 	connectData = (MQTTPacket_connectData)MQTTPacket_connectData_initializer;
 
 	return CMD_STATUS_OK;
 }
 
-static struct cmd_data g_mqtt_cmds[] = {
-	{ "init", 	cmd_mqtt_init_exec },
-	{ "will", 	cmd_mqtt_will_exec },
-	{ "user", 	cmd_mqtt_user_exec },
-	{ "password", 	cmd_mqtt_password_exec },
-	{ "connect", 	cmd_mqtt_connect_exec },
-	{ "subscribe", 	cmd_mqtt_subscribe_exec },
-	{ "unsubscribe", 	cmd_mqtt_unsubscribe_exec },
-	{ "publish", 	cmd_mqtt_publish_exec },
-	{ "disconnect",	cmd_mqtt_disconnect_exec },
-	{ "deinit",	cmd_mqtt_deinit_exec },
+static const struct cmd_data g_mqtt_cmds[] = {
+	{ "init",        cmd_mqtt_init_exec },
+	{ "will",        cmd_mqtt_will_exec },
+	{ "username",    cmd_mqtt_user_exec },
+	{ "password",    cmd_mqtt_password_exec },
+	{ "connect",     cmd_mqtt_connect_exec },
+	{ "subscribe",   cmd_mqtt_subscribe_exec },
+	{ "unsubscribe", cmd_mqtt_unsubscribe_exec },
+	{ "publish",     cmd_mqtt_publish_exec },
+	{ "disconnect",  cmd_mqtt_disconnect_exec },
+	{ "deinit",      cmd_mqtt_deinit_exec },
 };
 
 enum cmd_status cmd_mqtt_exec(char *cmd)
 {
 	return cmd_exec(cmd, g_mqtt_cmds, cmd_nitems(g_mqtt_cmds));
 }
+
+#endif /* PRJCONF_NET_EN */

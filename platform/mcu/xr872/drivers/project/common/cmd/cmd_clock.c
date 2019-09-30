@@ -38,12 +38,13 @@ enum CMD_CLOCK_TYPE {
 	CMD_CLOCK_TYPE_AHB1,
 	CMD_CLOCK_TYPE_AHB2,
 	CMD_CLOCK_TYPE_APB,
+	CMD_CLOCK_TYPE_APBS,
 	CMD_CLOCK_TYPE_NUM
 };
 
 /* index by enum CMD_CLOCK_TYPE */
 static const char *cmd_clock_type_str[CMD_CLOCK_TYPE_NUM] = {
-	"HF", "LF", "CPU", "DEV", "AHB1", "AHB2", "APB"
+	"HF", "LF", "CPU", "DEV", "AHB1", "AHB2", "APB", "APBS"
 };
 
 static uint32_t cmd_clock_get(enum CMD_CLOCK_TYPE type)
@@ -70,8 +71,13 @@ static uint32_t cmd_clock_get(enum CMD_CLOCK_TYPE type)
 		clock = HAL_GetAHB2Clock();
 		break;
 	case CMD_CLOCK_TYPE_APB:
-		clock = HAL_CCM_BusGetAPBClock();
+		clock = HAL_GetAPBClock();
 		break;
+#if (__CONFIG_CHIP_ARCH_VER == 2)
+	case CMD_CLOCK_TYPE_APBS:
+		clock = HAL_GetAPBSClock();
+		break;
+#endif
 	default:
 		clock = 0;
 		break;

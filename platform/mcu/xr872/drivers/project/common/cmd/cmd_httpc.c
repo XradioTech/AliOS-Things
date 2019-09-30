@@ -27,9 +27,11 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if PRJCONF_NET_EN
+
 #include "cmd_util.h"
 #include "net/HTTPClient/HTTPCUsr_api.h"
-#include "net/mbedtls/mbedtls.h"
+#include "mbedtls/mbedtls.h"
 
 static int HTTPC_checksum_check(void *url)
 {
@@ -58,7 +60,7 @@ static int HTTPC_get_test(HTTPParameters *clientParams)
 		return -1;
 	}
 	do {
-		nRetCode = HTTPC_get(clientParams,buf, 4096,(INT32 *)&recvSize);
+		nRetCode = HTTPC_get(clientParams, buf, 4096,(INT32 *)&recvSize);
 		if (checksum_flag == 1)
 			checksum += HTTPC_cal_checksum(buf,recvSize);
 
@@ -76,6 +78,8 @@ static int HTTPC_get_test(HTTPParameters *clientParams)
 
 	return nRetCode;
 }
+
+//#define HTTPC_CMD_REGISTER_USER_CALLBACK
 
 #ifdef HTTPC_CMD_REGISTER_USER_CALLBACK
 security_client user_param;
@@ -108,6 +112,7 @@ static int HTTPC_get_test_fresh(HTTPParameters *clientParams)
 
 #ifdef HTTPC_CMD_REGISTER_USER_CALLBACK
 	HTTPC_Register_user_certs(get_certs);
+//	HTTPC_set_ssl_verify_mode(MBEDTLS_SSL_VERIFY_OPTIONAL);
 #endif
 
 	if (HTTPC_open(clientParams) != 0) {
@@ -317,8 +322,8 @@ static int httpc_exec(char *cmd)
 	clientParams = malloc(sizeof(*clientParams));
 	if (!clientParams) {
 		return -1;
-	} else{
-		memset(clientParams,0,sizeof(HTTPParameters));
+	} else {
+		memset(clientParams, 0, sizeof(HTTPParameters));
 	}
 
 	argc = cmd_parse_argv(cmd, argv, 6);
@@ -334,8 +339,8 @@ static int httpc_exec(char *cmd)
 		checksum_flag = 0;
 	checksum = 0;
 
-	strcpy(clientParams->Uri,argv[1]);
-	if (cmd_strncmp(argv[0],"get",3) == 0) {
+	strcpy(clientParams->Uri, argv[1]);
+	if (cmd_strncmp(argv[0], "get", 3) == 0) {
 		if ((ret = HTTPC_get_test(clientParams)) != 0)
 			goto releaseParams;
 	} else if (cmd_strncmp(argv[0], "post", 4) == 0) {
@@ -445,7 +450,7 @@ enum cmd_status cmd_httpc_exec(char *cmd)
 	cmd_strlcpy(arg_buf, cmd, n+1);
 
 	if (OS_ThreadCreate(&g_httpc_thread,
-				"",
+				"httpc",
 				httpc_cmd_task,
 				(void *)arg_buf,
 				OS_THREAD_PRIO_APP,
@@ -520,3 +525,5 @@ enum cmd_status cmd_httpc_exec(char *cmd)
                 HTTPC_close(ClientParams);
         }
 #endif
+
+#endif /* PRJCONF_NET_EN */

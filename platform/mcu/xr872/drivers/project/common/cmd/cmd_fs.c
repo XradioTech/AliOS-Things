@@ -35,7 +35,7 @@
 #define FS_TEST_LFN	1
 
 #if FS_TEST_LFN
-#define FS_TEST_LFN_STR	"longlongLongLongName"
+#define FS_TEST_LFN_STR	"longName"
 #else
 #define FS_TEST_LFN_STR	""
 #endif
@@ -43,7 +43,7 @@
 #define FS_TEST_DATA_BUF_SIZE	1024
 #define FS_TEST_PATH_MAX_SIZE	(256 + 4)
 
-#define CMD_FS_VOL_NAME	""
+#define CMD_FS_VOL_NAME			"0:"
 
 int fs_test_create_file(const char *file_path, int file_size, uint8_t *buf, int buf_size)
 {
@@ -84,7 +84,7 @@ int fs_test_create_file(const char *file_path, int file_size, uint8_t *buf, int 
 	return (left > 0 ? -1 : 0);
 }
 
-int fs_test_create_dir(const char *dir_path, int file_num, int file_size_unit)
+int fs_test_create_dir(const char *dir_path, int file_num, int file_size)
 {
 	int i;
 	char *path;
@@ -92,7 +92,7 @@ int fs_test_create_dir(const char *dir_path, int file_num, int file_size_unit)
 	FRESULT res;
 
 	res = f_mkdir(dir_path);
-	if (res != FR_OK) {
+	if (res != FR_OK && res != FR_EXIST) {
 		CMD_ERR("create dir %s failed, return %d\n", dir_path, res);
 		return -1;
 	} else {
@@ -107,7 +107,7 @@ int fs_test_create_dir(const char *dir_path, int file_num, int file_size_unit)
 
 	for (i = 0; i < file_num; ++i) {
 		cmd_snprintf(path, FS_TEST_PATH_MAX_SIZE, "%s/file-%s-%02d.dat", dir_path, FS_TEST_LFN_STR, i);
-		if (fs_test_create_file(path, i * file_size_unit, buf, FS_TEST_DATA_BUF_SIZE) < 0) {
+		if (fs_test_create_file(path, file_size, buf, FS_TEST_DATA_BUF_SIZE) < 0) {
 			break;
 		}
 	}
@@ -270,7 +270,7 @@ int fs_test_cp_dir( const char *dir_dst, const char *dir_src)
 	uint8_t *buf = NULL;
 
 	res = f_mkdir(dir_dst);
-	if (res != FR_OK) {
+	if (res != FR_OK && res != FR_EXIST) {
 		CMD_ERR("create dir %s failed, return %d\n", dir_dst, res);
 		return -1;
 	} else {
@@ -310,10 +310,10 @@ int fs_test_cp_dir( const char *dir_dst, const char *dir_src)
 			if (fs_test_cp_dir(path_dst, path_src) < 0) {
 				goto out;
 			}
-		}
-
-		if (fs_test_cp_file(path_dst, path_src, buf, FS_TEST_DATA_BUF_SIZE) < 0) {
-			goto out;
+		} else {
+			if (fs_test_cp_file(path_dst, path_src, buf, FS_TEST_DATA_BUF_SIZE) < 0) {
+				goto out;
+			}
 		}
 	}
 
@@ -344,7 +344,7 @@ out:
 struct fs_test_param {
 	uint8_t task_idx;
 	uint8_t file_num;
-	int file_size_unit;
+	int file_size;
 };
 
 static void fs_test_task(void *arg)
@@ -356,7 +356,7 @@ static void fs_test_task(void *arg)
 
 	CMD_DBG("*** create dir and file test ***\n");
 	cmd_sprintf(dir_path[0], "%s/dir%d_0-%s", CMD_FS_VOL_NAME, param->task_idx, FS_TEST_LFN_STR);
-	fs_test_create_dir(dir_path[0], param->file_num, param->file_size_unit);
+	fs_test_create_dir(dir_path[0], param->file_num, param->file_size);
 
 	CMD_DBG("*** copy dir test ***\n");
 	cmd_sprintf(dir_path[1], "%s/dir%d_1-%s", CMD_FS_VOL_NAME, param->task_idx, FS_TEST_LFN_STR);
@@ -375,6 +375,10 @@ static void fs_test_task(void *arg)
 	OS_ThreadDelete(NULL);
 }
 
+/*
+ * command: fs mount
+ * example: fs mount
+ */
 static enum cmd_status cmd_fs_mount_exec(char *cmd)
 {
 	if (fs_ctrl_mount(FS_MNT_DEV_TYPE_SDCARD, 0) != 0) {
@@ -386,6 +390,10 @@ static enum cmd_status cmd_fs_mount_exec(char *cmd)
 	return CMD_STATUS_OK;
 }
 
+/*
+ * command: fs unmount
+ * example: fs unmount
+ */
 static enum cmd_status cmd_fs_unmount_exec(char *cmd)
 {
 	if (fs_ctrl_unmount(FS_MNT_DEV_TYPE_SDCARD, 0) != 0) {
@@ -397,14 +405,17 @@ static enum cmd_status cmd_fs_unmount_exec(char *cmd)
 	return CMD_STATUS_OK;
 }
 
-// fs test t=1, n=2, u=2097152	// 2MB
+/*
+ * command: fs test t=<thread-cnt> n=<file-num> l=<file-size>
+ * example: fs test t=1 n=2 l=2097152
+ */
 static enum cmd_status cmd_fs_test_exec(char *cmd)
 {
 	OS_Thread_t thread;
-	int i, thread_cnt, file_num, file_size_unit, cnt;
+	int i, thread_cnt, file_num, file_size, cnt;
 	struct fs_test_param *param;
 
-	cnt = cmd_sscanf(cmd, "t=%d, n=%d, u=%d", &thread_cnt, &file_num, &file_size_unit);
+	cnt = cmd_sscanf(cmd, "t=%d n=%d l=%d", &thread_cnt, &file_num, &file_size);
 	if (cnt != 3 || thread_cnt < 1) {
 		CMD_ERR("invalid argument %s\n", cmd);
 		return CMD_STATUS_FAIL;
@@ -414,7 +425,7 @@ static enum cmd_status cmd_fs_test_exec(char *cmd)
 		param = cmd_malloc(sizeof(struct fs_test_param));
 		param->task_idx = i;
 		param->file_num = file_num;
-		param->file_size_unit = file_size_unit;
+		param->file_size = file_size;
 
 		OS_ThreadSetInvalid(&thread);
 		if (OS_ThreadCreate(&thread,
@@ -432,6 +443,10 @@ static enum cmd_status cmd_fs_test_exec(char *cmd)
 	return CMD_STATUS_OK;
 }
 
+/*
+ * command: fs rmdir <dir-path>
+ * example: fs rmdir fs_test/dir
+ */
 static enum cmd_status cmd_fs_emptydir_exec(char *cmd)
 {
 	if (fs_test_rm_dir(cmd, 0) < 0)
@@ -440,11 +455,46 @@ static enum cmd_status cmd_fs_emptydir_exec(char *cmd)
 		return CMD_STATUS_OK;
 }
 
-static struct cmd_data g_fs_cmds[] = {
+/*
+ * command: fs open <file-path>
+ * example: fs open fs_test/test.txt
+ */
+static FIL fp;
+static enum cmd_status cmd_fs_open_exec(char *cmd)
+{
+	int ret;
+	char *path = cmd;
+	ret = f_open (&fp, path, FA_OPEN_ALWAYS);
+	if (ret != FR_OK) {
+		CMD_ERR("open fail, %d\n", ret);
+		return CMD_STATUS_FAIL;
+	} else {
+		CMD_DBG("open success\n");
+	}
+	return CMD_STATUS_OK;
+}
+
+/*
+ * command: fs close
+ * example: fs close
+ */
+static enum cmd_status cmd_fs_close_exec(char *cmd)
+{
+	int ret;
+	if ((ret = (f_close(&fp) != FR_OK))) {
+		CMD_ERR("close fail, %d\n", ret);
+		return CMD_STATUS_FAIL;
+	}
+	return CMD_STATUS_OK;
+}
+
+static const struct cmd_data g_fs_cmds[] = {
 	{ "mount",		cmd_fs_mount_exec },
 	{ "unmount",	cmd_fs_unmount_exec },
 	{ "test",		cmd_fs_test_exec },
 	{ "rmdir",		cmd_fs_emptydir_exec },
+	{ "open",		cmd_fs_open_exec },
+	{ "close",		cmd_fs_close_exec },
 };
 
 enum cmd_status cmd_fs_exec(char *cmd)

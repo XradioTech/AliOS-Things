@@ -614,37 +614,41 @@ extern "C" {
      * 	   @arg cfg->freq: Psram working frequency.
      * @retval HAL_Status: The status of driver.
      */
-    extern HAL_Status HAL_PsramCtrl_Init(struct psram_ctrl *ctrl, const PSRAMCtrl_InitParam *cfg);
+    HAL_Status HAL_PsramCtrl_Init(struct psram_ctrl *ctrl, const PSRAMCtrl_InitParam *cfg);
 
     /**
     * @brief Deinitialize Psram controller.
     * @param None
     * @retval HAL_Status: The status of driver.
     */
-    extern HAL_Status HAL_PsramCtrl_Deinit(struct psram_ctrl *ctrl);
+    HAL_Status HAL_PsramCtrl_Deinit(struct psram_ctrl *ctrl);
     /**
      * @brief Open psram controller SBUS.
      * @note At the same time, it will disable XIP and suspend schedule.
      * @param None
      * @retval HAL_Status: The status of driver.
      */
-    extern struct psram_ctrl *HAL_PsramCtrl_Open(uint32_t id);
+    struct psram_ctrl *HAL_PsramCtrl_Open(uint32_t id);
     /**
      * @brief Close psram controller SBUS.
      * @param None
      * @retval HAL_Status: The status of driver.
      */
-    extern HAL_Status HAL_PsramCtrl_Close(struct psram_ctrl *ctrl);
-    extern struct psram_ctrl *HAL_PsramCtrl_Create(uint32_t id, const PSRAMCtrl_InitParam *cfg);
+    HAL_Status HAL_PsramCtrl_Close(struct psram_ctrl *ctrl);
+    struct psram_ctrl *HAL_PsramCtrl_Create(uint32_t id, const PSRAMCtrl_InitParam *cfg);
 
-    extern HAL_Status HAL_PsramCtrl_Destory(struct psram_ctrl *ctrl);
+    HAL_Status HAL_PsramCtrl_Destory(struct psram_ctrl *ctrl);
     void HAL_PsramCtrl_IDBUS_Dma_Enable(uint32_t en);
-    extern void HAL_PsramCtrl_Set_Address_Field(struct psram_ctrl *ctrl, uint32_t id,
+    void HAL_PsramCtrl_Set_Address_Field(struct psram_ctrl *ctrl, uint32_t id,
             uint32_t startaddr, uint32_t endaddr, uint32_t bias_addr);
     int32_t HAL_PsramCtrl_Sbus_Transfer(struct psram_ctrl *ctrl, struct psram_request *mrq, bool dma);
-    extern void HAL_PsramCtrl_Set_Address_Field(struct psram_ctrl *ctrl, uint32_t id,
+    void HAL_PsramCtrl_Set_Address_Field(struct psram_ctrl *ctrl, uint32_t id,
             uint32_t startaddr, uint32_t endaddr, uint32_t bias_addr);
     int32_t HAL_PsramCtrl_Set_DQS_Delay_Cal(uint32_t clk);
+    void HAL_PsramCtrl_Set_RD_BuffSize(PSRAMC_CacheLLCfg size);
+    uint32_t HAL_PsramCtrl_Get_RD_BuffSize();
+    void HAL_PsramCtrl_Set_WR_BuffSize(PSRAMC_WrCacheLL size);
+    uint32_t HAL_PsramCtrl_Get_WR_BuffSize();
 #endif /* (__CONFIG_CHIP_ARCH_VER == 2) */
 
 #ifdef __cplusplus

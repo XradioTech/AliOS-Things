@@ -76,6 +76,8 @@ typedef struct {
 typedef enum {
 	EFUSE_TIMING_PARAM_24M	= 0x63321190U,
 	EFUSE_TIMING_PARAM_26M	= 0x63321190U,
+	EFUSE_TIMING_PARAM_40M	= 0xb55012A8U,
+	EFUSE_TIMING_PARAM_52M	= 0xC6642320U,
 } EFUSE_TimingParam;
 
 /******************************************************************************/

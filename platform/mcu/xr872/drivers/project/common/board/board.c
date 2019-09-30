@@ -29,17 +29,17 @@
 
 #include "board_debug.h"
 #include "board.h"
-#include "driver/chip/hal_codec.h"
+#include "driver/chip/hal_snd_card.h"
 #include <string.h>
 
 #include "pm/pm.h"
 
 /* uart */
 #if PRJCONF_UART_EN
-__nonxip_text
+__sram_text
 HAL_Status board_uart_init(UART_ID uart_id)
 {
-	__nonxip_rodata static const UART_InitParam board_uart_param = {
+	__sram_rodata static const UART_InitParam board_uart_param = {
 		.baudRate		  = BOARD_UART_BAUD_RATE,
 		.parity 		  = BOARD_UART_PARITY,
 		.stopBits		  = BOARD_UART_STOP_BITS,
@@ -69,106 +69,53 @@ __weak HAL_Status board_spi_deinit(SPI_Port spi)
 }
 #endif /* PRJCONF_SPI_EN */
 
-/* sound card0 */
-#if PRJCONF_SOUNDCARD0_EN
-__weak HAL_Status board_soundcard0_init(codec_detect_cb cb)
+#if PRJCONF_INTERNAL_SOUNDCARD_EN || PRJCONF_AC107_SOUNDCARD_EN
+__weak HAL_Status board_soundcard_init(void)
 {
-	static const I2C_InitParam i2c_param = {
-		.addrMode	= BOARD_SOUNDCARD0_I2C_ADDR_MODE,
-		.clockFreq	= BOARD_SOUNDCARD0_I2C_CLK
-	};
+	/* Codec register */
+#if PRJCONF_INTERNAL_SOUNDCARD_EN
+	HAL_SndCard_CodecRegisterInternal();
+#endif
+#if PRJCONF_AC107_SOUNDCARD_EN
+	HAL_SndCard_CodecRegisterAc107();
+#endif
+	//Add other codec register here
 
-	HAL_Status ret;
+	/* Platform register */
+#if PRJCONF_AC107_SOUNDCARD_EN	//or other codec that need to use I2S
+	HAL_SndCard_PlatformRegisterI2S();
+#endif
+	//Add other platform register here
 
-	ret = HAL_I2C_Init(BOARD_SOUNDCARD0_I2C_ID, &i2c_param);
-	if (ret != HAL_OK) {
-		BOARD_ERR("I2C %d init failed\n", BOARD_SOUNDCARD0_I2C_ID);
-		return ret;
-	}
+	/* Snd Card register*/
+	HAL_SndCard_Register();
 
-	CODEC_InitParam codec_param;
-	codec_param.card = AUDIO_CARD_EXTERNAL_CODEC;
-	codec_param.cb = cb;
-	ret = HAL_CODEC_Init(&codec_param);
-	if (ret != HAL_OK) {
-		BOARD_ERR("acodec init failed\n");
-		HAL_I2C_DeInit(BOARD_SOUNDCARD0_I2C_ID);
-		return ret;
-	}
-
-	uint8_t mclkDiv = 1;
-	CODEC_DetectParam detect_param;
-	HAL_CODEC_TYPE_Get(0, &detect_param);
-	if (detect_param.type == AUDIO_CODEC_AC101S)
-		mclkDiv = 2;
-
-	I2S_Param i2s_param;
-	memset(&i2s_param, 0, sizeof(i2s_param));
-	i2s_param.mclkDiv = mclkDiv;
-
-	ret = HAL_I2S_Init(&i2s_param);
-	if (ret != HAL_OK) {
-		BOARD_ERR("I2S init failed\n");
-		HAL_I2C_DeInit(BOARD_SOUNDCARD0_I2C_ID);
-		HAL_CODEC_DeInit(AUDIO_CARD_EXTERNAL_CODEC);
-		return ret;
-	}
-
-	return ret;
-}
-
-__weak HAL_Status board_soundcard0_deinit(void)
-{
-	AUDIO_CARD card = AUDIO_CARD_EXTERNAL_CODEC;
-
-	HAL_CODEC_DeInit(card);
-	HAL_I2S_DeInit();
-	return HAL_I2C_DeInit(BOARD_SOUNDCARD0_I2C_ID);
-}
-#endif /* PRJCONF_SOUNDCARD0_EN */
-
-/* sound card1 */
-#if PRJCONF_SOUNDCARD1_EN
-__weak HAL_Status board_soundcard1_init(void)
-{
-	DMIC_Param dmic_param;
-	memset(&dmic_param, 0, sizeof(dmic_param));
-
-	return HAL_DMIC_Init(&dmic_param);
-}
-
-__weak HAL_Status board_soundcard1_deinit(void)
-{
-	HAL_DMIC_DeInit();
 	return HAL_OK;
 }
-#endif /* PRJCONF_SOUNDCARD1_EN */
 
-/* sound card2 */
-#if PRJCONF_SOUNDCARD2_EN
-__weak HAL_Status board_soundcard2_init(void)
+__weak HAL_Status board_soundcard_deinit(void)
 {
-	HAL_Status ret;
+	/* Snd Card unregister*/
+	HAL_SndCard_Unregister();
 
-	CODEC_InitParam codec_param;
-	codec_param.card = AUDIO_CARD_INTERNAL_CODEC;
-	codec_param.cb = NULL;
-	ret = HAL_CODEC_Init(&codec_param);
-	if (ret != HAL_OK) {
-		BOARD_ERR("acodec init failed\n");
-		return ret;
-	}
+	/* Platform unregister */
+#if PRJCONF_AC107_SOUNDCARD_EN	//or other codec that need to use I2S
+	HAL_SndCard_PlatformUnregisterI2S();
+#endif
+	//Add other platform unregister here
 
-	return ret;
-}
+	/* Codec unregister */
+#if PRJCONF_INTERNAL_SOUNDCARD_EN
+	HAL_SndCard_CodecUnregisterInternal();
+#endif
+#if PRJCONF_AC107_SOUNDCARD_EN
+	HAL_SndCard_CodecUnregisterAc107();
+#endif
+	//Add other codec unregister here
 
-__weak HAL_Status board_soundcard2_deinit(void)
-{
-	AUDIO_CARD card = AUDIO_CARD_INTERNAL_CODEC;
-	HAL_CODEC_DeInit(card);
 	return HAL_OK;
 }
-#endif /* PRJCONF_SOUNDCARD1_EN */
+#endif
 
 /* mmc card */
 #if PRJCONF_MMC_EN
@@ -191,3 +138,4 @@ __weak HAL_Status board_sdcard_init(card_detect_cb cb)
 	return HAL_OK;
 }
 #endif
+

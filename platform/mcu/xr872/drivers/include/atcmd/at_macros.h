@@ -42,6 +42,10 @@ extern "C" {
 #define AT_COLON		':'
 #define AT_DOT			'.'
 #define AT_EQU			'='
+#define AT_QUO			'"'
+#define AT_QUE			'?'
+
+
 
 #define TABLE_SIZE(tbl)	(sizeof(tbl)/sizeof((tbl)[0]))
 

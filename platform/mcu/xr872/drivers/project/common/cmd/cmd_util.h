@@ -55,8 +55,8 @@ struct cmd2_data {
 	enum cmd_status (*exec)(char *);
 };
 
-enum cmd_status cmd_exec(char *cmd, struct cmd_data *cdata, int count);
-enum cmd_status cmd2_exec(char *cmd, struct cmd2_data *cdata, int count);
+enum cmd_status cmd_exec(char *cmd, const struct cmd_data *cdata, int count);
+enum cmd_status cmd2_exec(char *cmd, const struct cmd2_data *cdata, int count);
 
 int cmd_parse_argv(char *cmd, char *argv[], int size);
 
@@ -73,6 +73,9 @@ int cmd_write(enum cmd_code_type type, int code, const char *fmt, ...);
 
 int32_t cmd_raw_mode_read(uint8_t *buf, int32_t size, uint32_t msec);
 int32_t cmd_raw_mode_write(uint8_t *buf, int32_t size);
+
+void cmd_print_uint8_array(uint8_t *buf, int32_t size);
+void cmd_print_uint32_array(uint32_t *buf, int32_t size);
 
 #define cmd_raw_mode_enable()   console_disable();
 #define cmd_raw_mode_disable()  console_enable();

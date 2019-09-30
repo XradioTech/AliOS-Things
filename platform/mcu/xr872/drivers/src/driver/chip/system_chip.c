@@ -42,7 +42,7 @@ uint32_t SystemCoreClock;
 #else
 uint32_t SystemCoreClock;
 #endif
-extern const unsigned char __RAM_BASE[];	/* SRAM start address */
+extern const unsigned char __VECTOR_BASE[];	/* SRAM start address */
 
 __STATIC_INLINE void SystemChipAdjust(void)
 {
@@ -59,6 +59,18 @@ __STATIC_INLINE void SystemChipAdjust(void)
 		               PRCM_DCDC_BANDGAP_TRIM_MASK,
 		               (uint32_t)val << PRCM_DCDC_BANDGAP_TRIM_SHIFT);
 	}
+#elif (__CONFIG_CHIP_ARCH_VER == 2)
+	uint32_t cpu_clock = HAL_GetCPUClock();
+	if (cpu_clock > 240000000) {
+		HAL_PRCM_SetLDO1Volt(PRCM_LDO1_VOLT_1325MV, PRCM_LDO1_RET_VOLT_725MV);
+	} else if (cpu_clock > 160000000) {
+		HAL_PRCM_SetLDO1Volt(PRCM_LDO1_VOLT_1225MV, PRCM_LDO1_RET_VOLT_725MV);
+	} else {
+		HAL_PRCM_SetLDO1Volt(PRCM_LDO1_VOLT_1225MV, PRCM_LDO1_RET_VOLT_725MV);
+	}
+
+	/* don't care about efuse, force to use default value */
+	HAL_MODIFY_REG(PRCM->DCXO_CTRL, PRCM_ICTRL_OFFSET_MASK, 0x10 << PRCM_ICTRL_OFFSET_SHIFT);
 #endif
 }
 
@@ -73,7 +85,9 @@ void SystemInit(void)
 	HAL_PRCM_SetDCDCVoltage(PRCM_DCDC_VOLT_1V51);
 	HAL_PRCM_SetSRAMVoltage(PRCM_SRAM_VOLT_1V10, PRCM_SRAM_VOLT_0V90);
 #elif (__CONFIG_CHIP_ARCH_VER == 2)
-	HAL_PRCM_SetTOPLDOVoltage(PRCM_TOPLDO_VOLT_1V8_DEFAULT);
+	if (HAL_GlobalGetTopLdoVsel() == 0) {
+		HAL_PRCM_SetTOPLDOVoltage(PRCM_TOPLDO_VOLT_1V8_DEFAULT);
+	}
 	HAL_PRCM_SetLDO1Volt(PRCM_LDO1_VOLT_1275MV, PRCM_LDO1_RET_VOLT_725MV);
 	HAL_PRCM_SetRTCLDOVoltage(PRCM_RTC_LDO_RETENTION_VOLT_675MV, PRCM_RTC_LDO_WORK_VOLT_1075MV);
 #endif
@@ -86,7 +100,7 @@ void SystemInit(void)
 	               PRCM_DIG_LDO_BANDGAP_TRIM_MASK,
 	               2U << PRCM_DIG_LDO_BANDGAP_TRIM_SHIFT);
 #endif
-	SCB->VTOR = (uint32_t)__RAM_BASE; /* Vector Table Relocation in Internal SRAM. */
+	SCB->VTOR = (uint32_t)__VECTOR_BASE; /* Vector Table Relocation in Internal SRAM. */
 
 #if ((__FPU_PRESENT == 1) && (__FPU_USED == 1))
 	/* FPU settings, set CP10 and CP11 Full Access */
@@ -98,10 +112,8 @@ void SystemInit(void)
 
 	SystemCoreClock = HAL_GetCPUClock();
 	SystemChipAdjust();
-	//pm_init();
-
+	pm_init();
 	HAL_NVIC_Init();
-
 	HAL_CCM_Init();
 }
 

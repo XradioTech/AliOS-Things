@@ -27,11 +27,19 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __CONFIG_BOOTLOADER
+
 #include "efpg_i.h"
 #include "efpg_debug.h"
 #include "driver/chip/hal_uart.h"
 #include "driver/chip/hal_crypto.h"
-#include "net/mbedtls/sha256.h"
+
+#define EFPG_CRYPTO_BY_HW 1
+#ifdef EFPG_CRYPTO_BY_HW
+#include "driver/chip/hal_crypto.h"
+#else
+#include "mbedtls/sha256.h"
+#endif
 
 static uint8_t efpg_checksum8(uint8_t *data, uint32_t len)
 {
@@ -138,6 +146,14 @@ static int efpg_parse_cmd(efpg_priv_t *efpg)
 		efpg->field = EFPG_FIELD_BOOT;
 		efpg->expt_len = EFPG_BOOT_FRAME_LEN;
 		break;
+	case EFPG_DCXO_TRIM:
+		efpg->field = EFPG_FIELD_DCXO;
+		efpg->expt_len = EFPG_DCXO_FRAME_LEN;
+		break;
+	case EFPG_POUT_CAL:
+		efpg->field = EFPG_FIELD_POUT;
+		efpg->expt_len = EFPG_POUT_FRAME_LEN;
+		break;
 	case EFPG_TYPE_MAC:
 		efpg->field = EFPG_FIELD_MAC;
 		efpg->expt_len = EFPG_MAC_FRAME_LEN;
@@ -220,14 +236,27 @@ static efpg_state_t efpg_read_process(efpg_priv_t *efpg)
 
 	status = efpg_read_field(efpg->field, data, efpg->start_bit_addr, efpg->bit_length);
 
+#ifdef EFPG_CRYPTO_BY_HW
+	CE_SHA256_Handler hdl;
+	if ((HAL_SHA256_Init(&hdl, CE_CTL_IVMODE_SHA_MD5_FIPS180, NULL) != HAL_OK)
+		|| (HAL_SHA256_Append(&hdl, efpg->cmd_frame, EFPG_CMD_FRAME_LEN) != HAL_OK)
+		|| (HAL_SHA256_Append(&hdl, data, efpg->expt_len - EFPG_MSG_DGST_LEN) != HAL_OK)
+		|| (HAL_SHA256_Append(&hdl, efpg->key, efpg->key_len) != HAL_OK)
+		|| (HAL_SHA256_Finish(&hdl, (uint32_t *)msg_dgst) != HAL_OK)) {
+		EFPG_ERR("failed to calculate msg dgst\n");
+		return -1;
+	}
+#else
+
 	mbedtls_sha256_context ctx;
-    mbedtls_sha256_init( &ctx );
-    mbedtls_sha256_starts( &ctx, 0 );
-    mbedtls_sha256_update( &ctx, efpg->cmd_frame, EFPG_CMD_FRAME_LEN );
-    mbedtls_sha256_update( &ctx, data, efpg->expt_len - EFPG_MSG_DGST_LEN );
-    mbedtls_sha256_update( &ctx, efpg->key, efpg->key_len );
-    mbedtls_sha256_finish( &ctx, msg_dgst );
-    mbedtls_sha256_free( &ctx );
+	mbedtls_sha256_init( &ctx );
+	mbedtls_sha256_starts( &ctx, 0 );
+	mbedtls_sha256_update( &ctx, efpg->cmd_frame, EFPG_CMD_FRAME_LEN );
+	mbedtls_sha256_update( &ctx, data, efpg->expt_len - EFPG_MSG_DGST_LEN );
+	mbedtls_sha256_update( &ctx, efpg->key, efpg->key_len );
+	mbedtls_sha256_finish( &ctx, msg_dgst );
+	mbedtls_sha256_free( &ctx );
+#endif
 
 	if (status != EFPG_ACK_OK) {
 		EFPG_WARN("%s(), %d, status %d\n", __func__, __LINE__, status);
@@ -335,3 +364,4 @@ efpg_state_t efpg_data_frame_process(efpg_priv_t *efpg)
 	return EFPG_STATE_RESET;
 }
 
+#endif /* __CONFIG_BOOTLOADER */

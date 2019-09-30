@@ -29,7 +29,7 @@
 
 #include "board_common.h"
 #include "board.h"
-//#include "driver/chip/psram/psram.h"
+#include "driver/chip/psram/psram.h"
 
 HAL_Status board_pinmux_cfg(HAL_BoardIoctlReq req,
                             const GPIO_PinMuxParam *pinmux, uint32_t count)
@@ -50,18 +50,16 @@ HAL_Status board_pinmux_cfg(HAL_BoardIoctlReq req,
 
 void board_chip_clock_init(void)
 {
-#if (BOARD_HOSC_CLOCK == HOSC_CLOCK_24M)
+#if (__CONFIG_HOSC_TYPE == 24)
 	HAL_PRCM_SetHOSCType(PRCM_HOSC_TYPE_24M);
 	HAL_PRCM_SetSysPLL(PRCM_SYS_PLL_PARAM_HOSC24M);
-	PRCM->DCXO_CTRL |= 0x0d800000; // TODO
-#elif (BOARD_HOSC_CLOCK == HOSC_CLOCK_26M)
+#elif (__CONFIG_HOSC_TYPE == 26)
 	HAL_PRCM_SetHOSCType(PRCM_HOSC_TYPE_26M);
 	HAL_PRCM_SetSysPLL(PRCM_SYS_PLL_PARAM_HOSC26M);
-#elif (BOARD_HOSC_CLOCK == HOSC_CLOCK_40M)
+#elif (__CONFIG_HOSC_TYPE == 40)
 	HAL_PRCM_SetHOSCType(PRCM_HOSC_TYPE_40M);
 	HAL_PRCM_SetSysPLL(PRCM_SYS_PLL_PARAM_HOSC40M);
-	PRCM->DCXO_CTRL |= 0x06400000;
-#elif (BOARD_HOSC_CLOCK == HOSC_CLOCK_52M)
+#elif (__CONFIG_HOSC_TYPE == 52)
 	HAL_PRCM_SetHOSCType(PRCM_HOSC_TYPE_52M);
 	HAL_PRCM_SetSysPLL(PRCM_SYS_PLL_PARAM_HOSC52M);
 #else

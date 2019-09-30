@@ -31,4 +31,64 @@
  *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "driver/chip/hal_flashctrl.h"
+#include "driver/chip/hal_flash.h"
+#include "driver/chip/hal_xip.h"
+#include "sys/param.h"
+#include "pm/pm.h"
+
+#include "hal_base.h"
+
+#ifdef __CONFIG_ROM
+
+struct XipDrv
+{
+	XIP_Config mCfg;
+	uint32_t flash;
+	struct FlashDev *dev;
+#ifdef CONFIG_PM
+	struct soc_device_driver xip_drv;
+	struct soc_device xip_dev;
+#endif
+	struct flash_controller *flash_ctrl;
+
+};
+
+HAL_Status __HAL_Xip_Init(uint32_t flash, uint32_t xaddr);
+int PM_XipSuspend(struct soc_device *dev, enum suspend_state_t state);
+int PM_XipResume(struct soc_device *dev, enum suspend_state_t state);
+
+HAL_Status HAL_Xip_Init(uint32_t flash, uint32_t xaddr)
+{
+    HAL_Status ret;
+    ret = __HAL_Xip_Init(flash, xaddr);
+    if(ret != HAL_OK)
+        return ret;
+
+#ifdef CONFIG_PM
+	struct FlashDev *dev;
+    struct FlashChip *chip;
+	struct XipDrv *xip;
+
+    dev = getFlashDev(flash);
+	if (dev == NULL) {
+		return HAL_INVALID;
+	}
+    chip = getFlashChip(dev);
+	if ((chip == NULL) || (chip->mXip == NULL)) {
+		return HAL_INVALID;
+	}
+	xip = chip->mXip;
+    pm_unregister_ops(&xip->xip_dev);
+    xip->xip_drv.suspend = NULL;
+	xip->xip_drv.resume = NULL;
+    xip->xip_drv.suspend_noirq= PM_XipSuspend;
+	xip->xip_drv.resume_noirq = PM_XipResume;
+    pm_register_ops(&xip->xip_dev);
+#endif/*CONFIG_PM*/
+
+    return HAL_OK;
+}
+
+#endif/*__CONFIG_ROM*/
 

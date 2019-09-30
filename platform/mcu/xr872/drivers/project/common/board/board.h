@@ -31,7 +31,7 @@
 #define _BOARD_H_
 
 #include "board_config.h"
-#include "driver/chip/hal_codec.h"
+#include "driver/chip/hal_snd_card.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,22 +60,9 @@ HAL_Status board_spi_init(SPI_Port spi);
 HAL_Status board_spi_deinit(SPI_Port spi);
 #endif
 
-#if PRJCONF_SOUNDCARD0_EN
-/* sound card0 */
-HAL_Status board_soundcard0_init(codec_detect_cb cb);
-HAL_Status board_soundcard0_deinit(void);
-#endif
-
-#if PRJCONF_SOUNDCARD1_EN
-/* sound card1 */
-HAL_Status board_soundcard1_init(void);
-HAL_Status board_soundcard1_deinit(void);
-#endif
-
-#if PRJCONF_SOUNDCARD2_EN
-/* sound card2 */
-HAL_Status board_soundcard2_init(void);
-HAL_Status board_soundcard2_deinit(void);
+#if PRJCONF_INTERNAL_SOUNDCARD_EN || PRJCONF_AC107_SOUNDCARD_EN
+HAL_Status board_soundcard_init(void);
+HAL_Status board_soundcard_deinit(void);
 #endif
 
 #if PRJCONF_MMC_EN

@@ -49,21 +49,32 @@
 #include "common/cmd/cmd_irtx.h"
 #include "common/cmd/cmd_ce.h"
 #include "common/cmd/cmd_i2c.h"
+#include "common/cmd/cmd_i2s.h"
+#include "common/cmd/cmd_codec.h"
 #include "common/cmd/cmd_adc.h"
 #include "common/cmd/cmd_flash.h"
 #include "common/cmd/cmd_pwm.h"
 #include "common/cmd/cmd_sd.h"
 #include "common/cmd/cmd_efpg.h"
 #include "common/cmd/cmd_audio.h"
+#include "common/cmd/cmd_psram.h"
+#include "common/cmd/cmd_spi.h"
+#include "common/cmd/cmd_camera.h"
 
 #include "common/cmd/cmd_auddbg.h"
 #include "common/cmd/cmd_pm.h"
-#include "common/cmd/cmd_fs.h"
+#include "common/cmd/cmd_ota.h"
 #include "common/cmd/cmd_cedarx.h"
 
+#include "common/cmd/cmd_oled.h"
+
+#if PRJCONF_NET_EN
 #include "common/cmd/cmd_wlan.h"
 #include "common/cmd/cmd_ifconfig.h"
 #include "common/cmd/cmd_smart_config.h"
+#include "common/cmd/cmd_airkiss.h"
+#include "common/cmd/cmd_smartlink.h"
+#include "common/cmd/cmd_voice_print.h"
 #include "common/cmd/cmd_ping.h"
 #include "common/cmd/cmd_iperf.h"
 #include "common/cmd/cmd_sntp.h"
@@ -71,13 +82,19 @@
 #include "common/cmd/cmd_httpd.h"
 #include "common/cmd/tls/cmd_tls.h"
 #include "common/cmd/cmd_mqtt.h"
-#include "common/cmd/cmd_ota.h"
 #include "common/cmd/cmd_dhcpd.h"
 #include "common/cmd/cmd_nopoll.h"
 
-#include "common/cmd/cmd_netcmd.h"
-#include "common/cmd/cmd_etf.h"
 #include "common/cmd/cmd_broadcast.h"
 #include "common/cmd/cmd_arp.h"
+#include "common/cmd/cmd_lmac.h"
+#endif /* PRJCONF_NET_EN */
+#include "common/cmd/cmd_etf.h"
+
+/* Middleware */
+#include "common/cmd/cmd_fs.h"
+#include "common/cmd/cmd_xz.h"
+#include "common/cmd/cmd_console.h"
+#include "common/cmd/cmd_json.h"
 
 #endif /* _CMD_H_ */

@@ -123,6 +123,11 @@ void HAL_PRCM_EnableTOPLDOLQModeEnable(uint8_t enable)
 		HAL_CLR_BIT(PRCM->LDO_MODE_SW_SEL, PRCM_TOP_LDO_LQ_MODE_BIT);
 }
 
+void HAL_PRCM_SetSys1SleepPowerFlags(uint32_t flags)
+{
+    HAL_MODIFY_REG(PRCM->SYS1_SLEEP_CTRL, PRCM_SYS_WS_PWR_FLAGS_MASK, flags & PRCM_SYS_WS_PWR_FLAGS_MASK);
+}
+
 #endif /*__CONFIG_ROM */
 
 #endif /*__CONFIG_CHIP_ARCH_VER */

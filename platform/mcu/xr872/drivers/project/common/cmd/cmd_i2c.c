@@ -307,7 +307,7 @@ static enum cmd_status cmd_i2c_transmit_mem_exec(char *cmd)
 
 static enum cmd_status cmd_i2c_receive_mem_exec(char *cmd)
 {
-	int cnt;
+	int cnt,i;
 	uint32_t id, dev_addr, mem_addr, mem_add_size, len;
 	uint8_t *buf;
 	int32_t size;
@@ -350,13 +350,17 @@ static enum cmd_status cmd_i2c_receive_mem_exec(char *cmd)
 
 	cmd_write_respond(CMD_STATUS_OK, "OK");
 
-	cmd_msleep(1000);
-
 	cmd_raw_mode_enable();
 	size = cmd_raw_mode_write(buf, (int32_t)len);
 	if (size != (int32_t)len) {
 		CMD_ERR("len = %u, but raw mode write size = %d\n", len, size);
 	}
+
+	printf("\nread_buf:\n");
+	for(i=0; i<len; i++){
+		printf("0x%02x ",buf[i]);
+	}
+	printf("\n");
 
 	cmd_free(buf);
 	cmd_raw_mode_disable();
@@ -484,7 +488,7 @@ static enum cmd_status cmd_i2c_receive_sccb_exec(char *cmd)
 }
 #endif /* DRV_TEST_I2C_SCCB */
 
-static struct cmd_data g_i2c_cmds[] = {
+static const struct cmd_data g_i2c_cmds[] = {
 	{ "init",			cmd_i2c_init_exec },
 	{ "deinit",			cmd_i2c_deinit_exec },
 
