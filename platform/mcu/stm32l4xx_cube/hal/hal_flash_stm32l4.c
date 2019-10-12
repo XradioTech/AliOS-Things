@@ -3,17 +3,76 @@
  */
 #include "stm32l4xx.h"
 #include "stm32l4xx_hal.h"
-
+#include <stdio.h>
+#include <string.h>
 #ifdef HAL_FLASH_MODULE_ENABLED
 
 #include <k_api.h>
-#include "hal/soc/soc.h"
+#include "aos/hal/flash.h"
 #include "stm32l4xx_hal_flash.h"
 
 #define ROUND_DOWN(a,b) (((a) / (b)) * (b))
 #define MIN(a,b)        (((a) < (b)) ? (a) : (b))
 
 extern const hal_logic_partition_t hal_partitions[];
+
+
+int hal_reboot_bank(void)
+{
+    int ret = 0;
+#if defined (STM32L471xx) || defined (STM32L475xx) || defined (STM32L476xx) || \
+    defined (STM32L485xx) || defined (STM32L486xx) || defined (STM32L496xx) || \
+    defined (STM32L4A6xx) || defined (STM32L4R5xx) || defined (STM32L4R7xx) || \
+    defined (STM32L4R9xx) || defined (STM32L4S5xx) || defined (STM32L4S7xx) || defined (STM32L4S9xx)
+
+    FLASH_OBProgramInitTypeDef OBInit;
+    HAL_FLASH_Unlock();
+    /* Clear OPTVERR bit set on virgin samples */
+    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_OPTVERR);
+    /* Allow Access to option bytes sector */
+    HAL_FLASH_OB_Unlock();
+    /* Get the Dual boot configuration status */
+    HAL_FLASHEx_OBGetConfig(&OBInit);
+    /* Enable/Disable dual boot feature */
+    OBInit.OptionType = OPTIONBYTE_USER;
+    OBInit.USERType   = OB_USER_BFB2;
+    do {
+        if (((OBInit.USERConfig) & (OB_BFB2_ENABLE)) == OB_BFB2_ENABLE) {
+            printf("switch to bank1.\n");
+            OBInit.USERConfig = OB_BFB2_DISABLE;
+        }
+        else {
+            printf("switch to bank2.\n");
+            OBInit.USERConfig = OB_BFB2_ENABLE;
+        }
+        if(HAL_FLASHEx_OBProgram (&OBInit) != HAL_OK) {
+            /*
+             Error occurred while setting option bytes configuration.
+             User can add here some code to deal with this error.
+             To know the code error, user can call function 'HAL_FLASH_GetError()'
+            */
+            printf("HAL_FLASHEx_OBProgram failed\n");
+            ret = -1;
+            break;
+        }
+
+        /* Start the Option Bytes programming process */
+        if (HAL_FLASH_OB_Launch() != HAL_OK) {
+            /*
+               Error occurred while reloading option bytes configuration.
+               User can add here some code to deal with this error.
+               To know the code error, user can call function 'HAL_FLASH_GetError()'
+            */
+            printf("HAL_FLASH_OB_Launch failed\n");
+            ret = -1;
+            break;
+        }
+    } while (0);
+    HAL_FLASH_OB_Lock();
+    HAL_FLASH_Lock();
+#endif
+    return ret;
+}
 
 /**
   * @brief  Get the bank of a given address.
@@ -151,18 +210,43 @@ int FLASH_erase_at(uint32_t address, uint32_t len_bytes)
 int FLASH_write_at(uint32_t address, uint64_t *pData, uint32_t len_bytes)
 {
     int i;
+    int last_bytes = len_bytes;
     int ret = -1;
-
-#ifndef CODE_UNDER_FIREWALL
-    /* irq already mask under firewall */
-    __disable_irq();
-#endif
-
-    for (i = 0; i < len_bytes; i += 8) {
-        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD,
-                              address + i,
-                              *(pData + (i / 8) )) != HAL_OK) {
-            break;
+    uint64_t *src_ptr = pData;
+    uint32_t dst_addr = address;
+    uint64_t double_word = 0;
+    while(last_bytes >= 8) {
+        #ifndef CODE_UNDER_FIREWALL
+        /* irq already mask under firewall */
+        __disable_irq();
+        #endif
+        ret = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, dst_addr, *src_ptr);
+        #ifndef CODE_UNDER_FIREWALL
+         /* irq should never be enable under firewall */
+        __enable_irq();
+        #endif
+        if (ret != HAL_OK) {
+            printf("hal flash program failed\n");
+            return -1;
+        }
+        last_bytes -= 8;
+        dst_addr += 8;
+        src_ptr++;
+    }
+    if(last_bytes) {
+        memcpy((void*)&double_word, (void*)src_ptr, last_bytes);
+        #ifndef CODE_UNDER_FIREWALL
+        /* irq already mask under firewall */
+        __disable_irq();
+        #endif
+        ret = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, dst_addr, *src_ptr);
+        #ifndef CODE_UNDER_FIREWALL
+         /* irq should never be enable under firewall */
+        __enable_irq();
+        #endif
+        if (ret != HAL_OK) {
+            printf("hal flash program failed\n");
+            return -1;
         }
     }
     /* Memory check */
@@ -178,10 +262,7 @@ int FLASH_write_at(uint32_t address, uint64_t *pData, uint32_t len_bytes)
         }
         ret = 0;
     }
-#ifndef CODE_UNDER_FIREWALL
-    /* irq should never be enable under firewall */
-    __enable_irq();
-#endif
+
     return ret;
 }
 
@@ -255,72 +336,121 @@ int FLASH_update(uint32_t dst_addr, const void *data, uint32_t size)
     return ret;
 }
 
-hal_logic_partition_t *hal_flash_get_info(hal_partition_t pno)
+int32_t hal_flash_info_get(hal_partition_t in_partition, hal_logic_partition_t *partition)
 {
     hal_logic_partition_t *logic_partition;
+#if defined (STM32L471xx) || defined (STM32L475xx) || defined (STM32L476xx) || \
+    defined (STM32L485xx) || defined (STM32L486xx) || defined (STM32L496xx) || \
+    defined (STM32L4A6xx) || defined (STM32L4R5xx) || defined (STM32L4R7xx) || \
+    defined (STM32L4R9xx) || defined (STM32L4S5xx) || defined (STM32L4S7xx) || defined (STM32L4S9xx)
 
-    logic_partition = (hal_logic_partition_t *)&hal_partitions[ pno ];
+    hal_partition_t new_pno = in_partition;
+    uint32_t memrmp = 0;
+    uint32_t current_bank = 0;
+    memrmp = READ_BIT(SYSCFG->MEMRMP, SYSCFG_MEMRMP_FB_MODE);
+    current_bank = memrmp ? FLASH_BANK_2 : FLASH_BANK_1;
+    if(current_bank == FLASH_BANK_2) {//userbin2
+        if(in_partition == HAL_PARTITION_APPLICATION) {
+            new_pno = HAL_PARTITION_OTA_TEMP;
+        }
+        else if(in_partition == HAL_PARTITION_OTA_TEMP) {
+            new_pno = HAL_PARTITION_APPLICATION;
+        }
+    }
+    logic_partition = (hal_logic_partition_t *)&hal_partitions[ new_pno ];
+#else
+    logic_partition = (hal_logic_partition_t *)&hal_partitions[ in_partition ];
+#endif
+    memcpy(partition, logic_partition, sizeof(hal_logic_partition_t));
 
-    return logic_partition;
+    return 0;
 }
 
 int32_t hal_flash_write(hal_partition_t pno, uint32_t *poff, const void *buf , uint32_t buf_size)
 {
     int ret = 0;
     uint32_t start_addr;
-    hal_logic_partition_t *partition_info;
+    hal_logic_partition_t  partition_info;
+    hal_logic_partition_t *p_partition_info;
     hal_partition_t real_pno;
 
-    ret = HAL_FLASH_Unlock();
-    if (ret != 0) {
+    if (HAL_FLASH_Unlock() != 0) {
         printf("HAL_FLASH_Unlock return %d\n", ret);
         return -1;
     }
     __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_ALL_ERRORS);
 
     real_pno = pno;
-    partition_info = hal_flash_get_info( real_pno );
-    start_addr = partition_info->partition_start_addr + *poff;
+    p_partition_info = &partition_info;
+    memset(p_partition_info, 0, sizeof(hal_logic_partition_t));
+    hal_flash_info_get( real_pno, p_partition_info );
+    start_addr = p_partition_info->partition_start_addr + *poff;
 
 #ifdef USING_FLAT_FLASH
     start_addr = FLASH_flat_addr(start_addr);
 #endif
 
-    if (0 != FLASH_update(start_addr, buf, buf_size)) {
-        printf("FLASH_update failed!\n");
-    }
-    *poff += buf_size;
+    if(real_pno == HAL_PARTITION_OTA_TEMP || 
+        real_pno == HAL_PARTITION_APPLICATION ) {
+        if(FLASH_write_at(start_addr, buf, buf_size) != 0) {
+           ret = -1;
+           printf("FLASH_update failed!\n");
+        }
 
-    ret = HAL_FLASH_Lock();
-    if (ret != 0) {
+     }
+     else {
+        if (FLASH_update(start_addr, buf, buf_size) != 0) {
+            ret = -1;
+            printf("FLASH_update failed!\n");
+        }
+    }
+    if (ret == 0) {
+        *poff += buf_size;
+     }
+
+    if (HAL_FLASH_Lock() != 0) {
         printf("HAL_FLASH_Lock return %d\n", ret);
-        return -1;
+        ret = -1;
     }
 
-    return 0;
+    return ret;
 }
 
 int32_t hal_flash_read(hal_partition_t pno, uint32_t *poff, void *buf, uint32_t buf_size)
 {
-    uint32_t start_addr;
-    hal_logic_partition_t *partition_info;
+    uint32_t start_addr, len;
+    hal_logic_partition_t  partition_info;
+    hal_logic_partition_t *p_partition_info;
     hal_partition_t real_pno;
+    uint64_t *pdata;
 
     real_pno = pno;
 
-    partition_info = hal_flash_get_info( real_pno );
+    p_partition_info = &partition_info;
+    memset(p_partition_info, 0, sizeof(hal_logic_partition_t));
+    hal_flash_info_get( real_pno, p_partition_info );
 
-    if (poff == NULL || buf == NULL || *poff + buf_size > partition_info->partition_length) {
+    if (poff == NULL || buf == NULL || *poff + buf_size > p_partition_info->partition_length) {
         return -1;
     }
-    start_addr = partition_info->partition_start_addr + *poff;
+    start_addr = p_partition_info->partition_start_addr + *poff;
 
 #ifdef USING_FLAT_FLASH
     start_addr = FLASH_flat_addr(start_addr);
 #endif
 
-    FLASH_read_at(start_addr, buf, buf_size);
+    len = (((buf_size % 8) == 0) ? buf_size : (ROUND_DOWN(buf_size, 8) + 8));
+    pdata = (uint64_t *)krhino_mm_alloc(len);
+    if (pdata == NULL) {
+        return -1;
+    }
+    memset(pdata, 0, len);
+    FLASH_read_at(start_addr, pdata, len);
+    memcpy((uint8_t *)buf, (uint8_t *)pdata, buf_size);
+
     *poff += buf_size;
+    krhino_mm_free(pdata);
+    pdata = NULL;
 
     return 0;
 }
@@ -331,7 +461,8 @@ int32_t hal_flash_erase(hal_partition_t pno, uint32_t off_set,
     int ret = 0;
     uint32_t start_addr;
     uint32_t erase_size;
-    hal_logic_partition_t *partition_info;
+    hal_logic_partition_t  partition_info;
+    hal_logic_partition_t *p_partition_info;
     hal_partition_t real_pno;
 
     ret = HAL_FLASH_Unlock();
@@ -342,13 +473,15 @@ int32_t hal_flash_erase(hal_partition_t pno, uint32_t off_set,
     __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_ALL_ERRORS);
 
     real_pno = pno;
-    partition_info = hal_flash_get_info( real_pno );
-    if (size + off_set > partition_info->partition_length) {
+    p_partition_info = &partition_info;
+    memset(p_partition_info, 0, sizeof(hal_logic_partition_t));
+    hal_flash_info_get( real_pno, p_partition_info );
+    if (size + off_set > p_partition_info->partition_length) {
         return -1;
     }
 
-    start_addr = ROUND_DOWN((partition_info->partition_start_addr + off_set), FLASH_PAGE_SIZE);
-    erase_size = partition_info->partition_start_addr + off_set - start_addr + size;
+    start_addr = ROUND_DOWN((p_partition_info->partition_start_addr + off_set), FLASH_PAGE_SIZE);
+    erase_size = p_partition_info->partition_start_addr + off_set - start_addr + size;
 
 #ifdef USING_FLAT_FLASH
     start_addr = FLASH_flat_addr(start_addr);

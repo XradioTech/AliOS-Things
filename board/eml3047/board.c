@@ -2,9 +2,10 @@
  * Copyright (C) 2015-2017 Alibaba Group Holding Limited
  */
 
-#include "hal/soc/soc.h"
+#include <aos/hal/flash.h>
 #include <aos/kernel.h>
-#include <aos/aos.h>
+#include "aos/kernel.h"
+#include "stm32l0xx.h"
 
 /* Logic partition on flash devices */
 hal_logic_partition_t hal_partitions[HAL_PARTITION_MAX] =
@@ -13,7 +14,7 @@ hal_logic_partition_t hal_partitions[HAL_PARTITION_MAX] =
     {
         .partition_owner            = HAL_FLASH_EMBEDDED,
         .partition_description      = "PARAMETER2",
-        .partition_start_addr       = 0x8015000,
+        .partition_start_addr       = 0x801A000,
         .partition_length           = 0x2000,  // 8k bytes
         .partition_options          = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN,
     },
@@ -22,3 +23,15 @@ hal_logic_partition_t hal_partitions[HAL_PARTITION_MAX] =
 void board_init(void)
 {
 }
+
+void BoardCriticalSectionBegin( uint32_t *mask )
+{
+    *mask = __get_PRIMASK( );
+    __disable_irq( );
+}
+
+void BoardCriticalSectionEnd( uint32_t *mask )
+{
+    __set_PRIMASK( *mask );
+}
+

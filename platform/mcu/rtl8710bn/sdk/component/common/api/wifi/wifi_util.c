@@ -10,8 +10,14 @@
 #define pvPortMalloc  rtw_zmalloc
 #define vPortFree  rtw_free
 
+uint32_t osKernelSysTick(void)
+{
+    return (uint32_t)g_tick_count;
+}
+
 int iw_ioctl(const char * ifname, unsigned long request, struct iwreq *	pwrq)
 {
+        memset(pwrq->ifr_name, 0, IFNAMSIZ);
 	memcpy(pwrq->ifr_name, ifname, 5);
 	return rltk_wlan_control(request, (void *) pwrq);
 }
@@ -118,6 +124,21 @@ int wext_set_auth_param(const char *ifname, __u16 idx, __u32 value)
 
 	if (iw_ioctl(ifname, SIOCSIWAUTH, &iwr) < 0) {
 		printf("\n\rWEXT: SIOCSIWAUTH(param %d value 0x%x) failed)", idx, value);
+	}
+
+	return ret;
+}
+
+int wext_set_mfp_support(const char *ifname, __u8 value)
+{
+	int ret = 0;
+	struct iwreq iwr;
+
+	memset(&iwr, 0, sizeof(iwr));
+	iwr.u.param.value = value;
+
+	if (iw_ioctl(ifname, SIOCSIWMFP, &iwr) < 0) {
+		RTW_API_INFO(("\n\rWEXT: SIOCSIWMFP(value 0x%x) failed)", value));
 	}
 
 	return ret;
@@ -657,6 +678,22 @@ int wext_get_rssi(const char *ifname, int *rssi)
 		ret = -1;
 	} else {
 		*rssi = 0 - iwr.u.sens.value;
+	}
+	return ret;
+}
+
+int wext_get_snr(const char *ifname, int *snr)
+{
+	struct iwreq iwr;
+	int ret = 0;
+
+	memset(&iwr, 0, sizeof(iwr));
+
+	if (iw_ioctl(ifname, SIOCGIWSNR, &iwr) < 0) {
+		printf("\n\rioctl[SIOCGIWSNR] error");
+		ret = -1;
+	} else {
+		*snr = iwr.u.snr.value;
 	}
 	return ret;
 }
@@ -1348,4 +1385,35 @@ void wext_set_indicate_mgnt(int enable)
 {
 	rtw_set_indicate_mgnt(enable);
 	return;
+}
+
+#ifdef CONFIG_AP_MODE
+extern void rltk_suspend_softap(const char *ifname);
+void wext_suspend_softap(const char *ifname)
+{
+	rltk_suspend_softap(ifname);
+}
+#endif
+
+extern int rltk_get_nhm_ratio_level(const char *ifname, __u32 * level);
+int wext_get_nhm_ratio_level(const char *ifname, __u32 *level)
+{
+	int ret = -1;
+
+	wext_disable_powersave(ifname);
+	ret = rltk_get_nhm_ratio_level(ifname, level);
+	wext_enable_powersave(ifname, 1, 1);
+	return ret;
+}
+
+extern int rltk_get_retry_drop_num(const char *ifname, rtw_fw_retry_drop_t * retry);
+int wext_get_retry_drop_num(const char *ifname, rtw_fw_retry_drop_t * retry)
+{
+	return rltk_get_retry_drop_num(ifname, retry);
+}
+
+extern int rltk_get_sw_trx_statistics(const char *ifname, rtw_net_device_stats_t *stats);
+int wext_get_sw_trx_statistics(const char *ifname, rtw_net_device_stats_t *stats)
+{
+	return rltk_get_sw_trx_statistics(ifname, stats);
 }

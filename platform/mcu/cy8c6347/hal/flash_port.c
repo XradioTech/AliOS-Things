@@ -1,6 +1,7 @@
-#include "hal/soc/soc.h"
+
+#include "aos/hal/flash.h"
 #include "flash/cy_flash.h"
-#include <aos/aos.h>
+#include "aos/kernel.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -17,7 +18,7 @@ extern const hal_logic_partition_t hal_partitions[];
   * @note   The FLASH chunk must no cross a FLASH bank boundary.
   * @note   The source and destination buffers have no specific alignment constraints.
   * @param  In: dst_addr    Destination address in the FLASH memory.
-  * @param  In: data        Source address. 
+  * @param  In: data        Source address.
   * @param  In: size        Number of bytes to update.
   * @retval  0:  Success.
   *         <0:  Failure.
@@ -40,7 +41,7 @@ int FLASH_update(uint32_t dst_addr, const void *data, uint32_t size)
         int len = MIN(FLASH_PAGE_SIZE - fl_offset, size);
 
         /* Load from the flash into the cache */
-        memcpy(page_cache, (void *) fl_addr, FLASH_PAGE_SIZE);  
+        memcpy(page_cache, (void *) fl_addr, FLASH_PAGE_SIZE);
         /* Update the cache from the source */
         memcpy((uint8_t *)page_cache + fl_offset, src_addr, len);
 
@@ -87,59 +88,50 @@ int FLASH_read_at(uint32_t address, uint8_t *pData, uint32_t len_bytes)
     return ret;
 }
 
-hal_logic_partition_t *hal_flash_get_info(hal_partition_t pno)
+int32_t hal_flash_info_get(hal_partition_t in_partition, hal_logic_partition_t *partition)
 {
     hal_logic_partition_t *logic_partition;
 
-    logic_partition = (hal_logic_partition_t *)&hal_partitions[ pno ];
+    logic_partition = (hal_logic_partition_t *)&hal_partitions[ in_partition ];
+    memcpy(partition, logic_partition, sizeof(hal_logic_partition_t));
 
-    return logic_partition;
+    return 0;
 }
 
 int32_t hal_flash_write(hal_partition_t pno, uint32_t* poff, const void* buf ,uint32_t buf_size)
 {
+    int32_t ret;
     uint32_t start_addr;
-    hal_logic_partition_t *partition_info;
-    hal_partition_t real_pno;
+    hal_logic_partition_t  info;
+    hal_logic_partition_t *partition_info = &info;
 
-#ifdef CONFIG_AOS_KV_MULTIPTN_MODE
-    if (pno == CONFIG_AOS_KV_PTN) {
-        if ((*poff) >= CONFIG_AOS_KV_PTN_SIZE) {
-            pno = (hal_partition_t)CONFIG_AOS_KV_SECOND_PTN;
-            *poff = (*poff) - CONFIG_AOS_KV_PTN_SIZE;
-        }
+    memset(partition_info, 0, sizeof(hal_logic_partition_t));
+    ret = hal_flash_info_get( pno, partition_info);
+    if (ret != 0) {
+        return -1;
     }
-#endif
-    real_pno = pno;
-		
-    partition_info = hal_flash_get_info( real_pno );
+
     start_addr = partition_info->partition_start_addr + *poff;
     if (CY_FLASH_DRV_SUCCESS != FLASH_update(start_addr, buf, buf_size)) {
         printf("FLASH_update failed!\n");
     }
     *poff += buf_size;
-		
 
     return 0;
 }
 
 int32_t hal_flash_read(hal_partition_t pno, uint32_t* poff, void* buf, uint32_t buf_size)
 {
+    int32_t ret;
     uint32_t start_addr;
-    hal_logic_partition_t *partition_info;
-    hal_partition_t real_pno;
+    hal_logic_partition_t  info;
+    hal_logic_partition_t *partition_info = &info;
 
-#ifdef CONFIG_AOS_KV_MULTIPTN_MODE
-    if (pno == CONFIG_AOS_KV_PTN) {
-        if ((*poff) >=  CONFIG_AOS_KV_PTN_SIZE) {
-            pno = (hal_partition_t)CONFIG_AOS_KV_SECOND_PTN;
-            *poff = (*poff) - CONFIG_AOS_KV_PTN_SIZE;
-        }
+    memset(partition_info, 0, sizeof(hal_logic_partition_t));
+    ret = hal_flash_info_get( pno, partition_info);
+    if (ret != 0) {
+        return -1;
     }
-#endif
-    real_pno = pno;
-
-    partition_info = hal_flash_get_info( real_pno );
 
     if(poff == NULL || buf == NULL || *poff + buf_size > partition_info->partition_length)
         return -1;
@@ -155,26 +147,22 @@ int32_t hal_flash_erase(hal_partition_t pno, uint32_t off_set,
 {
     cy_en_flashdrv_status_t status;
     uint32_t start_addr;
-    hal_logic_partition_t *partition_info;
-    hal_partition_t real_pno;
+    hal_logic_partition_t  info;
+    hal_logic_partition_t *partition_info = &info;
     uint32_t * page_cache = NULL;
+    int32_t ret;
 
     page_cache = (uint32_t *)aos_malloc(FLASH_PAGE_SIZE);
     if (page_cache == NULL)
       return -1;
     memset(page_cache, 0xff, FLASH_PAGE_SIZE);
 
-#ifdef CONFIG_AOS_KV_MULTIPTN_MODE
-    if (pno == CONFIG_AOS_KV_PTN) {
-        if (off_set >= CONFIG_AOS_KV_PTN_SIZE) {
-            pno = (hal_partition_t)CONFIG_AOS_KV_SECOND_PTN;
-            off_set -= CONFIG_AOS_KV_PTN_SIZE;
-        }
+    memset(partition_info, 0, sizeof(hal_logic_partition_t));
+    ret = hal_flash_info_get( pno, partition_info);
+    if (ret != 0) {
+        return -1;
     }
-#endif
-    real_pno = pno;
 
-    partition_info = hal_flash_get_info( real_pno );
     if(size + off_set > partition_info->partition_length)
         return -1;
 
@@ -183,7 +171,7 @@ int32_t hal_flash_erase(hal_partition_t pno, uint32_t off_set,
     for(uint32_t i=0; i<size/FLASH_PAGE_SIZE; i++)
     {
         status = Cy_Flash_WriteRow(start_addr, page_cache);
-  
+
         if(status != CY_FLASH_DRV_SUCCESS)
         {
             printf("Flash erase failed\n");

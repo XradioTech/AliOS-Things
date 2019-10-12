@@ -36,6 +36,10 @@ _memmap_cacheattr_wt_allvalid = 0x22222112;
 _memmap_cacheattr_bp_allvalid = 0x22222222;
 PROVIDE(_memmap_cacheattr_reset = _memmap_cacheattr_wb_trapnull);
 
+_begin_of_ram   = ORIGIN(dram0_0_seg);
+_end_of_ram     = ORIGIN(dram0_0_seg) + LENGTH(dram0_0_seg);
+_SYS_STACK_SIZE_ = 0x800;
+
 SECTIONS
 {
   .dport0.rodata : ALIGN(4)
@@ -93,15 +97,25 @@ SECTIONS
     *(.entry.text)
     *(.init.literal)
     *(.init)
-    *esp8266.a:entry.o(.literal .text .literal.* .text.*)
+    *mcu_esp8266.a:entry.o(.literal .text .literal.* .text.*)
     *libmain.a:spi_flash.o(.literal .text .literal.* .text.*)
-    *xtensa.a:(.literal .text .literal.* .text.*)
+    *arch_xtensa_lx106.a:xtensa_vectors.o(.literal .text .literal.* .text.*)
+    *arch_xtensa_lx106.a:port.o(.literal .text .literal.* .text.*)
+
+    *rhino.a:(.literal.ready_list_add_head .text.ready_list_add_head)
+    *rhino.a:(.literal.ready_list_add_tail .text.ready_list_add_tail)
+    *rhino.a:(.literal.ready_list_add .text.ready_list_add)
+    *rhino.a:(.literal.ringbuf_push .text.ringbuf_push)
+    *rhino.a:(.literal.pend_task_wakeup .text.pend_task_wakeup)
+    *rhino.a:(.literal.buf_queue_send .text.buf_queue_send)
+    *rhino.a:(.literal.krhino_buf_queue_send .text.krhino_buf_queue_send)
+    *rhino.a:(.literal.k_err_proc .text.k_err_proc)
+
     *(.literal .text)
-    *(.fini.literal)
-    *(.fini)
-    *(.gnu.version)
     _text_end = ABSOLUTE(.);
     _etext = .;
+    . = ALIGN (1024);
+    _iram_heap_start = ABSOLUTE(.);
   } >iram1_0_seg :iram1_0_phdr
 
   .irom0.text : ALIGN(4)
@@ -145,6 +159,23 @@ SECTIONS
   {
     . = ALIGN (8);
     _bss_start = ABSOLUTE(.);
+    *mcu_esp8266.a:flash.o(.bss .bss.* COMMON)
+    *mcu_esp8266.a:heap_iram.o(.bss .bss.* COMMON)
+    *mcu_esp8266.a:entry.o(.bss .bss.* COMMON)
+    *libmain.a:spi_flash.o(.bss .bss.* COMMON)
+    *libgcc.a:(.bss .bss.* COMMON)
+    *libmain.a:(.bss .bss.* COMMON)
+    *arch_xtensa_lx106.a:(.bss .bss.* COMMON)
+    *libhal.a:(.bss .bss.* COMMON)
+    *libnet80211.a:(.bss .bss.* COMMON)
+    *mcu_esp8266.a:(.bss .bss.* COMMON)
+    *libcirom.a:(.bss .bss.* COMMON)
+    *libcrypto.a:(.bss .bss.* COMMON)
+    *libwpa.a:(.bss .bss.* COMMON)
+    *liblwip.a:(.bss .bss.* COMMON)
+    *libphy.a:(.bss .bss.* COMMON)
+    *libpp.a:(.bss .bss.* COMMON)
+    *rhino.a:(.bss .bss.* COMMON)
     *(.bss)
     *(.bss.*)
     *(COMMON)

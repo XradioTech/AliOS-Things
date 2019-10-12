@@ -5,7 +5,9 @@
 #include <k_api.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "hal/hal.h"
+
+#include "aos/hal/gpio.h"
+
 #include "stm32l4xx_hal.h"
 #include "hal_gpio_stm32l4.h"
 #ifdef HAL_GPIO_MODULE_ENABLED
@@ -241,7 +243,6 @@ int32_t hal_gpio_output_toggle(gpio_dev_t *gpio)
 
 int32_t hal_gpio_input_get(gpio_dev_t *gpio, uint32_t *value)
 {
-    uint16_t pin = 0;
     GPIO_TypeDef* GPIOx = NULL;
     int32_t ret = 0;
 
@@ -250,9 +251,8 @@ int32_t hal_gpio_input_get(gpio_dev_t *gpio, uint32_t *value)
     }
 
     ret = get_gpio_group(gpio, &GPIOx);
-    if (ret == 0) {
-        pin = get_gpio_pin(gpio->port);
-        *value = HAL_GPIO_ReadPin(GPIOx, pin);
+    if (ret == 0) {        
+        *value = HAL_GPIO_ReadPin(GPIOx, get_gpio_pin(gpio->port));
     };
 
     return ret;
@@ -482,6 +482,11 @@ int32_t hal_gpio_enable_irq(gpio_dev_t *gpio, gpio_irq_trigger_t trigger,gpio_ir
 {
 
     int32_t ret = -1;
+
+    if (IRQ_MODE != gpio->config) {
+	return (-1);
+    }
+
     gpio_irq_slop_t * slop = gpio_slop_get(-1);
     if(NULL == slop) {
         return(-1);
@@ -503,7 +508,12 @@ int32_t hal_gpio_disable_irq(gpio_dev_t *gpio)
 {
 
     int32_t ret = -1;
-    IRQn_Type pirqn = 0;
+
+    if (IRQ_MODE != gpio->config) {
+	return (-1);
+    }
+
+   IRQn_Type pirqn = 0;
     gpio_irq_slop_t * slop = gpio_slop_get(gpio->port);
     if(NULL == slop) {
         return(-1);

@@ -29,6 +29,7 @@
 ******************************************************************************
 */ 
 
+#include "aos_debug.h"
 
 #include "mico_rtos.h"
 #include "mico_platform.h"
@@ -117,7 +118,7 @@ OSStatus platform_uart_init( platform_uart_driver_t* driver, const platform_uart
 	    DIAG_UartReInit((IRQ_FUN) platform_loguart_irq);
 	    NVIC_SetPriority(UART_LOG_IRQ, 10); /* this is rom_code_patch */
             LOGUART_SetBaud(config->baud_rate);
-            return;
+            return err;
         }
 
     	serial_init((serial_t*)&peripheral->serial_obj, peripheral->tx, peripheral->rx);
@@ -479,6 +480,14 @@ void platform_loguart_irq( void* id)
     platform_uart_driver_t* driver = &platform_uart_drivers[0];
     u8      UartReceiveData = 0;
     BOOL    PullMode = _FALSE;
+    volatile u8 reg_iir;
+    u32 RegValue;
+
+    reg_iir = UART_IntStatus(UART2_DEV);
+    if ((reg_iir & RUART_RECEIVE_LINE_STATUS) != 0) {
+        RegValue = UART_LineStatusGet(UART2_DEV);
+        return;
+    }
 
     u32 IrqEn = DiagGetIsrEnReg();
 

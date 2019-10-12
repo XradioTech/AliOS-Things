@@ -5,6 +5,7 @@
 #include <k_api.h>
 #include "frxt/xtensa_config.h"
 
+#define WDT_TIMEOUT_MS  20000
 void soc_hw_timer_init()
 {
 }
@@ -12,13 +13,11 @@ void soc_hw_timer_init()
 #if (RHINO_CONFIG_USER_HOOK > 0)
 void krhino_idle_pre_hook(void)
 {
-
 }
 
 void krhino_idle_hook(void)
 {
     extern void vApplicationIdleHook(void);
-
     vApplicationIdleHook();
 }
 
@@ -32,7 +31,7 @@ void krhino_init_hook(void)
 
 void krhino_start_hook(void)
 {
-#if (RHINO_CONFIG_TASK_SCHED_STATS > 0)
+#if (RHINO_CONFIG_SYS_STATS > 0)
     krhino_task_sched_stats_reset();
 #endif
 }

@@ -7,7 +7,6 @@ src = Split('''
         ../../arch/csky/cskyv2-l/port_s_novic.S 
         ../../arch/csky/cskyv2-l/port_c.c 
         ../../arch/csky/cskyv2-l/entry.S 
-        aos/trace_impl.c 
         modules/libc/minilibc_port.c 
         csi/csi_kernel/rhino/adapter/csi_rhino.c 
         csi/csi_kernel/rhino/driver/systick.c 
@@ -55,14 +54,7 @@ global_ldflags = Split('''
 
 
 global_macro = Split('''
-        CONFIG_AOS_KV_MULTIPTN_MODE
-        CONFIG_AOS_KV_PTN=6
-        CONFIG_AOS_KV_SECOND_PTN=7
-        CONFIG_AOS_KV_PTN_SIZE=4096
-        CONFIG_AOS_KV_BUFFER_SIZE=8192
-        CONFIG_AOS_CLI_BOARD
-        CONFIG_AOS_CLI
-        CONFIG_AOS_FOTA_BREAKPOINT
+        CONFIG_AOS_UOTA_BREAKPOINT
         WITH_LWIP
 ''')
 
@@ -71,11 +63,10 @@ dependencis = Split('''
         kernel/rhino
         kernel/hal
         kernel/init
-        kernel/vcall
-        kernel/protocols/net
-        framework/common 
+        osal
+        network/lwip
         utility/cjson
-        tools/cli
+        kernel/cli
         platform/mcu/csky/hal_init
 ''')
 

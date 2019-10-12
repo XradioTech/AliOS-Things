@@ -3,19 +3,18 @@
  */
 
 #if defined(__GNUC__)
-typedef void (*cpp_func) ();
-extern cpp_func __ctors_start__[];
-extern cpp_func __ctors_end__[];
+typedef void (*pfunc)();
+extern pfunc __ctors_start__[];
+extern pfunc __ctors_end__[];
 
-__attribute__((weak)) void * __dso_handle = 0;
+__attribute__((weak)) void *__dso_handle = 0;
 
 void cpp_init(void)
 {
-    cpp_func *f;
+    pfunc *f;
 
     for (f = __ctors_start__; f < __ctors_end__; f++) {
         (*f)();
     }
 }
 #endif
-

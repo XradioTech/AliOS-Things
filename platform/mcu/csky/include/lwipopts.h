@@ -59,7 +59,7 @@
 
 #define MEM_LIBC_MALLOC                 1
 #if MEM_LIBC_MALLOC
-#include <aos/aos.h>
+#include "aos/kernel.h"
 #define mem_clib_malloc aos_malloc
 #define mem_clib_free aos_free
 #define mem_clib_calloc(n, m) aos_zalloc( (n) * (m) )
@@ -274,6 +274,9 @@
 #define TCP_FR_DEBUG                    LWIP_DBG_ON
 #define TCP_QLEN_DEBUG                  LWIP_DBG_ON
 #define TCP_RST_DEBUG                   LWIP_DBG_ON
+#define PKTPRINT_DEBUG                  LWIP_DBG_OFF
+#define IPERF_DEBUG                     LWIP_DBG_OFF
+#define PING_DEBUG                      LWIP_DBG_OFF
 
 /*
    ---------- Performance tracking options ----------

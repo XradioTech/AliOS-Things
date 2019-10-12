@@ -15,22 +15,21 @@
  */
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <lcsfc.h>
 #include <dh_type.h>
 
-#include "hal/soc/soc.h"
+#include "aos/hal/flash.h"
 
 extern DH_S32 DH_MDK_LCSFC_Erase(DH_U32 u32StartAddr, DH_U32 u32Length);
 extern DH_S32 DH_MDK_LCSFC_WriteFlash(DH_U32 u32Addr, DH_U32 u32Cnt, DH_U8 *pu8Buf);
 extern DH_S32 DH_MDK_LCSFC_Init(DH_U32 u32FMaxSize, DH_U32 u32Baudrate);
 
-hal_logic_partition_t *hal_flash_get_info(hal_partition_t in_partition)
+int32_t hal_flash_info_get(hal_partition_t in_partition, hal_logic_partition_t *partition)
 {
-    hal_logic_partition_t *logic_partition = NULL;
-
-    return logic_partition;
+    return 0;
 }
 
 int32_t hal_flash_erase(hal_partition_t in_partition, uint32_t off_set, uint32_t size)

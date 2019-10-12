@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include "cJSON_Utils.h"
 
+#define MATH_FABS(x)    ((x) > 0 ? (x) : (-(x)))
+
 static char* cJSONUtils_strdup(const char* str)
 {
     size_t len = 0;
@@ -207,6 +209,11 @@ cJSON *cJSONUtils_GetPointer(cJSON *object, const char *pointer)
 /* JSON Patch implementation. */
 static void cJSONUtils_InplaceDecodePointerString(char *string)
 {
+    if( string == NULL )
+    {
+        return;
+    }
+
     char *s2 = string;
     for (; *string; s2++, string++)
     {
@@ -268,7 +275,7 @@ static int cJSONUtils_Compare(cJSON *a, cJSON *b)
     {
         case cJSON_Number:
             /* numeric mismatch. */
-            return ((a->valueint != b->valueint) || (a->valuedouble != b->valuedouble)) ? -2 : 0;
+            return ((a->valueint != b->valueint) || (MATH_FABS(a->valuedouble - b->valuedouble) > 1e-6)) ? -2 : 0;
         case cJSON_String:
             /* string mismatch. */
             return (strcmp(a->valuestring, b->valuestring) != 0) ? -3 : 0;
@@ -476,6 +483,11 @@ static int cJSONUtils_ApplyPatch(cJSON *object, cJSON *patch)
 int cJSONUtils_ApplyPatches(cJSON *object, cJSON *patches)
 {
     int err = 0;
+    if( patches == NULL )
+    {
+        return 1;
+    }
+
     if ((patches->type & 0xFF) != cJSON_Array)
     {
         /* malformed patches. */
@@ -535,7 +547,7 @@ static void cJSONUtils_CompareToPatch(cJSON *patches, const char *path, cJSON *f
     switch ((from->type & 0xFF))
     {
         case cJSON_Number:
-            if ((from->valueint != to->valueint) || (from->valuedouble != to->valuedouble))
+            if ((from->valueint != to->valueint) || (MATH_FABS(from->valuedouble - to->valuedouble) > 1e-6))
             {
                 cJSONUtils_GeneratePatch(patches, "replace", path, 0, to);
             }

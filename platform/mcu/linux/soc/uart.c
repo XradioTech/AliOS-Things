@@ -14,9 +14,10 @@
 #include <cpu_event.h>
 #include <pthread.h>
 #include <signal.h>
-#include "hal/soc/soc.h"
 
-#ifdef VCALL_RHINO
+#include "aos/hal/uart.h"
+
+#ifdef OSAL_RHINO
 #include <k_api.h>
 
 typedef unsigned char
@@ -200,7 +201,7 @@ int32_t hal_uart_recv_II(uart_dev_t *uart, void *data, uint32_t expect_size, uin
 #include <fcntl.h>
 #include <string.h>
 #include <assert.h>
-#include <hal/atcmd.h>
+#include <atcmd_config_platform.h>
 
 static int at_uart_fd = -1;
 

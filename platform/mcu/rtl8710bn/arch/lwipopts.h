@@ -56,7 +56,7 @@
 #define LWIP_NOASSERT			1
 
 #define LWIP_DEBUG                      0
-#define LWIP_DEBUG_TRACE                0
+//#define LWIP_DEBUG_TRACE              1
 #define SOCKETS_DEBUG                   LWIP_DBG_OFF // | LWIP_DBG_MASK_LEVEL
 
 #define IP_DEBUG                        LWIP_DBG_OFF
@@ -91,6 +91,12 @@
 #define SNMP_MSG_DEBUG                  LWIP_DBG_OFF
 #define SNMP_MIB_DEBUG                  LWIP_DBG_OFF
 #define DNS_DEBUG                       LWIP_DBG_OFF
+#define PKTPRINT_DEBUG                  LWIP_DBG_OFF
+#define IPERF_DEBUG                     LWIP_DBG_OFF
+#define PING_DEBUG                      LWIP_DBG_OFF
+#define PKTPRINT_DEBUG                  LWIP_DBG_OFF
+#define IPERF_DEBUG                     LWIP_DBG_OFF
+#define PING_DEBUG                      LWIP_DBG_OFF
 //#define LWIP_COMPAT_MUTEX      		1
 /**
  * SYS_LIGHTWEIGHT_PROT==1: if you want inter-task protection for certain
@@ -269,6 +275,11 @@
  */
 #define LWIP_TCP_KEEPALIVE              1
 
+/**
+ * TCP_SYNMAXRTX: Maximum number of retransmissions of SYN segments.
+ */
+#define TCP_SYNMAXRTX                   10
+
 /*
    ----------------------------------------
    ---------- Statistics options ----------
@@ -441,7 +452,7 @@ The STM32F107 allows computing and verifying the IP, UDP, TCP and ICMP checksums
 #define TCPIP_MBOX_SIZE                 16
 #define DEFAULT_ACCEPTMBOX_SIZE         8
 #define DEFAULT_RAW_RECVMBOX_SIZE       4
-#define DEFAULT_UDP_RECVMBOX_SIZE       8
+#define DEFAULT_UDP_RECVMBOX_SIZE       20 // 8
 #define DEFAULT_TCP_RECVMBOX_SIZE       8
 
 #ifdef CONFIG_AOS_MESH

@@ -25,16 +25,23 @@ MEMORY
 	XIPBOOT (rx)  :			ORIGIN = 0x08000000+0x20, LENGTH = 0x04000-0x20	/* XIPBOOT: 32k, 32 Bytes resvd for header*/
 	XIPSYS (r) :			ORIGIN = 0x08009000, LENGTH = 0x1000	/* XIPSYS: 4K system data in flash */
 	XIPCAL (r) :			ORIGIN = 0x0800A000, LENGTH = 0x1000	/* XIPCAL: 4K calibration data in flash */
-	XIP1 (rx)  : 			ORIGIN = 0x0800B000+0x20, LENGTH = 0xF2000-0x20	/* XIP1: 968k, 32 Bytes resvd for header */
-	XIP2 (rx)  : 			ORIGIN = 0x08100000+0x20, LENGTH = 0xF2000-0x20	/* XIP2: 968k, 32 Bytes resvd for header */
+	XIP1 (rx)  : 			ORIGIN = 0x08019000+0x20, LENGTH = 0xE2000-0x20	/* XIP1: 904k, 32 Bytes resvd for header */
 }
 
-
+PROVIDE(app_download_addr = 0xffffffff);
+PROVIDE(kernel_download_addr = 0x8100000);
 
 SECTIONS
 {
 	.rom.text : { } > ROM
 	.rom.rodata : { } > ROM
+	.ARM.exidx :
+	{
+		__exidx_start = .;
+	    *(.ARM.exidx*)
+	    *(.gnu.linkonce.armexidx.*)
+		__exidx_end = .;
+	} > ROM
 	.hal.rom.bss : { } > ROMBSS_RAM
 
 	/* image1 entry, this section should in RAM and fixed address for ROM */
@@ -103,7 +110,6 @@ SECTIONS
   
 	.ram_image2.bss :
 	{
-
 		__bss_start__ = .;
 		*(.bss*)
 		*(COMMON)

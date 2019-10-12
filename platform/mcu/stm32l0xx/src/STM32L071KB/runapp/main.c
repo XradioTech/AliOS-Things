@@ -5,13 +5,10 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32l0xx_hal.h"
-#include <aos/aos.h>
 #include <k_api.h>
-#include <aos/kernel.h>
 
 /* rhino task definition */
-#define DEMO_TASK_STACKSIZE    128 
-#define DEMO_TASK_PRIORITY     20
+#define DEMO_TASK_STACKSIZE    256
 
 static ktask_t demo_task_obj;
 cpu_stack_t demo_task_buf[DEMO_TASK_STACKSIZE];
@@ -22,7 +19,6 @@ UART_HandleTypeDef huart4;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-ktask_t *g_aos_init;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -33,12 +29,12 @@ static void MX_USART4_UART_Init(void);
 /* Private function prototypes -----------------------------------------------*/
 void hal_reboot(void) {}
 
-extern int application_start(void);
+extern int application_start(int argc, char **argv);
 void aos_app_entry(void *args)
 {
     HW_Init();
     DBG_Init();
-    application_start();
+    application_start(0,NULL);
 }
 
 int main(void)
@@ -57,14 +53,14 @@ int main(void)
   MX_USART4_UART_Init();
 
   /* aos initialization */
-  aos_init();
+  krhino_init();
 
   /* aos rhino task creation */
-  krhino_task_create(&demo_task_obj, "aos app", 0,DEMO_TASK_PRIORITY, 
+  krhino_task_create(&demo_task_obj, "aos app", 0,RHINO_CONFIG_PRI_MAX - 2,
         50, demo_task_buf, DEMO_TASK_STACKSIZE, (task_entry_t)aos_app_entry, 1);
 
   /* aos start */
-  aos_start();
+  krhino_start();
 
 }
 
@@ -76,11 +72,11 @@ static void SystemClock_Config(void)
   RCC_OscInitTypeDef RCC_OscInitStruct;
   RCC_ClkInitTypeDef RCC_ClkInitStruct;
 
-    /**Configure the main internal regulator output voltage 
+    /**Configure the main internal regulator output voltage
     */
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
-    /**Initializes the CPU, AHB and APB busses clocks 
+    /**Initializes the CPU, AHB and APB busses clocks
     */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
@@ -94,7 +90,7 @@ static void SystemClock_Config(void)
     _Error_Handler(__FILE__, __LINE__);
   }
 
-    /**Initializes the CPU, AHB and APB busses clocks 
+    /**Initializes the CPU, AHB and APB busses clocks
     */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
@@ -108,16 +104,18 @@ static void SystemClock_Config(void)
     _Error_Handler(__FILE__, __LINE__);
   }
 
-    /**Configure the Systick interrupt time 
+#ifndef CONFIG_AOS_DISABLE_TICK
+    /**Configure the Systick interrupt time
     */
   HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
 
-    /**Configure the Systick 
+    /**Configure the Systick
     */
   HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
 
   /* SysTick_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(SysTick_IRQn, 3, 0);
+#endif
 }
 
 /* USART4 init function */
@@ -141,9 +139,9 @@ static void MX_USART4_UART_Init(void)
 
 }
 
-/** Configure pins as 
-        * Analog 
-        * Input 
+/** Configure pins as
+        * Analog
+        * Input
         * Output
         * EVENT_OUT
         * EXTI
@@ -167,10 +165,10 @@ void _Error_Handler(char * file, int line)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
-  while(1) 
+  while(1)
   {
   }
-  /* USER CODE END Error_Handler_Debug */ 
+  /* USER CODE END Error_Handler_Debug */
 }
 
 #ifdef USE_FULL_ASSERT

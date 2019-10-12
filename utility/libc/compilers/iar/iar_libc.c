@@ -7,21 +7,24 @@
 #include <sys/types.h>
 #include <time.h>
 #include <stdio.h>
-#include <hal/hal.h>
+#include <string.h>
+#include "aos/kernel.h"
+
+#include "aos/hal/uart.h"
 
 int errno;
 
-extern void *aos_malloc(unsigned int size);
-extern void aos_alloc_trace(void *addr, size_t allocator);
-extern void aos_free(void *mem);
-extern void *aos_realloc(void *mem, unsigned int size);
-extern long long aos_now_ms(void);
+extern void      *aos_malloc(unsigned int size);
+extern void       aos_alloc_trace(void *addr, size_t allocator);
+extern void       aos_free(void *mem);
+extern void      *aos_realloc(void *mem, unsigned int size);
+extern long long  aos_now_ms(void);
 
 __ATTRIBUTES void *malloc(unsigned int size)
 {
     void *mem;
 
-#if (RHINO_CONFIG_MM_DEBUG > 0u && RHINO_CONFIG_GCC_RETADDR > 0u)
+#if (RHINO_CONFIG_MM_DEBUG > 0u)
     mem = aos_malloc(size | AOS_UNSIGNED_INT_MSB);
 #else
     mem = aos_malloc(size);
@@ -34,7 +37,7 @@ __ATTRIBUTES void *realloc(void *old, unsigned int newlen)
 {
     void *mem;
 
-#if (RHINO_CONFIG_MM_DEBUG > 0u && RHINO_CONFIG_GCC_RETADDR > 0u)
+#if (RHINO_CONFIG_MM_DEBUG > 0u)
     mem = aos_realloc(old, newlen | AOS_UNSIGNED_INT_MSB);
 #else
     mem = aos_realloc(old, newlen);
@@ -47,7 +50,7 @@ __ATTRIBUTES void *calloc(size_t len, size_t elsize)
 {
     void *mem;
 
-#if (RHINO_CONFIG_MM_DEBUG > 0u && RHINO_CONFIG_GCC_RETADDR > 0u)
+#if (RHINO_CONFIG_MM_DEBUG > 0u)
     mem = aos_malloc((elsize * len) | AOS_UNSIGNED_INT_MSB);
 #else
     mem = aos_malloc(elsize * len);
@@ -76,7 +79,7 @@ int *__errno _PARAMS ((void))
     return 0;
 }
 
-void __assert_func(const char * a, int b, const char * c, const char *d)
+void __assert_func(const char *a, int b, const char *c, const char *d)
 {
     while (1);
 }
@@ -90,8 +93,7 @@ size_t __write(int handle, const unsigned char *buffer, size_t size)
     memset(&uart_stdio, 0, sizeof(uart_stdio));
     uart_stdio.port = 0;
 
-    if (buffer == 0)
-    {
+    if (buffer == 0) {
         /*
          * This means that we should flush internal buffers.  Since we don't we just return.
          * (Remember, "handle" == -1 means that all handles should be flushed.)
@@ -100,18 +102,17 @@ size_t __write(int handle, const unsigned char *buffer, size_t size)
     }
 
     /* This function only writes to "standard out" and "standard err" for all other file handles it returns failure. */
-    if ((handle != 1) && (handle != 2))
-    {
-        return ((size_t)-1);
+    if ((handle != 1) && (handle != 2)) {
+        return ((size_t) - 1);
     }
 
     /* Send data. */
     for (i = 0; i < size; i++) {
         if (buffer[i] == '\n') {
-            hal_uart_send(&uart_stdio, (void *)"\r", 1, 0);
+            hal_uart_send(&uart_stdio, (void *)"\r", 1, AOS_WAIT_FOREVER);
         }
 
-        hal_uart_send(&uart_stdio, &buffer[i], 1, 0);
+        hal_uart_send(&uart_stdio, &buffer[i], 1, AOS_WAIT_FOREVER);
     }
 
     return size;
@@ -134,9 +135,9 @@ void __close()
 
 int remove(char const *p)
 {
-	return 0;
+    return 0;
 }
-	
+
 void gettimeofday()
 {
 
@@ -152,4 +153,5 @@ void optarg()
 
 }
 
- #endif
+#endif
+

@@ -6,7 +6,6 @@ src = Split('''
         hal/uart.c
         hal/flash.c
         hal/wifi_port.c
-        hal/ota_port.c
         hal/ais_ota_port.c
         hal/misc.c
         hal/i2c.c
@@ -83,18 +82,16 @@ prebuild_libs = Split('''
 ''')
 
 global_macro = Split('''
-        CONFIG_AOS_KV_BUFFER_SIZE=8192
-        CONFIG_AOS_CLI_BOARD
         SYSINFO_PRODUCT_MODEL=\\"ALI_AOS_ESP32\\"
         SYSINFO_DEVICE_NAME=\\"ESP32\\"
 ''')
 
 dependencis = Split('''
         kernel/hal
-        kernel/vcall
+        osal
         kernel/init
-        kernel/modules/fs/kv
-        kernel/protocols/net 
+        kernel/fs/kv
+        network/lwip 
         security/alicrypto
 ''')
 
@@ -126,21 +123,20 @@ else:
     dependencis.append('platform/arch/xtensa/lx6')
     src.append('aos/hook_impl.c')
     src.append('aos/soc_impl.c')
-    src.append('aos/trace_impl.c')
     src.append('aos/heap_wrapper.c')
 
 if aos_global_config.get('mesh'):
-    dependencis.append('kernel/protocols/mesh')
+    dependencis.append('network/umesh')
 
 ble = aos_global_config.get('mesh', 0)
 if ble:
-    dependencis.append('kernel/protocols/bluetooth')
+    dependencis.append('network/bluetooth')
     global_includes.append('bsp/include/bt/include')
-    local_includes.append('#kernel/protocols/bluetooth/port')
-    local_includes.append('#kernel/protocols/bluetooth/host')
-    local_includes.append('#kernel/protocols/bluetooth/host/bt_mesh')
-    local_includes.append('#kernel/protocols/bluetooth/core/include')
-    local_includes.append('#kernel/protocols/bluetooth/include/bluetooth')
+    local_includes.append('#network/bluetooth/port')
+    local_includes.append('#network/bluetooth/host')
+    local_includes.append('#network/bluetooth/host/bt_mesh')
+    local_includes.append('#network/bluetooth/core/include')
+    local_includes.append('#network/bluetooth/include/bluetooth')
 
     if aos_global_config.get('hci_h4') != 1:
         src.append('ble_hci_driver/hci_driver.c')

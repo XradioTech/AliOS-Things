@@ -8,10 +8,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <aos/aos.h>
 #include <arg_options.h>
 
-#ifndef CONFIG_VCALL_POSIX
+#include "aos/init.h"
+#include "aos/kernel.h"
+#include "ulog/ulog.h"
+
+#ifndef CONFIG_OSAL_POSIX
 #include <k_api.h>
 #endif
 
@@ -27,10 +30,7 @@ extern void __gcov_flush(void);
 extern void rl_free_line_state(void);
 extern void rl_cleanup_after_signal(void);
 extern void hw_start_hal(options_t *poptions);
-extern void trace_start();
 extern void netmgr_init(void);
-extern int  aos_framework_init(void);
-extern int  aos_cli_init(void);
 extern void cpu_tmr_sync(void);
 
 static options_t options = { 0 };
@@ -49,13 +49,11 @@ static void exit_clean(void)
 
 static void app_entry(void *arg)
 {
-    int i = 0;
-
     kinit.argc        = options.argc;
     kinit.argv        = options.argv;
     kinit.cli_enable  = options.cli.enable;
 
-#ifndef CONFIG_VCALL_POSIX
+#ifndef CONFIG_OSAL_POSIX
     cpu_tmr_sync();
 #endif
 
@@ -68,12 +66,15 @@ static void app_entry(void *arg)
 #endif
     hw_start_hal(&options);
 
-    aos_kernel_init(&kinit);
+    aos_components_init(&kinit);
+#ifndef AOS_BINS
+    application_start(kinit.argc, kinit.argv);  /* jump to app/example entry */
+#endif
 }
 
 static void start_app(void)
 {
-#ifndef CONFIG_VCALL_POSIX
+#ifndef CONFIG_OSAL_POSIX
 #if (RHINO_CONFIG_CPU_NUM > 1)
     ktask_t     *app_task;
     krhino_task_cpu_dyn_create(&app_task, "app_task", 0, 20, 0, 2048, app_entry, 0, 1);

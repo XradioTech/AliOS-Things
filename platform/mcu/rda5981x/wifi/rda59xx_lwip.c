@@ -1,5 +1,4 @@
-#include "lwip/ip_addr.h"
-#include "lwip/netif.h"
+#include "lwip/netifapi.h"
 #include "netif/etharp.h"
 #include "lwip/sys.h"
 
@@ -16,12 +15,57 @@ const ip_addr_t * rda59xx_get_netif_ip(struct netif *netif)
     }
 
     if (!ip4_addr_isany(netif_ip4_addr(netif))) {
-        return netif_ip_addr4(netif);;
+        return netif_ip_addr4(netif);
     }
 
     return NULL;
 }
 
+void rda59xx_add_dns_addr(struct netif *netif)
+{
+    // Do nothing if not brought up
+    const ip_addr_t *ip_addr = rda59xx_get_netif_ip(netif);
+    if(!ip_addr)
+        return;
+    // Check for existing dns server
+    for (char numdns = 0; numdns < DNS_MAX_SERVERS; numdns++) {
+        const ip_addr_t *dns_ip_addr = dns_getserver(numdns);
+        if (!ip_addr_isany(dns_ip_addr)) {
+            return;
+        }
+    }
+   if (IP_IS_V4(ip_addr)) {
+        /* 8.8.8.8 google */
+        ip_addr_t ipv4_dns_addr = IPADDR4_INIT(0x08080808);
+        dns_setserver(0, &ipv4_dns_addr);
+    }
+}
+
+/** \brief  Low level init of the MAC and PHY.
+ *
+ *  \param[in]      netif  Pointer to LWIP netif structure
+ */
+
+static err_t rda59xx_low_level_init(struct netif *netif)
+{
+    static int init_flag = 0;
+    if(init_flag == 0){
+        //wland_reg_func();
+        maclib_init();
+        init_flag = 1;
+    }
+    return ERR_OK;
+}
+
+/**
+ * This function is the ethernet packet send function. It calls
+ * etharp_output after checking link status.
+ *
+ * \param[in] netif the lwip network interface structure for this enetif
+ * \param[in] q Pointer to pbug to send
+ * \param[in] ipaddr IP address
+ * \return ERR_OK or error code
+ */
 static err_t rda59xx_etharp_output(struct netif *netif, struct pbuf *q, const ip_addr_t *ipaddr)
 {
   /* Only send packet is link is up */
@@ -31,6 +75,14 @@ static err_t rda59xx_etharp_output(struct netif *netif, struct pbuf *q, const ip
   return ERR_CONN;
 }
 
+/** \brief  Low level output of a packet. Never call this from an
+ *          interrupt context, as it may block until TX descriptors
+ *          become available.
+ *
+ *  \param[in] netif the lwip network interface structure for this netif
+ *  \param[in] p the MAC packet to send (e.g. IP packet including MAC addresses and type)
+ *  \return ERR_OK if the packet could be sent or an err_t value if the packet couldn't be sent
+ */
 static err_t rda59xx_low_level_output(struct netif *netif, struct pbuf *p)
 {
     struct pbuf *q;
@@ -90,6 +142,13 @@ static err_t rda59xx_low_level_output(struct netif *netif, struct pbuf *p)
     return ERR_BUF;
 }
 
+
+/** \brief  Allocates a pbuf and returns the data from the incoming packet.
+ *
+ *  \param[in] netif the lwip network interface structure
+ *  \param[in] idx   index of packet to be read
+ *  \return a pbuf filled with the received packet (including MAC header)
+ */
 static struct pbuf *rda59xx_low_level_input(struct netif *netif, u8_t *data, u32_t len)
 {
     struct pbuf *p, *q;
@@ -162,11 +221,18 @@ static struct pbuf *rda59xx_low_level_input(struct netif *netif, u8_t *data, u32
     return p;
 }
 
+
+/** \brief  Attempt to read a packet from the EMAC interface.
+ *
+ *  \param[in] netif the lwip network interface structure
+ *  \param[in] idx   index of packet to be read
+ */
 void rda59xx_netif_input(struct netif *netif, u8_t *data, u32_t len)
 {
   struct eth_hdr *ethhdr;
   struct pbuf *p;
 
+  LWIP_DEBUGF(NETIF_DEBUG, ("rda59xx_netif_input\r\n"));
   /* move received packet into a new pbuf */
   p = rda59xx_low_level_input(netif, data, len);
   if (p == NULL) {
@@ -189,6 +255,7 @@ void rda59xx_netif_input(struct netif *netif, u8_t *data, u32_t len)
         /* Free buffer */
         pbuf_free(p);
       }
+      LWIP_DEBUGF(NETIF_DEBUG, ("rda5991h_enetif_input: IP input ok\n"));
       break;
 
     default:
@@ -207,17 +274,17 @@ void rda59xx_sta_netif_link_failed()
 void rda59xx_netif_link_down(u32_t netif)
 {
     if(netif == 0)
-        netif_set_link_down(&lwip_sta_netif);
+        netifapi_netif_set_link_down(&lwip_sta_netif);
     else
-        netif_set_link_down(&lwip_ap_netif);
+        netifapi_netif_set_link_down(&lwip_ap_netif);
 }
 
 void rda59xx_netif_link_up(u32_t netif)
 {
     if(netif == 0)
-        netif_set_link_up(&lwip_sta_netif);
+        netifapi_netif_set_link_up(&lwip_sta_netif);
     else
-        netif_set_link_up(&lwip_ap_netif);
+        netifapi_netif_set_link_up(&lwip_ap_netif);
 }
 
 void rda59xx_netif_data_input(u8_t *data, u32_t len, u32_t idx, u32_t netif)
@@ -241,21 +308,31 @@ static void rda59xx_sta_netif_status_irq(struct netif *lwip_netif)
     if (netif_is_up(lwip_netif) && rda59xx_get_netif_ip(lwip_netif) != NULL) {
             sys_sem_signal(&lwip_sta_netif_has_addr);
         }
-    return;    
+    return;
 }
 
 
 err_t rda59xx_sta_netif_init(struct netif *netif)
 {
+    err_t err;
+    LWIP_ASSERT("netif != NULL", (netif != NULL));
+
     netif->name[0] = 's';
     netif->name[1] = 't';
 #if LWIP_NETIF_HOSTNAME
     /* Initialize interface hostname */
     if(netif->hostname == NULL)
+#ifdef DELETE_HFILOP_CODE
         netif->hostname = "rda59xx_sta";
+#else
+    {
+        extern char *hfilop_layer_get_hostname(void);
+	 netif->hostname = hfilop_layer_get_hostname();
+    }
+#endif
 #endif /* LWIP_NETIF_HOSTNAME */
     rda59xx_get_macaddr((u8_t *)(netif->hwaddr), 0);
-    
+
     netif->hwaddr_len = ETHARP_HWADDR_LEN;
 
     /* maximum transfer unit */
@@ -264,12 +341,15 @@ err_t rda59xx_sta_netif_init(struct netif *netif)
     /* device capabilities */
     // TODOETH: check if the flags are correct below
     netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP;
-
+    err = rda59xx_low_level_init(netif);
+    if (err != ERR_OK)
+        return err;
     netif->output = rda59xx_etharp_output;
     netif->linkoutput = rda59xx_low_level_output;
+
     netif_set_link_callback(&lwip_sta_netif, rda59xx_sta_netif_link_irq);
-    netif_set_status_callback(&lwip_sta_netif, rda59xx_sta_netif_status_irq);    
-    netif_set_default(&lwip_sta_netif);
+    netif_set_status_callback(&lwip_sta_netif, rda59xx_sta_netif_status_irq);
+    netifapi_netif_set_default(&lwip_sta_netif);
     return ERR_OK;
 }
 
@@ -283,6 +363,9 @@ static void rda59xx_ap_netif_link_irq(struct netif *lwip_netif)
 
 err_t rda59xx_ap_netif_init(struct netif *netif)
 {
+    err_t err;
+    LWIP_ASSERT("netif != NULL", (netif != NULL));
+
     netif->name[0] = 'a';
     netif->name[1] = 'p';
 #if LWIP_NETIF_HOSTNAME
@@ -291,7 +374,7 @@ err_t rda59xx_ap_netif_init(struct netif *netif)
         netif->hostname = "rda59xx_ap";
 #endif /* LWIP_NETIF_HOSTNAME */
     rda59xx_get_macaddr((u8_t *)(netif->hwaddr), 1);
-    
+
     netif->hwaddr_len = ETHARP_HWADDR_LEN;
 
     /* maximum transfer unit */
@@ -300,14 +383,31 @@ err_t rda59xx_ap_netif_init(struct netif *netif)
     /* device capabilities */
     // TODOETH: check if the flags are correct below
     netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP;
-
+    err = rda59xx_low_level_init(netif);
+    if (err != ERR_OK)
+        return err;
     netif->output = rda59xx_etharp_output;
     netif->linkoutput = rda59xx_low_level_output;
+
     netif_set_link_callback(&lwip_ap_netif, rda59xx_ap_netif_link_irq);
     if(netif_default == NULL)
-        netif_set_default(&lwip_ap_netif);
-    
+        netifapi_netif_set_default(&lwip_ap_netif);
+
     return ERR_OK;
 }
 
+void rda59xx_netif_down(int netif)
+{
+    if(netif == 0)
+        netifapi_netif_set_down(&lwip_sta_netif);
+    else
+        netifapi_netif_set_down(&lwip_ap_netif);
+}
+void rda59xx_netif_up(int netif)
+{
+    if(netif == 0)
+        netifapi_netif_set_up(&lwip_sta_netif);
+    else
+        netifapi_netif_set_up(&lwip_ap_netif);
+}
 

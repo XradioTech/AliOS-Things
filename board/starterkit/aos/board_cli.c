@@ -1,9 +1,18 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include <aos/aos.h>
+
+#include "aos/cli.h"
+#include "aos/kernel.h"
+#include "ulog/ulog.h"
+
 #include <atparser.h>
 
+#include "aos/yloop.h"
+
+#ifndef AT_RECV_FAIL_POSTFIX
+#define AT_RECV_FAIL_POSTFIX "ERROR\r\n"
+#endif
 
 #define STARTERKIT_WIFI_MODULE_FOTA "AT+FOTA"
 #define FOTA_OOB_PREFIX "+FOTAEVENT:"
@@ -15,6 +24,9 @@ typedef struct modulefotastatus {
 } fotastatus_t;
 
 static fotastatus_t fota_status;
+#define FOTA_OOB_BUF_SIZE 64
+extern int at_dev_fd;
+static char fota_oob_buf[FOTA_OOB_BUF_SIZE];
 
 static int module_fota_firmware_size_check(char *pcsize)
 {
@@ -94,7 +106,8 @@ static int wifi_module_fota(char *pcsize, char *pcversion, char *pcurl, char *pc
         goto end;
     }
 
-    ret = at.send_raw(pcatcmd, out, sizeof(out));
+    ret = at_send_wait_reply(at_dev_fd, pcatcmd, strlen(pcatcmd), true,
+                             NULL, 0, out, sizeof(out), NULL);
     LOGD(TAG, "The AT response is: %s", out);
     if (strstr(out, AT_RECV_FAIL_POSTFIX) != NULL || ret != 0) {
         printf("%s %d failed", __func__, __LINE__);
@@ -113,6 +126,7 @@ end:
     return ret;
 }
 
+#ifdef AOS_COMP_CLI
 static void handle_module_fota_cmd(char *pwbuf, int blen, int argc, char **argv)
 {
     int ret = 0;
@@ -169,6 +183,7 @@ struct cli_command module_ota_cli_cmd[] = {
         .function = handle_module_fota_cmd
     }
 };
+#endif
 
 void fota_event_handler(void *arg, char *buf, int buflen)
 {
@@ -195,8 +210,10 @@ static void wifi_event_handler(input_event_t *event, void *priv_data)
         return;
     
     if (event->code == CODE_WIFI_ON_GOT_IP){
-        at.oob(FOTA_OOB_PREFIX, FOTA_OOB_POSTFIX, 64, fota_event_handler, NULL);
+        at_register_callback(at_dev_fd, FOTA_OOB_PREFIX, FOTA_OOB_POSTFIX, fota_oob_buf, FOTA_OOB_BUF_SIZE, fota_event_handler, NULL);
+#ifdef AOS_COMP_CLI
         aos_cli_register_commands(&module_ota_cli_cmd[0],sizeof(module_ota_cli_cmd) / sizeof(struct cli_command));
+#endif
         LOG("Hello, WiFi GOT_IP event! at %s %d\r\n", __FILE__, __LINE__);
     }
 }
@@ -208,10 +225,11 @@ int board_cli_init(void)
     ret = aos_sem_new(&fota_status.stmoduelfotasem, 0);
     if (ret){
         printf("fail to creat sem4  %s %d \r\n", __FILE__, __LINE__);
+        return -1;
     }
     fota_status.ret = 0;
 
     aos_register_event_filter(EV_WIFI, wifi_event_handler, NULL);
+    return 0;
 }
-
 

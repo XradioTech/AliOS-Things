@@ -34,10 +34,11 @@ def process_component_test(source_directory):
     code_list = []
 
     source_codes = "/*\n * warning: testcase collection code is auto generate, please don't change!!!\n */\n\n"
-    source_codes += "#include <aos/aos.h>\n\n"
+    source_codes += "#include \"aos/kernel.h\"\n\n"
 
     components = re.findall(r"COMPONENTS\s+\:\=\s+.+\n", config_mk_str)[0]
     for name in components.split(" "):
+        name = name.strip()
         if name.endswith("_test"):
             location = name + "_LOCATION\s+\:\=\s+.+"
             # find all source code files related to test components
@@ -50,7 +51,6 @@ def process_component_test(source_directory):
                         for code in re.findall("AOS_TESTCASE\s*\((.+\)\s*;)", codes):
                             code_list.append(code[:len(code)-2])
 
-    
     for code in code_list:
         source_codes +=  "extern void %s(void);\n"%(code)
 
@@ -88,7 +88,7 @@ def process_component_init(init_dir):
 
     component_init_src = "component_init.c"
 
-    init_codes = "/*\n * warning: component init code, don't change!!!\n */\n\n#include <aos/aos.h>\n\nvoid aos_components_init(void) {\n"
+    init_codes = "/*\n * warning: component init code, don't change!!!\n */\n\n#include \"aos/kernel.h\"\n\nvoid aos_components_gen_init(void) {\n"
 
     # find all head file through config.mk 
     for root, dirs, files in  chain.from_iterable(os.walk(path.strip()) for path in \
@@ -118,7 +118,7 @@ def main():
     with open(sys.argv[1], "r") as f:
         config_mk_str = f.read()
 
-        process_component_init(sys.argv[2])
+        #process_component_init(sys.argv[2])
         process_component_test(sys.argv[2])
 
 if __name__ == "__main__":

@@ -1,15 +1,16 @@
-src =Split(''' 
+src =Split('''
+    board.c
 ''')
 component =aos_component('board_pca10040', src)
 
 
-global_includes =Split(''' 
+global_includes =Split('''
     .
 ''')
 for i in global_includes:
     component.add_global_includes(i)
 
-global_macros =Split(''' 
+global_macros =Split('''
     STDIO_UART=0
     CONFIG_NO_TCPIP
     BOARD_PCA10040
@@ -24,4 +25,4 @@ global_macros =Split('''
 for i in global_macros:
     component.add_global_macros(i)
 
-supported_targets=="bluetooth.aisilopapp bluetooth.ble_advertisements bluetooth.bleperipheral"
+linux_only_targets="blink bluetooth.bleadv bluetooth.blemesh_tmall bluetooth.bleperipheral bluetooth.breezeapp helloworld modbus_demo udata_demo.sensor_local_demo udata_demo.udata_local_demo udataapp yts"

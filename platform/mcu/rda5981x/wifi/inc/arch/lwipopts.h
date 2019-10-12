@@ -29,21 +29,21 @@
  * Author: Adam Dunkels <adam@sics.se>
  *
  */
-#ifndef __LWIPOPTS_H__
-#define __LWIPOPTS_H__
+#ifndef __RDA59XX_LWIPOPTS_H__
+#define __RDA59XX_LWIPOPTS_H__
 #include "lwip/arch.h"
 
 /**
  * Loopback demo related options.
  */
-//#define LWIP_NETIF_LOOPBACK             1
-//#define LWIP_HAVE_LOOPIF                1
-//#define LWIP_NETIF_LOOPBACK_MULTITHREADING       1
-//#define LWIP_LOOPBACK_MAX_PBUFS         8
+#define LWIP_NETIF_LOOPBACK             1
+#define LWIP_HAVE_LOOPIF                1
+#define LWIP_NETIF_LOOPBACK_MULTITHREADING       1
+#define LWIP_LOOPBACK_MAX_PBUFS         8
 
 #define TCPIP_THREAD_NAME               "tcp/ip"
 #define TCPIP_THREAD_STACKSIZE          3072
-#define TCPIP_THREAD_PRIO               32
+#define TCPIP_THREAD_PRIO               7
 
 #define DEFAULT_THREAD_STACKSIZE        200
 #define DEFAULT_THREAD_PRIO             1
@@ -51,8 +51,8 @@
 /* Disable lwIP asserts */
 #define LWIP_NOASSERT                   1
 
-#define LWIP_DEBUG                      0
-#define LWIP_DEBUG_TRACE                0
+//#define LWIP_DEBUG                    1
+//#define LWIP_DEBUG_TRACE              1
 #define SOCKETS_DEBUG                   LWIP_DBG_OFF // | LWIP_DBG_MASK_LEVEL
 
 #define IP_DEBUG                        LWIP_DBG_OFF
@@ -87,6 +87,9 @@
 #define SNMP_MSG_DEBUG                  LWIP_DBG_OFF
 #define SNMP_MIB_DEBUG                  LWIP_DBG_OFF
 #define DNS_DEBUG                       LWIP_DBG_OFF
+#define PKTPRINT_DEBUG                  LWIP_DBG_OFF
+#define IPERF_DEBUG                     LWIP_DBG_OFF
+#define PING_DEBUG                      LWIP_DBG_OFF
 //#define LWIP_COMPAT_MUTEX             1
 /**
  * SYS_LIGHTWEIGHT_PROT==1: if you want inter-task protection for certain
