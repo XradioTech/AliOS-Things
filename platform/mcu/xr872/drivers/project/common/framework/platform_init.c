@@ -70,7 +70,7 @@
 #include "cedarx/cedarx.h"
 #endif
 
-#define PLATFORM_SHOW_DEBUG_INFO	1	/* for internal debug only */
+#define PLATFORM_SHOW_DEBUG_INFO	0	/* for internal debug only */
 
 static void platform_show_info(void)
 {

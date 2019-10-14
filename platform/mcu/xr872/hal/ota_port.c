@@ -66,7 +66,7 @@ int ota_hal_write(unsigned int *off, char *in_buf, unsigned int in_buf_len)
     ret = hal_flash_write(ota_partition, &_off_set, in_buf, in_buf_len);
     ota_info.ota_len += in_buf_len;
 
-    OTA_DEBUG("w &_off_set 0x %08x, %d\n", _off_set ,ota_info.ota_len);
+    //OTA_DEBUG("w &_off_set 0x %08x, %d\n", _off_set ,ota_info.ota_len);
     return ret;
 }
 
