@@ -89,6 +89,8 @@ SECTIONS
         *kv.a: (.text .text.* .rodata .rodata.*)
         *udhcp.a: (.text .text.* .rodata .rodata.*)
 				/**rhino.a: (.text .text.* .rodata .rodata.*)  can not set*/
+        *vfs.a: (.text .text.* .rodata .rodata.*)
+        *debug.a: (.text .text.* .rodata .rodata.*)
 
 		/* security */
         *alicrypto.a: (.text .text.* .rodata .rodata.*)

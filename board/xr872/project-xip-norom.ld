@@ -88,8 +88,9 @@ SECTIONS
         *yloop.a: (.text .text.* .rodata .rodata.*)
         *kv.a: (.text .text.* .rodata .rodata.*)
         *udhcp.a: (.text .text.* .rodata .rodata.*)
-        /**libc_nano.a: (.text .text.* .rodata .rodata.*) can not set*/
 				/**rhino.a: (.text .text.* .rodata .rodata.*)  can not set*/
+        *vfs.a: (.text .text.* .rodata .rodata.*)
+        *debug.a: (.text .text.* .rodata .rodata.*)
 
 		/* security */
         *alicrypto.a: (.text .text.* .rodata .rodata.*)
