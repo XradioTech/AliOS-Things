@@ -35,55 +35,36 @@
 extern "C" {
 #endif
 
+#if 0
+typedef struct {
+    void *hdl;
+} aos_hdl_t;
+
+typedef aos_hdl_t aos_sem_t;
+#endif
+
+typedef void* SemaphoreHandle_t;
+
 typedef struct OS_Semaphore {
-	ksem_t sem;
-	uint32_t count;
-	uint32_t max_count;
+    SemaphoreHandle_t   handle;
 } OS_Semaphore_t;
 
-static __inline OS_Status OS_SemaphoreCreate(OS_Semaphore_t *sem, uint32_t initCount, uint32_t maxCount)
-{
-	if (RHINO_SUCCESS == krhino_sem_create(&sem->sem, "UNDEF", (sem_count_t)initCount)) {
-		sem->count = initCount;
-		sem->max_count = maxCount;
-		return OS_OK;
-	} else {
-		return OS_FAIL;
-	}
-}
+typedef struct OS_Semaphore_XR{
+	aos_sem_t sem;
+	uint32_t count;
+	uint32_t max_count;
+} OS_Semaphore_XR_t;
 
-static __inline OS_Status OS_SemaphoreCreateBinary(OS_Semaphore_t *sem)
-{
-	if (RHINO_SUCCESS == krhino_sem_create(&sem->sem, "UNDEF", 0)) {
-		sem->count = 0;
-		sem->max_count = 1;
-		return OS_OK;
-	} else {
-		return OS_FAIL;
-	}
-}
-
-static __inline OS_Status OS_SemaphoreDelete(OS_Semaphore_t *sem)
-{
-	if (RHINO_SUCCESS == krhino_sem_del(&sem->sem)) {
-		return OS_OK;
-	} else {
-		return OS_FAIL;
-	}
-}
+OS_Status OS_SemaphoreCreate(OS_Semaphore_t *sem, uint32_t initCount, uint32_t maxCount);
+OS_Status OS_SemaphoreCreateBinary(OS_Semaphore_t *sem);
+OS_Status OS_SemaphoreDelete(OS_Semaphore_t *sem);
 
 OS_Status OS_SemaphoreWait(OS_Semaphore_t *sem, OS_Time_t waitMS);//xradio irq call,can not in xip
 OS_Status OS_SemaphoreRelease(OS_Semaphore_t *sem);//xradio irq, can not xin xip
 
-static __inline int OS_SemaphoreIsValid(OS_Semaphore_t *sem)
-{
-	return (sem->sem.blk_obj.obj_type == RHINO_SEM_OBJ_TYPE);
-}
+int OS_SemaphoreIsValid(OS_Semaphore_t *sem);
 
-static __inline void OS_SemaphoreSetInvalid(OS_Semaphore_t *sem)
-{
-	sem->sem.blk_obj.obj_type = RHINO_OBJ_TYPE_NONE;
-}
+void OS_SemaphoreSetInvalid(OS_Semaphore_t *sem);
 
 #ifdef __cplusplus
 }

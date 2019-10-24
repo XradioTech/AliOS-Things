@@ -32,6 +32,7 @@
 #include <stdint.h>
 #include <k_api.h>
 #include <aos/kernel.h>
+#include "compiler.h"
 
 #ifdef __cplusplus
 extern "C" {

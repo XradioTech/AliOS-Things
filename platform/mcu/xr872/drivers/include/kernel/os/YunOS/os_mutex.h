@@ -35,34 +35,50 @@
 extern "C" {
 #endif
 
+#if 0
+typedef aos_hdl_t aos_mutex_t;
+typedef struct {
+    void *hdl;
+} aos_hdl_t;
+#endif
+
+typedef void* SemaphoreHandle_t;
+
 typedef struct OS_Mutex {
-	kmutex_t mutex;
+	SemaphoreHandle_t	handle;
 } OS_Mutex_t;
 
 static __inline OS_Status OS_MutexCreate(OS_Mutex_t *mutex)
 {
-	if (RHINO_SUCCESS == krhino_mutex_create(&mutex->mutex, "UNDEF")) {
+	//aos_mutex_new(aos_mutex_t *)mutex)
+	if (RHINO_SUCCESS == aos_mutex_new((aos_mutex_t *)mutex)) {
 		return OS_OK;
 	} else {
 		return OS_FAIL;
 	}
 }
 
-
 static __inline OS_Status OS_MutexDelete(OS_Mutex_t *mutex)
 {
+
+	//void aos_mutex_free(aos_mutex_t *mutex)
+	aos_mutex_free((aos_mutex_t *)mutex);
+	return OS_OK;
+#if 0
 	if (RHINO_SUCCESS == krhino_mutex_del(&mutex->mutex)) {
 		return OS_OK;
 	} else {
 		return OS_FAIL;
 	}
+#endif
 }
 
 static __inline OS_Status OS_MutexLock(OS_Mutex_t *mutex, OS_Time_t waitMS)
 {
-	tick_t ticks = OS_MSecsToTicks(waitMS);
+	//tick_t ticks = OS_MSecsToTicks(waitMS);
+	//int aos_mutex_lock(aos_mutex_t *mutex, unsigned int timeout)
 
-	if (RHINO_SUCCESS == krhino_mutex_lock(&mutex->mutex, ticks)) {
+	if (RHINO_SUCCESS == aos_mutex_lock((aos_mutex_t *)mutex, waitMS)) {
 		return OS_OK;
 	} else {
 		return OS_E_TIMEOUT;
@@ -71,7 +87,9 @@ static __inline OS_Status OS_MutexLock(OS_Mutex_t *mutex, OS_Time_t waitMS)
 
 static __inline OS_Status OS_MutexUnlock(OS_Mutex_t *mutex)
 {
-	if (RHINO_SUCCESS == krhino_mutex_unlock(&mutex->mutex)) {
+	//int aos_mutex_unlock(aos_mutex_t *mutex)
+
+	if (RHINO_SUCCESS == aos_mutex_unlock((aos_mutex_t *)mutex)) {
 		return OS_OK;
 	} else {
 		return OS_FAIL;
@@ -100,12 +118,17 @@ static __inline OS_Status OS_RecursiveMutexUnlock(OS_Mutex_t *mutex)
 
 static __inline int OS_MutexIsValid(OS_Mutex_t *mutex)
 {
-	return (mutex->mutex.blk_obj.obj_type == RHINO_MUTEX_OBJ_TYPE);
+	return aos_mutex_is_valid((aos_mutex_t *)mutex);
+
+	//return (mutex->mutex.blk_obj.obj_type == RHINO_MUTEX_OBJ_TYPE);
 }
 
 static __inline void OS_MutexSetInvalid(OS_Mutex_t *mutex)
 {
-	mutex->mutex.blk_obj.obj_type = RHINO_OBJ_TYPE_NONE;
+	aos_mutex_t *mutex_t = NULL;
+	mutex_t = (aos_mutex_t *)mutex;
+	mutex_t->hdl = NULL;
+	//mutex->mutex.blk_obj.obj_type = RHINO_OBJ_TYPE_NONE;
 }
 
 /**
@@ -117,7 +140,9 @@ static __inline void OS_MutexSetInvalid(OS_Mutex_t *mutex)
  */
 static __always_inline void *OS_MutexGetOwner(OS_Mutex_t *mutex)
 {
-	return mutex->mutex.mutex_task;
+	aos_mutex_t *mutex_t;
+	mutex_t = (aos_mutex_t *)mutex;
+	return (((kmutex_t *)(mutex_t->hdl))->mutex_task);
 }
 
 #ifdef __cplusplus

@@ -37,6 +37,10 @@ extern int stdout_init(void);
 
 void hardware_init_hook(void)
 {
+#ifdef __CONFIG_ROM
+	extern void rom_init();
+	rom_init();
+#endif
 	HAL_BoardIoctlCbRegister(board_ioctl);
 	SystemInit();
 }

@@ -61,7 +61,8 @@ XR872_OTA_FILES := $(XR872_OTA_PATH)/ota.c \
 # drivers/src/pm 
 XR872_PM_PATH  := drivers/src/pm
 XR872_PM_FILES := $(XR872_PM_PATH)/pm.c \
-                  $(XR872_PM_PATH)/port.c
+                  $(XR872_PM_PATH)/port.c \
+                  $(XR872_PM_PATH)/cpu.s
 
 # drivers/src/efpg
 XR872_EFPG_PATH  := drivers/src/efpg

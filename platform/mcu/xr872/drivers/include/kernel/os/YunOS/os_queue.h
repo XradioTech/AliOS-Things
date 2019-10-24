@@ -36,49 +36,91 @@
 extern "C" {
 #endif
 
+#if 0
+typedef struct {
+    void *hdl;
+} aos_hdl_t;
+
+typedef aos_hdl_t aos_queue_t;
+#endif
+
+typedef void * QueueHandle_t;
+
 typedef struct OS_Queue {
+    QueueHandle_t   handle;
+} OS_Queue_t;
+
+typedef struct OS_Queue_XR {
 	kbuf_queue_t queue;
 	uint32_t item_size;
 	void* msg_start;
-} OS_Queue_t;
+} OS_Queue_XR_t;
 
 static __inline int OS_QueueIsValid(OS_Queue_t *queue)
 {
-	return (queue->queue.blk_obj.obj_type == RHINO_BUF_QUEUE_OBJ_TYPE);
+	OS_Queue_XR_t *queue_t = NULL;
+	queue_t = queue->handle;
+
+	return (queue_t->queue.blk_obj.obj_type == RHINO_BUF_QUEUE_OBJ_TYPE);
 }
 
 static __inline void OS_QueueSetInvalid(OS_Queue_t *queue)
 {
-	queue->queue.blk_obj.obj_type = RHINO_OBJ_TYPE_NONE;
+	OS_Queue_XR_t *queue_t = NULL;
+	queue_t = queue->handle;
+
+	queue_t->queue.blk_obj.obj_type = RHINO_OBJ_TYPE_NONE;
+	//queue->handle = NULL;
 }
 
-
+//int aos_queue_new(aos_queue_t *queue, void *buf, unsigned int size, int max_msg);
 static __inline OS_Status OS_QueueCreate(OS_Queue_t *queue, uint32_t queueLen, uint32_t itemSize)
 {
 	void *msg_start = NULL;
+	OS_Queue_XR_t *queue_t = NULL;
 
 	msg_start = malloc(queueLen * itemSize);
 	if (msg_start == NULL) {
 		return OS_E_NOMEM;
 	}
 
-	if (RHINO_SUCCESS == krhino_buf_queue_create(&queue->queue, "UNDEF", (void**)msg_start, queueLen * itemSize, itemSize)) {
-		queue->msg_start = msg_start;
-		queue->item_size = itemSize;
+	queue_t = malloc(sizeof(OS_Queue_XR_t));
+	if (queue_t == NULL) {
+		free(msg_start);
+		return OS_E_NOMEM;
+	}
+
+	memset(queue_t, 0, sizeof(OS_Queue_XR_t));
+
+	if (RHINO_SUCCESS == krhino_buf_queue_create(&queue_t->queue, "UNDEF", (void**)msg_start, queueLen * itemSize, itemSize)) {
+		queue_t->msg_start = msg_start;
+		queue_t->item_size = itemSize;
+		queue->handle = queue_t;
 		return OS_OK;
 	} else {
+		free(queue_t);
+		queue_t = NULL;
 		free(msg_start);
 		msg_start = NULL;
+		queue->handle = NULL;
 		return OS_FAIL;
 	}
 }
 
 static __inline OS_Status OS_QueueDelete(OS_Queue_t *queue)
 {
-	if ((queue != NULL)) {
-		if (RHINO_SUCCESS == krhino_buf_queue_del(&queue->queue)) {
-			if(queue->msg_start != NULL)
-				free(queue->msg_start);
+	OS_Queue_XR_t *queue_t = NULL;
+	queue_t = queue->handle;
+
+	if ((queue != NULL) && queue->handle != NULL) {
+		if (RHINO_SUCCESS == krhino_buf_queue_del(&queue_t->queue)) {
+			if(queue_t->msg_start != NULL)
+				free(queue_t->msg_start);
+
+			if(queue_t != NULL)
+				free(queue->handle);
+
+			queue->handle = NULL;
 			return OS_OK;
 		} else {
 			return OS_FAIL;
@@ -89,7 +131,10 @@ static __inline OS_Status OS_QueueDelete(OS_Queue_t *queue)
 
 static __inline OS_Status OS_QueueSend(OS_Queue_t *queue, const void *item, OS_Time_t waitMS)
 {
-	if (RHINO_SUCCESS == krhino_buf_queue_send(&queue->queue, item, queue->item_size)) {
+	OS_Queue_XR_t *queue_t = NULL;
+	queue_t = queue->handle;
+
+	if (RHINO_SUCCESS == krhino_buf_queue_send(&queue_t->queue, item, queue_t->item_size)) {
 		return OS_OK;
 	} else {
 		return OS_FAIL;
@@ -98,10 +143,13 @@ static __inline OS_Status OS_QueueSend(OS_Queue_t *queue, const void *item, OS_T
 
 static __inline OS_Status OS_QueueReceive(OS_Queue_t *queue, void *item, OS_Time_t waitMS)
 {
+	OS_Queue_XR_t *queue_t = NULL;
+	queue_t = queue->handle;
+
 	tick_t ticks = waitMS == OS_WAIT_FOREVER ? OS_WAIT_FOREVER : OS_MSecsToTicks(waitMS);
 	size_t msg_len;
 
-	if (RHINO_SUCCESS == krhino_buf_queue_recv(&queue->queue, ticks, item, &msg_len)) {
+	if (RHINO_SUCCESS == krhino_buf_queue_recv(&queue_t->queue, ticks, item, &msg_len)) {
 		return OS_OK;
 	} else {
 		return OS_E_TIMEOUT;

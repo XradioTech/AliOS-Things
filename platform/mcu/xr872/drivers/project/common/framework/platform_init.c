@@ -366,13 +366,18 @@ void platform_cache_init(void)
 #endif
 }
 
+//extern void HAL_Flash_SetDbgMask(uint8_t dbg_mask);  //rom debug
+//extern void image_set_dbg_mask(uint16_t dbg_mask);  //rom debug
+
 /* init basic platform hardware and services */
 __nonxip_text
 __weak void platform_init_level0(void)
 {
 	pm_start();
+     //HAL_Flash_SetDbgMask(0xff); //rom debug
 
 	HAL_Flash_Init(PRJCONF_IMG_FLASH);
+	//image_set_dbg_mask(0xffff);//rom debug
 	image_init(PRJCONF_IMG_FLASH, PRJCONF_IMG_ADDR, PRJCONF_IMG_MAX_SIZE);
 #if (defined(__CONFIG_XIP) || defined(__CONFIG_PSRAM))
     platform_cache_init();

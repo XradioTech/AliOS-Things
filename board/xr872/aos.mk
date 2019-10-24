@@ -31,8 +31,6 @@ $(NAME)_SOURCES += config/k_config.c \
 
 $(NAME)_SOURCES += startup/startup_gcc.s
 
-$(NAME)_ASMFLAGS += -c -x assembler-with-cpp
-
 include $(SOURCE_ROOT)/platform/mcu/xr872/config.mk
 
 ifeq ($(with_rom),1)
@@ -75,6 +73,5 @@ GLOBAL_CFLAGS += -DSYSINFO_ARCH=\"Cortex-M4F\"
 GLOBAL_CFLAGS += -DSYSINFO_MCU=\"$(HOST_MCU_FAMILY)\"
 GLOBAL_CFLAGS += -DSYSINFO_BOARD=\"$(MODULE)\"
 
-GLOBAL_CFLAGS  += -D__CONFIG_CHIP_XR872
 
 EXTRA_TARGET_MAKEFILES +=  $(SOURCE_ROOT)/platform/mcu/$(HOST_MCU_NAME)/mkimage.mk

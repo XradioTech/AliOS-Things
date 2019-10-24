@@ -292,8 +292,9 @@ SECTIONS
 				*rom.a:sdio.o (.text .text.* .rodata .rodata.*)
 
 				*rom.a:hexdump.o (.text .text.* .rodata .rodata.*)
+                               *(.xip_text* .xip_rodata*)
+                                . = ALIGN(4);
 
-        /* All xip end */
         __xip_end__ = .;
     } > FLASH
     .text :
