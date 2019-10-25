@@ -1,4 +1,3 @@
-
 #include <aos/cli.h>
 #include "driver/chip/hal_chip.h"
 #include "driver/chip/system_chip.h"

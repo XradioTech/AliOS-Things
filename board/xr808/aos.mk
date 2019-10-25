@@ -31,8 +31,6 @@ $(NAME)_SOURCES += config/k_config.c \
 
 $(NAME)_SOURCES += startup/startup_gcc.s
 
-$(NAME)_ASMFLAGS += -c -x assembler-with-cpp
-
 include $(SOURCE_ROOT)/platform/mcu/xr872/config.mk
 
 ifeq ($(with_rom),1)

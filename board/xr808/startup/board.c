@@ -200,13 +200,39 @@ void soc_driver_init(void)
 
     printf("soc_driver_init done\n");
 }
+#if 0 //mem read printf
+#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 
+void print_hex_dump_words_t(const void *addr, unsigned int len)
+{
+	unsigned int i;
+	const unsigned int *add = addr;
+
+	if ((unsigned int)add & 0x03) {
+		printf("addr should be align 4B!\n");
+		add =  (const void *)(((unsigned int)add) & ~0x03);
+	}
+	len = DIV_ROUND_UP(len, 4);
+
+	if ((unsigned int)add & 0x0f)
+		printf("[%p]: ", add);
+	for (i = 0; i < len; i++) {
+		if (((unsigned int)add & 0x0f) == 0x0)
+			printf("\n[%p]: ", add);
+		printf("0x%08x ", *add++);
+	}
+	printf("\n");
+}
+#endif
 //extern uint32_t dumpsys_mm_info_func(uint32_t len);
 void soc_system_init(void)
 {
     printf("%s %d\n", __func__, __LINE__);
+
+	//__wrap_printf("%s %d\n", __func__, __LINE__);  //test rom call libc printf
+	//print_hex_dump_words_t(0x200b00, (1024+256));
     platform_init();
-	//dumpsys_mm_info_func(0);
+	//dumpsys_mm_info_func(0);   //or debug_mm_overview(NULL); //check mm
 }
 
 void soc_systick_init(void)

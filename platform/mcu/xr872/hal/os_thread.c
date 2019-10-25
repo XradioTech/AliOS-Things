@@ -35,14 +35,14 @@
 extern uint8_t g_sched_lock[RHINO_CONFIG_CPU_NUM];
 int OS_ThreadIsSchedulerRunning(void)
 {
-	unsigned long flags;
-	flags = arch_irq_save();
+	//unsigned long flags;
+	//flags = arch_irq_save();
 
 	if (g_sched_lock[cpu_cur_get()] == 0u) {//RHINO_SCHED_ALREADY_ENABLED
-		arch_irq_restore(flags);
+		//arch_irq_restore(flags);
 		return 1;
   } else {
-	  arch_irq_restore(flags);
+	  //arch_irq_restore(flags);
 	return 0;
 	}
 }
