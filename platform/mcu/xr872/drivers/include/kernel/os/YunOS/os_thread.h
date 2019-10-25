@@ -110,20 +110,9 @@ static __inline void OS_ThreadResumeScheduler(void)
 	krhino_sched_enable();
 }
 
-extern uint8_t g_sched_lock[RHINO_CONFIG_CPU_NUM];
-static __inline int OS_ThreadIsSchedulerRunning(void)   // irq disable or enable ?? how to do
-{
-	//unsigned long flags;
-	//flags = arch_irq_save();
 
-	if (g_sched_lock[cpu_cur_get()] == 0u) {//RHINO_SCHED_ALREADY_ENABLED
-		//arch_irq_restore(flags);
-		return 1;
-    } else {
-	 //   arch_irq_restore(flags);
-		return 0;
-	}
-}
+int OS_ThreadIsSchedulerRunning(void);
+
 
 static __inline void OS_ThreadSleep(OS_Time_t msec)
 {

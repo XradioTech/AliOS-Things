@@ -459,7 +459,7 @@ void xr871_wlan_start_monitor(void)
 	config.time_sw_ch_long = 0;
 	config.time_sw_ch_short = 0;
 
-	WIFI_DEBUG("wlan start monitor mode, nif %p, cb %p\n", nif, g_monitor_cb);
+	printf("wlan start monitor mode, nif %p, cb %p\n", nif, g_monitor_cb);
 
 	if(nif) {
 		sc_assistant_get_fun(&sca_fun);
@@ -486,7 +486,7 @@ void xr871_wlan_stop_monitor(void)
 	  the null callback, than user cannt recv raw pkt. do nothing for  the reason:
 	  the function stop sc_assisant, close net thread and the  the start connect thread confict, then system hold.
 	*/
-	;
+	printf("wlan stop monitor mode\n");
 #if 0
 	struct netif *nif = g_wlan_netif;
 
