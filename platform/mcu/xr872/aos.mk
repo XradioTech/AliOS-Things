@@ -35,7 +35,8 @@ $(NAME)_SOURCES += hal/soc/flash.c \
                    hal/wifi_port.c \
                    hal/wifi.c \
                    hal/hal.c \
-                   hal/os_semaphore.c
+                   hal/os_semaphore.c \
+                   hal/os_thread.c
 
 #$(NAME)_SOURCES += hal/soc/flash.c \
 #                   hal/soc/sd.c \
