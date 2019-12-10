@@ -57,7 +57,7 @@ typedef struct OS_Timer {
 } OS_Timer_t;
 
 typedef struct OS_Timer_XR{
-	aos_timer_t timer;
+	ktimer_t *handle; /* must be first */
 	OS_TimerType type;
 	OS_TimerCallback_t cb;
 	void *ctx;
@@ -74,24 +74,27 @@ static __inline OS_Status OS_TimerCreate(OS_Timer_t *timer, OS_TimerType type,
                          OS_TimerCallback_t cb, void *ctx, OS_Time_t periodMS)
 {
 	OS_Timer_XR_t *timer_t;
-    timer_t = aos_malloc(sizeof(OS_Timer_XR_t));
+
+	sys_time_t first = krhino_ms_to_ticks((uint32_t)periodMS);
+	sys_time_t round = type == OS_TIMER_ONCE ? 0 : first;// round:first value;non round: 0
+
+    timer_t = krhino_mm_alloc(sizeof(OS_Timer_XR_t));
     if (timer_t == NULL) {
         return OS_E_NOMEM;
     }
 
 	memset(timer_t, 0, sizeof(OS_Timer_XR_t));
-	//int aos_timer_new(aos_timer_t *timer, void (*fn)(void *, void *), void *arg,
-					//  int ms, int repeat);
 
-	if(aos_timer_new(&(timer_t->timer), krhino_timer_cb, timer_t,
-							periodMS, type) == 0) {
+	if (RHINO_SUCCESS == krhino_timer_dyn_create(&timer_t->handle, "timer", krhino_timer_cb,
+													first, round, timer_t, 0)) { //auto_run disable
+		//timer->handle = (void*)timer_obj;
 		timer_t->ctx = ctx;
-		timer_t->type = type;
 		timer_t->cb = cb;
+		timer_t->type = type;
 		timer->handle = timer_t;
 		return OS_OK;
 	} else {
-		aos_free(timer_t);
+		krhino_mm_free(timer_t);
 		timer->handle = NULL;
 		return OS_FAIL;
 	}
@@ -99,28 +102,29 @@ static __inline OS_Status OS_TimerCreate(OS_Timer_t *timer, OS_TimerType type,
 
 static __inline OS_Status OS_TimerDelete(OS_Timer_t *timer)
 {
-	//void aos_timer_free(aos_timer_t *timer)
 	OS_Timer_XR_t *timer_t;
 	timer_t = (OS_Timer_XR_t *)(timer->handle);
 
-	aos_timer_free(&(timer_t->timer));
-	timer_t->cb = NULL;
-	aos_free(timer_t);
-	timer->handle = NULL;
-	return OS_OK;
-}
-
-static __inline OS_Status OS_TimerStart(OS_Timer_t *timer)
-{
-	//int aos_timer_start(aos_timer_t *timer)
-	OS_Timer_XR_t *timer_t;
-	timer_t = (OS_Timer_XR_t *)(timer->handle);
-
-	if (RHINO_SUCCESS == aos_timer_start(&(timer_t->timer))) {
+	if (RHINO_SUCCESS == krhino_timer_dyn_del(timer_t->handle)) {
+		krhino_mm_free(timer_t);
+		timer->handle = NULL;
 		return OS_OK;
 	} else {
 		return OS_FAIL;
 	}
+}
+
+static __inline OS_Status OS_TimerStart(OS_Timer_t *timer)
+{
+	OS_Timer_XR_t *timer_t;
+	timer_t = (OS_Timer_XR_t *)(timer->handle);
+
+	if (RHINO_SUCCESS == krhino_timer_start(timer_t->handle)) {
+		return OS_OK;
+	} else {
+		return OS_FAIL;
+	}
+
 }
 
 static __inline OS_Status OS_TimerChangePeriod(OS_Timer_t *timer, OS_Time_t periodMS)
@@ -133,21 +137,24 @@ static __inline OS_Status OS_TimerChangePeriod(OS_Timer_t *timer, OS_Time_t peri
 
 	tick_t first = krhino_ms_to_ticks((uint32_t)periodMS);
 	tick_t round = timer_t->type == OS_TIMER_ONCE ? 0 : first;
-	if (RHINO_SUCCESS == krhino_timer_change(timer_t->timer.hdl, first, round)) {
-		return OS_OK;
+	if (RHINO_SUCCESS == krhino_timer_change(timer_t->handle, first, round)) {
+		if (RHINO_SUCCESS == krhino_timer_start(timer_t->handle)) {  //need to restart
+			return OS_OK;
+		} else {
+			return OS_FAIL;
+		}
 	} else {
 		return OS_FAIL;
 	}
+
 }
 
 static __inline OS_Status OS_TimerStop(OS_Timer_t *timer)
 {
-	//int aos_timer_stop(aos_timer_t *timer)
-
 	OS_Timer_XR_t *timer_t;
 	timer_t = (OS_Timer_XR_t *)(timer->handle);
 
-	if (RHINO_SUCCESS == aos_timer_stop(&(timer_t->timer))) {
+	if (RHINO_SUCCESS == krhino_timer_stop(timer_t->handle)) {
 		return OS_OK;
 	} else {
 		return OS_FAIL;
@@ -156,8 +163,6 @@ static __inline OS_Status OS_TimerStop(OS_Timer_t *timer)
 
 static __inline int OS_TimerIsValid(OS_Timer_t *timer)
 {
-	//return (timer->handle != OS_INVALID_HANDLE);
-
 	OS_Timer_XR_t *timer_t;
 	timer_t = (OS_Timer_XR_t *)(timer->handle);
 
@@ -165,7 +170,7 @@ static __inline int OS_TimerIsValid(OS_Timer_t *timer)
 		return 0;
 	}
 
-	if(timer_t->timer.hdl == NULL) {
+	if(timer_t->handle == NULL) {
 		return 0;
 	}
 
@@ -176,7 +181,7 @@ static __inline void OS_TimerSetInvalid(OS_Timer_t *timer)
 {
 	OS_Timer_XR_t *timer_t;
 	timer_t = (OS_Timer_XR_t *)(timer->handle);
-	timer_t->timer.hdl = NULL;
+	//timer_t->handle= NULL;
 	timer->handle = OS_INVALID_HANDLE;
 }
 
@@ -184,9 +189,7 @@ static __always_inline int OS_TimerIsActive(OS_Timer_t *timer)
 {
 	OS_Timer_XR_t *timer_t;
 	timer_t = (OS_Timer_XR_t *)(timer->handle);
-
-	//ktimer_t *ktimer = timer->handle;
-	return (((ktimer_t *)(timer_t->timer.hdl))->timer_state == TIMER_ACTIVE);
+	return (timer_t->handle->timer_state == TIMER_ACTIVE);
 }
 
 static __inline void *OS_TimerGetContext(void *arg)

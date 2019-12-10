@@ -79,7 +79,7 @@ static __inline OS_Status OS_QueueCreate(OS_Queue_t *queue, uint32_t queueLen, u
 	void *msg_start = NULL;
 	OS_Queue_XR_t *queue_t = NULL;
 
-	msg_start = malloc(queueLen * itemSize);
+	msg_start = malloc(queueLen * itemSize + queueLen*4);
 	if (msg_start == NULL) {
 		return OS_E_NOMEM;
 	}
@@ -92,7 +92,8 @@ static __inline OS_Status OS_QueueCreate(OS_Queue_t *queue, uint32_t queueLen, u
 
 	memset(queue_t, 0, sizeof(OS_Queue_XR_t));
 
-	if (RHINO_SUCCESS == krhino_buf_queue_create(&queue_t->queue, "UNDEF", (void**)msg_start, queueLen * itemSize, itemSize)) {
+	if (RHINO_SUCCESS == krhino_buf_queue_create(&queue_t->queue, "UNDEF", msg_start,
+		(queueLen * itemSize + queueLen*4), itemSize)) {//RINGBUF_TYPE_DYN mode, need more sram,msglen head
 		queue_t->msg_start = msg_start;
 		queue_t->item_size = itemSize;
 		queue->handle = queue_t;

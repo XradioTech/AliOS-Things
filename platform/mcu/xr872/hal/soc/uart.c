@@ -31,6 +31,7 @@
 #include "aos/kernel.h"
 #include "driver/chip/hal_chip.h"
 #include "board_config.h"
+#include "pm/pm.h"
 
 #define MAX_UART_NUM 2
 #define UART_FIFO_SIZE 128
@@ -50,7 +51,69 @@ typedef struct
 } _uart_drv_t;
 
 static _uart_drv_t _uart_drv[MAX_UART_NUM];
+static UART_ID g_uart_stdout_id = UART_NUM;
 
+#ifdef CONFIG_PM
+static int8_t g_uart_stdio_suspending = 0;
+
+__nonxip_text
+static int uart_stdio_suspend(struct soc_device *dev, enum suspend_state_t state)
+{
+	g_uart_stdio_suspending = 1;
+
+//#if STDOUT_WAIT_UART_TX_DONE
+	if (g_uart_stdout_id < UART_NUM) {
+		UART_T *uart = HAL_UART_GetInstance(g_uart_stdout_id);
+		while (!HAL_UART_IsTxEmpty(uart)) { }
+		HAL_UDelay(100); /* wait tx done, 100 us for baudrate 115200 */
+	}
+//#endif
+
+	switch (state) {
+	case PM_MODE_SLEEP:
+	case PM_MODE_STANDBY:
+	case PM_MODE_HIBERNATION:
+		printf("a%s ok\n", __func__);
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
+
+/* BESURE app cpu has run now for nuart use app gpio */
+__nonxip_text
+static int uart_stdio_resume(struct soc_device *dev, enum suspend_state_t state)
+{
+	switch (state) {
+	case PM_MODE_SLEEP:
+	case PM_MODE_STANDBY:
+	case PM_MODE_HIBERNATION:
+		printf("a%s ok\n", __func__);
+		break;
+	default:
+		break;
+	}
+
+	g_uart_stdio_suspending = 0;
+
+	return 0;
+}
+
+static const struct soc_device_driver uart_stdout_drv = {
+	.name = "uart_stdio",
+	.suspend_noirq = uart_stdio_suspend,
+	.resume_noirq = uart_stdio_resume,
+};
+
+static struct soc_device uart_stdio_dev = {
+	.name = "uart_stdio",
+	.driver = &uart_stdout_drv,
+};
+
+#define UART_STDIO_DEV (&uart_stdio_dev)
+#endif
 static void uart_rx_callback(void* arg)
 {
 	uint8_t rx_byte;
@@ -70,6 +133,7 @@ int32_t hal_uart_init(uart_dev_t *uart)
 {
 	int32_t ret = -1;
 	_uart_drv_t *pdrv = &_uart_drv[uart->port];
+	g_uart_stdout_id = uart->port;
 
 	printf("%s: Humble test enter, port = %d\n", __func__, uart->port);
 	if (uart != NULL) {
@@ -116,8 +180,8 @@ int32_t hal_uart_init(uart_dev_t *uart)
 			ret = HAL_UART_Init(uart->port, &board_uart_param);
 			if (ret == 0) {
 				kstat_t stat;
-				// create tx mutex
-				stat = krhino_buf_queue_dyn_create(&pdrv->bufque, "cli", UART_FIFO_SIZE , 1);
+				stat = krhino_buf_queue_dyn_create(&pdrv->bufque, "cli",
+					(UART_FIFO_SIZE*1 + UART_FIFO_SIZE*4), 1);//RINGBUF_TYPE_DYN mode, need more sram,msglen head
 				if(stat != RHINO_SUCCESS) {
 					HAL_UART_DeInit(uart->port);
 					return stat;
@@ -127,6 +191,12 @@ int32_t hal_uart_init(uart_dev_t *uart)
 				pdrv->status = _UART_STATUS_OPENED;
 			}
 		}
+
+#ifdef CONFIG_PM
+		if (!g_uart_stdio_suspending) {
+			pm_register_ops(UART_STDIO_DEV);
+		}
+#endif
 	}
 
 	printf("%s: exit\n", __func__);
@@ -140,6 +210,11 @@ int32_t hal_uart_finalize(uart_dev_t *uart)
 
 	printf("%s: enter, port = %d\n", __func__, uart->port);
 	if (pdrv->status == _UART_STATUS_OPENED) {
+#ifdef CONFIG_PM
+			if (!g_uart_stdio_suspending) {
+				pm_unregister_ops(UART_STDIO_DEV);
+			}
+#endif
 		aos_mutex_free(&pdrv->tx_mutex);
 		krhino_buf_queue_dyn_del(pdrv->bufque);
 		ret = HAL_UART_DeInit(uart->port);
@@ -154,6 +229,12 @@ int32_t hal_uart_send(uart_dev_t *uart, const void *data, uint32_t size, uint32_
 {
 	int32_t ret = -1;
 	_uart_drv_t *pdrv = &_uart_drv[uart->port];
+
+#ifdef CONFIG_PM
+	if (g_uart_stdio_suspending) {
+		return 0;
+	}
+#endif
 
 	if (pdrv->status == _UART_STATUS_OPENED) {
 		aos_mutex_lock(&pdrv->tx_mutex, timeout);
