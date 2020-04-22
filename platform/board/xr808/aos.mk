@@ -1,7 +1,7 @@
 NAME := board_xr808
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.0
+$(NAME)_VERSION    := 1.0.2
 $(NAME)_SUMMARY    := configuration for board xr808
 MODULE             := 1062
 HOST_ARCH          := Cortex-M4
@@ -10,7 +10,7 @@ SUPPORT_MBINS      := no
 HOST_MCU_NAME      := xr872
 ENABLE_VFP         := 0
 
-$(NAME)_COMPONENTS += $(HOST_MCU_FAMILY) newlib_stub kernel_init netmgr lwip cli yloop fatfs
+$(NAME)_COMPONENTS += $(HOST_MCU_FAMILY) newlib_stub kernel_init netmgr network cli yloop fatfs
 
 GLOBAL_DEFINES += STDIO_UART=0
 GLOBAL_DEFINES += CONFIG_AOS_FATFS_SUPPORT_MMC
@@ -35,15 +35,15 @@ include $(SOURCE_ROOT)/platform/mcu/xr872/config.mk
 
 ifeq ($(with_rom),1)
 ifeq ($(with_xip),1)
-GLOBAL_LDFLAGS += -T board/xr808/project-xip-rom.ld
+GLOBAL_LDFLAGS += -T platform/board/xr808/project-xip-rom.ld
 else
-GLOBAL_LDFLAGS += -T board/xr808/project-noxip-rom.ld
+GLOBAL_LDFLAGS += -T platform/board/xr808/project-noxip-rom.ld
 endif
 else
 ifeq ($(with_xip),1)
-GLOBAL_LDFLAGS += -T board/xr808/project-xip-norom.ld
+GLOBAL_LDFLAGS += -T platform/board/xr808/project-xip-norom.ld
 else
-GLOBAL_LDFLAGS += -T board/xr808/project-noxip-norom.ld
+GLOBAL_LDFLAGS += -T platform/board/xr808/project-noxip-norom.ld
 endif
 endif
 

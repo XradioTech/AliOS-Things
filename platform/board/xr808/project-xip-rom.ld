@@ -1,4 +1,4 @@
-INCLUDE board/xr872/rom_symbol.ld
+INCLUDE platform/board/xr872/rom_symbol.ld
 /* Linker script to configure memory regions. */
 MEMORY
 {
