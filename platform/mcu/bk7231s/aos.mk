@@ -2,14 +2,19 @@ NAME := mcu_bk7231s
 
 HOST_OPENOCD := bk7231s
 
+ifeq ($(AOS_2NDBOOT_SUPPORT), yes)
+$(NAME)_COMPONENTS += bootloader
+$(NAME)_LIBSUFFIX  := _2ndboot
+else
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.0
+$(NAME)_VERSION    := 1.0.1
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu bk7231s
 
 $(NAME)_COMPONENTS := arch_armv5
-$(NAME)_COMPONENTS += newlib_stub rhino yloop alicrypto
+$(NAME)_COMPONENTS += newlib_stub rhino yloop alicrypto debug
 $(NAME)_COMPONENTS += lwip netmgr
 $(NAME)_COMPONENTS += libprov
+endif
 
 GLOBAL_DEFINES += CONFIG_AOS_UOTA_BREAKPOINT
 GLOBAL_DEFINES += CONFIG_AOS_CLI_BOARD
@@ -48,6 +53,12 @@ GLOBAL_LDFLAGS += -mcpu=arm968e-s           \
                   -nostartfiles             \
                   $(CLIB_LDFLAGS_NANO_FLOAT)
 
+ifeq ($(AOS_2NDBOOT_SUPPORT), yes)
+
+GLOBAL_LDS_FILES += platform/mcu/bk7231s/bk7231s_boot.ld
+
+else
+
 PING_PONG_OTA := 0
 ifeq ($(PING_PONG_OTA),1)
 GLOBAL_DEFINES += CONFIG_PING_PONG_OTA
@@ -57,7 +68,23 @@ else
 GLOBAL_LDS_FILES += platform/mcu/bk7231s/bk7231s.ld
 endif
 
+
+endif
+
 $(NAME)_INCLUDES += aos
+
+
+ifeq ($(AOS_2NDBOOT_SUPPORT), yes)
+$(NAME)_INCLUDES += boot/include
+$(NAME)_SOURCES +=  boot/boot.c \
+                    boot/boot_handlers.S \
+                    boot/boot_vectors.S \
+                    boot/ll.S \
+                    boot/uart.c \
+                    boot/flash.c \
+                    boot/wdt.c \
+                    boot/sys.c
+else
 
 $(NAME)_SOURCES += aos/aos_main.c
 $(NAME)_SOURCES += aos/soc_impl.c
@@ -79,12 +106,18 @@ $(NAME)_SOURCES += hal/pwrmgmt_hal/board_cpu_pwr.c \
 
 #Beken ip
 $(NAME)_PREBUILT_LIBRARY += beken/ip/ip.a
-#$(NAME)_COMPONENTS += ip
+#$(NAME)_COMPONENTS += mcu_bk7231s_beken_ip
 
 #Beken entry
-$(NAME)_COMPONENTS += entry
+$(NAME)_COMPONENTS += mcu_bk7231s_beken_entry
 
 include ./platform/mcu/bk7231s/beken/beken.mk
 
+endif
+
+
 EXTRA_TARGET_MAKEFILES += $($(HOST_MCU_FAMILY)_LOCATION)/gen_image_bin.mk
 
+ifeq ($(AOS_2NDBOOT_SUPPORT), yes)
+EXTRA_TARGET_MAKEFILES += $($(HOST_MCU_FAMILY)_LOCATION)/gen_boot_bin.mk
+endif

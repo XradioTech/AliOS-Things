@@ -5,9 +5,9 @@
  /**
   *                      caution
   * linuxhost hw.c won't use any lwip functionalities,
-  * disable WITH_LWIP to avoid close() -> lwip_close()
+  * disable CONFIG_AOS_LWIP to avoid close() -> lwip_close()
   */
-#undef WITH_LWIP
+#undef CONFIG_AOS_LWIP
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -113,7 +113,7 @@ int32_t hal_flash_write(hal_partition_t pno, uint32_t* poff, const void* buf, ui
 
 int32_t hal_flash_read(hal_partition_t pno, uint32_t* poff, void* buf, uint32_t buf_size)
 {
-	int ret = -1;	
+	int ret = -1;
 
 	if (poff != NULL)
 	{
@@ -122,7 +122,7 @@ int32_t hal_flash_read(hal_partition_t pno, uint32_t* poff, void* buf, uint32_t 
 		if (flash_fd != NULL)
 		{
 			if (fseek(flash_fd, *poff, 0) == 0)
-			{			
+			{
 				ret = fread(buf, sizeof(char), buf_size, flash_fd);
 				if (ret < 0)
 					perror("error reading flash:");
@@ -143,8 +143,8 @@ int32_t hal_flash_erase(hal_partition_t in_partition, uint32_t off_set,
 	if (NULL != flash_fd)
 	{
 		char *buf = (char *)malloc(size);
-		if (buf != NULL) 
-		{	
+		if (buf != NULL)
+		{
 			if (fseek(flash_fd, off_set, 0) == 0)
 			{
 				memset(buf, -1, size);
@@ -153,11 +153,11 @@ int32_t hal_flash_erase(hal_partition_t in_partition, uint32_t off_set,
 					perror("error erase flash:");
 			}
 			free(buf);
-		}	
+		}
 
 		fclose(flash_fd);
 	}
-	
+
 	return ret < 0 ? ret : 0;
 }
 
@@ -238,9 +238,7 @@ int csp_printf(const char *fmt, ...)
 
 #endif
 
-#if defined(DEV_SAL_MK3060)
-extern hal_wifi_module_t aos_wifi_module_mk3060;
-#else
+#if  !defined(AOS_COMP_SAL) && !defined(AOS_COMP_MAL)
 extern hal_wifi_module_t sim_aos_wifi_linux;
 #endif
 uart_dev_t uart_0;
@@ -263,14 +261,8 @@ void hw_start_hal(options_t *poptions)
 #endif
 
 #ifdef AOS_HAL
-#if defined(DEV_SAL_MK3060)
-	hal_wifi_register_module(&aos_wifi_module_mk3060);
-#else
+#if !defined(AOS_COMP_SAL) && !defined(AOS_COMP_MAL) 
 	hal_wifi_register_module(&sim_aos_wifi_linux);
 #endif
-#endif
-
-#ifdef LINUX_MESH_80211
-	linux_wifi_register();
 #endif
 }

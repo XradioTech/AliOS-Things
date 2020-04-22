@@ -1,7 +1,14 @@
+if AOS_CREATE_PROJECT
 config AOS_MCU_ESP32
     bool
-    select AOS_COMP_LWIP
-    select AOS_COMP_BT_HOST if BLE_CONFIG != n
+    default y
+endif
+
+if !AOS_CREATE_PROJECT
+config AOS_MCU_ESP32
+    bool
+    select AOS_COMP_BT_HOST if EN_BLE_HOST
+    select AOS_COMP_BT_HOST if (EN_BLE_HOST && !bt_mesh_standalone_deploy)
     select AOS_COMP_MBEDTLS
     select AOS_COMP_NETMGR
     select AOS_ARCH_XTENSA_LX6 if OSAL_CONFIG = rhino
@@ -9,6 +16,7 @@ config AOS_MCU_ESP32
     select AOS_COMP_UMESH if  MESH_CONFIG != n
     help
       driver & sdk for platform/mcu esp32
+endif
 
 if AOS_MCU_ESP32
 # Configurations for mcu esp32
@@ -21,10 +29,6 @@ config OSAL_CONFIG
 
 config MESH_CONFIG
     bool "mesh config"
-    default n
-
-config BLE_CONFIG
-    bool "ble config"
     default n
 
 endif

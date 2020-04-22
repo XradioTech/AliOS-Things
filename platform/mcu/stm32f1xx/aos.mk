@@ -3,10 +3,10 @@ NAME := mcu_stm32f1xx
 HOST_OPENOCD := stm32f1xx
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.1
+$(NAME)_VERSION    := 1.0.2
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu stm32f1xx
 
-$(NAME)_COMPONENTS += arch_armv7m rhino newlib_stub
+$(NAME)_COMPONENTS += arch_armv7m rhino newlib_stub osal_aos
 
 GLOBAL_DEFINES += USE_HAL_DRIVER
 
@@ -76,12 +76,18 @@ $(NAME)_SOURCES += drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c \
                    drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c \
                    drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_utils.c
 
-$(NAME)_SOURCES += hal/hal_uart_stm32f1.c \
-                   hal/hw.c \
+$(NAME)_SOURCES += hal/hal_uart_stm32f1.c  \
+                   hal/hw.c                \
+                   hal/hal_gpio_stm32f1.c  \
+                   hal/hal_i2c_stm32f1.c   \
+                   hal/hal_spi_stm32f1.c   \
+                   hal/hal_dac_stm32f1.c   \
+                   hal/hal_adc_stm32f1.c   \
+                   hal/hal_timer_stm32f1.c \
+                   hal/hal_pwm_stm32f1.c   \
                    hal/hal_flash_stm32f1.c \
-                   hal/hal_i2c_stm32f1.c \
-                   hal/hal_spi_stm32f1.c \
-                   hal/hal_gpio_stm32f1.c
+                   hal/hal_wdg_stm32f1.c   \
+                   hal/hal_rtc_stm32f1.c
 
 ifeq ($(COMPILER),armcc)
 GLOBAL_CFLAGS   += --c99 --cpu=Cortex-M3 --apcs=/softfp -D__MICROLIB -g --split_sections

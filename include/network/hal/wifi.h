@@ -228,7 +228,25 @@ struct hal_wifi_module_s {
  *
  * @return  Instance pointer, or NULL if no instance registered.
  */
+
 hal_wifi_module_t *hal_wifi_get_default_module(void);
+
+/**
+ * Set module base information.
+ * @param[in]   m       the wifi instance, NULL if default.
+ * @param[in]   os      the os name string, eg "linux", "rtos".
+ * @param[in]   partner the name string of partner, eg: "tmall_genie".
+ * @param[in]   app_net the app protocol string, eg: "mqtt", "websocket", "http","http+mqtt".
+ * @param[in]   type    the device type string, eg: "solo","sub","gw"
+ * @param[in]   project the project name string, eg: "at_wifi", "tmall_genie", "gateway"
+ * @param[in]   cloud   the cloud name string, eg: "aliyun"
+ *
+ * @return      0 on success, otherwise failure for no module found.
+ */
+
+int hal_wifi_set_module_base(hal_wifi_module_t *m, char *os,
+                              char *partner,char* app_net, char* type,
+                              char *project, char* cloud);
 
 /**
  * Regster a wifi instance to the HAL framework.
@@ -268,7 +286,7 @@ int hal_wifi_get_mac_addr(hal_wifi_module_t *m, uint8_t *mac);
 int hal_wifi_set_mac_addr(hal_wifi_module_t *m, const uint8_t *mac);
 
 /**
- * Start the wifi instance.
+ * Start the wifi instance, connect the wifi.
  *
  * @param[in]  m          the wifi instance, NULL if default.
  * @param[in]  init_para  the config used to start the wifi.
@@ -352,7 +370,7 @@ int hal_wifi_power_off(hal_wifi_module_t *m);
 int hal_wifi_power_on(hal_wifi_module_t *m);
 
 /**
- * Suspend the wifi instance.
+ * Suspend the wifi instance, disconnect the wifi.
  *
  * @param[in]  m  the wifi instance, NULL if default.
  *
@@ -433,8 +451,11 @@ void hal_wifi_register_monitor_cb(hal_wifi_module_t *m, monitor_data_cb_t fn);
  *
  * @param[in]  m   the wifi instance, NULL if default.
  * @param[in]  fn  the callback function.
+ * @note if param fn is not NULL, means start monitor,
+ *       if param fn is NULL, means stop monitor.
  */
 void hal_wlan_register_mgnt_monitor_cb(hal_wifi_module_t *m, monitor_data_cb_t fn);
+
 
 /**
  * Send 802.11 raw frame
@@ -480,7 +501,7 @@ void hal_umesh_register_wifi(hal_wifi_module_t *m);
 #if (WIFI_CONFIG_SUPPORT_LOWPOWER > 0)
 /**
  * Set the event listen interval for the wifi.
- * 
+ *
  * @param[in]  m   the wifi instance, NULL for default.
  * @param[uint8_t]  listen_interval   the listen interval in power save mode.
  */
@@ -488,7 +509,7 @@ int hal_wifi_set_listeninterval(hal_wifi_module_t *m, uint8_t listen_interval);
 
 /**
  * enter power save mode.
- * 
+ *
  * @param[in]  m   the wifi instance, NULL for default.
  * @param[uint8_t] recvDTIMs set 1 to receive DTIM, set 0 not to receive DTIM .
  */
@@ -496,7 +517,7 @@ int hal_wifi_enter_powersave(hal_wifi_module_t *m, uint8_t recvDTIMs);
 
 /**
  * exit power save mode.
- * 
+ *
  * @param[in]  m   the wifi instance, NULL for default.
  */
 int hal_wifi_exit_powersave(hal_wifi_module_t *m);

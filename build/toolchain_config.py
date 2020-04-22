@@ -1,6 +1,9 @@
 # Download toolchain automatically
 auto_download = "yes"
 
+# Search board from specific directories
+board_dirs = ["platform/board/board_legacy"]
+
 # Available toolchains
 toolchains = {
     'arm-none-eabi':{

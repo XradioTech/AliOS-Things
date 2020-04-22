@@ -6,11 +6,11 @@ HOST_OPENOCD := imx6
 HOST_ARCH := Cortex-A9
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.1
+$(NAME)_VERSION    := 1.0.2
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu imx6
 
 $(NAME)_COMPONENTS += arch_armv7a
-$(NAME)_COMPONENTS += newlib_stub rhino
+$(NAME)_COMPONENTS += newlib_stub rhino osal_aos
 
 GLOBAL_INCLUDES += ./aos                                      \
                    ./imx6_platform_sdk/sdk                    \
@@ -86,4 +86,8 @@ GLOBAL_LDS_FILES += platform/mcu/imx6/imx6_platform_sdk/apps/common/basic_alios_
 
 GLOBAL_DEFINES += CONFIG_ARM
 
-include $($(NAME)_LOCATION)/$(HOST_MCU_NAME).mk
+ifeq ($(AOS_CONFIG_SMP),y)
+include $($(NAME)_LOCATION)/imx6dq.mk
+else
+include $($(NAME)_LOCATION)/imx6sl.mk
+endif

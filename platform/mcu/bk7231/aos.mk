@@ -3,13 +3,12 @@ NAME := mcu_bk7231
 HOST_OPENOCD := bk7231
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.1
+$(NAME)_VERSION    := 1.0.2
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu bk7231
 
 $(NAME)_COMPONENTS := arch_armv5
 $(NAME)_COMPONENTS += newlib_stub rhino yloop
-LWIP := 1
-$(NAME)_COMPONENTS += lwip umesh netmgr
+$(NAME)_COMPONENTS += netmgr
 $(NAME)_COMPONENTS += libprov
 
 GLOBAL_DEFINES += CONFIG_AOS_UOTA_BREAKPOINT
@@ -62,10 +61,6 @@ $(NAME)_SOURCES += hal/gpio.c        \
                    hal/beken_rhino.c
 
 include ./platform/mcu/bk7231/hal_init/hal_init.mk
-
-#ifneq (,$(filter umesh,$(COMPONENTS)))
-$(NAME)_SOURCES +=  hal/mesh_wifi_hal.c
-#endif
 
 $(NAME)_PREBUILT_LIBRARY := beken.a
 

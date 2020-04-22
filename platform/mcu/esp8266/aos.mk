@@ -3,13 +3,11 @@ HOST_OPENOCD := esp8266
 NAME := mcu_esp8266
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.1
+$(NAME)_VERSION    := 1.0.2
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu esp8266
 
-$(NAME)_COMPONENTS := yloop newlib_stub debug
+$(NAME)_COMPONENTS := yloop newlib_stub
 $(NAME)_COMPONENTS += lwip netmgr
-
-use_private_lwip := 1
 
 ESP_INC_PATH    := bsp/include
 GLOBAL_INCLUDES += $(ESP_INC_PATH)
@@ -19,7 +17,7 @@ GLOBAL_INCLUDES += $(ESP_INC_PATH)/lwip $(ESP_INC_PATH)/lwip/ipv4 $(ESP_INC_PATH
 # $(NAME)_INCLUDES := $(ESP_INC_PATH)/driver
 GLOBAL_INCLUDES  += $(ESP_INC_PATH)/driver
 
-GLOBAL_INCLUDES  += common
+GLOBAL_INCLUDES  += hal/include
 
 GLOBAL_CFLAGS    += -DOTA_DUBANK
 
@@ -41,14 +39,6 @@ GLOBAL_LDFLAGS   += -nostdlib                      \
                     -u call_user_start             \
                     -Wl,-EL                        \
                     -mlongcalls
-
-ifeq ($(SUPPORT_ESP8285),yes)
-GLOBAL_LDS_FILES += platform/mcu/esp8266/bsp/ld/eagle.app.v6.new_8285.1024.app1.ld
-else
-GLOBAL_LDS_FILES += platform/mcu/esp8266/bsp/ld/eagle.app.v6.new.1024.app1.ld
-endif
-
-GLOBAL_LDFLAGS   += -Lplatform/mcu/esp8266/bsp/ld
 
 GLOBAL_DEFINES += CONFIG_ESP_LWIP COAP_WITH_YLOOP
 GLOBAL_DEFINES += MBEDTLS_AES_ROM_TABLES
@@ -112,8 +102,8 @@ $(NAME)_PREBUILT_LIBRARY += lib/libespos.a
 $(NAME)_PREBUILT_LIBRARY += lib/libfreertos.a
 else
 $(NAME)_COMPONENTS       += rhino arch_xtensa_lx106
-$(NAME)_SOURCES          += aos/hook_impl.c
-$(NAME)_SOURCES          += aos/soc_impl.c
+#$(NAME)_SOURCES          += aos/hook_impl.c
+#$(NAME)_SOURCES          += aos/soc_impl.c
 endif
 
 include platform/mcu/esp8266/espos/espos.mk

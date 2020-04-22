@@ -3,18 +3,10 @@ NAME := mcu_asr5501
 HOST_OPENOCD := asr5501
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.0
+$(NAME)_VERSION    := 1.0.1
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu asr5501
 
-LWIP := 1
-
-ifeq ($(LWIP),1)
-$(NAME)_COMPONENTS += lwip
-no_with_lwip       := 0
-GLOBAL_DEFINES     += WITH_LWIP
-endif
-
-$(NAME)_COMPONENTS += arch_armv7m
+$(NAME)_COMPONENTS += arch_armv7m newlib_stub rhino
 
 $(NAME)_CFLAGS += -DLEGA_CM4 -DALIOS_SUPPORT -DWIFI_DEVICE -D_SPI_FLASH_ENABLE_ -DPS_CLOSE_APLL -DDCDC_PFMMODE_CLOSE -D_SPI_FLASH_120MHz_ -DCFG_MIMO_UF
 $(NAME)_CFLAGS += -DCFG_BATX=1 -DCFG_BARX=1  -DCFG_REORD_BUF=4  -DCFG_SPC=4  -DCFG_TXDESC0=4 -DCFG_TXDESC1=4 -DCFG_TXDESC2=4 -DCFG_TXDESC3=4 -DCFG_TXDESC4=4 -DCFG_CMON -DCFG_MDM_VER_V21 -DCFG_SOFTAP_SUPPORT -DCFG_SNIFFER_SUPPORT -DCFG_DBG=2 -D__FPU_PRESENT=1 -DDX_CC_TEE -DHASH_SHA_512_SUPPORTED -DCC_HW_VERSION=0xF0 -DDLLI_MAX_BUFF_SIZE=0x10000 -DSSI_CONFIG_TRNG_MODE=0
@@ -65,6 +57,12 @@ $(NAME)_SOURCES += hal/src/hw.c \
             hal/src/uart.c \
             hal/src/flash.c \
             hal/src/wdg.c   \
+            hal/src/spi.c   \
+            hal/src/adc.c   \
+            hal/src/i2c.c   \
+            hal/src/pwm.c   \
+            hal/src/rtc.c   \
+            hal/src/timer.c   \
             hal/src/wifi_port.c \
             hal/src/pwrmgmt_hal/board_cpu_pwr.c \
             hal/src/pwrmgmt_hal/board_cpu_pwr_rtc.c \

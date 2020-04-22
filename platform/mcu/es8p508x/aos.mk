@@ -2,12 +2,12 @@ NAME := mcu_es8p508x
 HOST_OPENOCD := es8p508x
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.0
+$(NAME)_VERSION    := 1.0.1
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu es8p508x
 
-$(NAME)_COMPONENTS += arch_armv6m rhino
+$(NAME)_COMPONENTS += arch_armv6m rhino osal_aos
 
-GLOBAL_DEFINES += __PRINTF_USE_UART2__ CONFIG_NO_TCPIP
+GLOBAL_DEFINES += __PRINTF_USE_UART2__
 
 GLOBAL_INCLUDES += drivers/        \
                    drivers/library/Include \

@@ -2,11 +2,11 @@ HOST_OPENOCD := LPC54018
 NAME := mcu_lpc54018impl
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.1
+$(NAME)_VERSION    := 1.0.2
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu lpc54018impl
 
 $(NAME)_COMPONENTS += arch_armv7m
-$(NAME)_COMPONENTS += rhino newlib_stub
+$(NAME)_COMPONENTS += rhino newlib_stub osal_aos
 
 GLOBAL_CFLAGS  += -DA_LITTLE_ENDIAN
 GLOBAL_CFLAGS  += -DCPU_LPC54018JET180

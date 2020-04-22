@@ -1,6 +1,0 @@
-config AOS_APP_UAI_KWS_DEMO
-    bool "uAI KWS DEMO"
-    select AOS_COMP_UAI
-    help
-        uAI KWS DEMO
-

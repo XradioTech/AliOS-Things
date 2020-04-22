@@ -7,11 +7,11 @@ HOST_ARCH := Cortex-M4
 HOST_OPENOCD := stm32f4x
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.1
+$(NAME)_VERSION    := 1.0.2
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu stm32f4xx
 
 $(NAME)_COMPONENTS += arch_armv7m
-$(NAME)_COMPONENTS += newlib_stub rhino netmgr
+$(NAME)_COMPONENTS += newlib_stub rhino netmgr osal_aos
 
 # Global defines
 GLOBAL_DEFINES  := USE_STDPERIPH_DRIVER \
@@ -102,7 +102,6 @@ $(NAME)_SOURCES += mico/mico_rhino.c
 
 GLOBAL_LDFLAGS += -L ./platform/mcu/stm32f4xx/$(TOOLCHAIN_NAME)
 
-$(NAME)_COMPONENTS += lwip
 # Components
 #$(NAME)_COMPONENTS += $(TOOLCHAIN_NAME)
 include ./platform/mcu/stm32f4xx/spi_flash/spi_flash.mk

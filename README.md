@@ -33,29 +33,25 @@ All modules have been organized as Components, Configuring via menuconfig, which
 
 ## Documentation
 
-- AliOS Things wiki: [Github Wiki](https://github.com/alibaba/AliOS-Things/wiki)
-- AliOS Things documentation: [Alibaba Cloud IoT Documentation](https://dev.iot.aliyun.com/doc) | AliOS Things
+### Quick Start
 
-### How to contribute
+Please refer to [Quick Start](https://help.aliyun.com/document_detail/161037.html)
+
+### Docs
+
+AliOS Things Docs: [Documentation](https://help.aliyun.com/document_detail/161023.html)
+
+### Contributing
 
 Please refer to [Contributing Guideline](https://github.com/alibaba/AliOS-Things/wiki/contributing).
 
-### Quick Start by Command Line using Ubuntu Machine
+### Connecting to IoT Platform
 
-Please refer to [Quick Start](https://github.com/alibaba/AliOS-Things/wiki/Quick-Start).
-
-### Quick Start by AliOS Studio
-
-AliOS Things uses [vscode](https://code.visualstudio.com/) as IDE, supporting Windows/MAC/Linux.
-Please refer to [AliOS Studio](https://github.com/alibaba/AliOS-Things/wiki/AliOS-Things-Studio).
-
-### IoT Platform
-
-AliOS Things can help you connect your devices to [Alibaba Cloud IoT platform](https://iot.console.aliyun.com/quick_start) more quickly.
+AliOS Things can help you connect your devices to [Alibaba Cloud IoT platform](https://iot.console.aliyun.com/quick_start) quickly.
 
 ## Community
 
-* [DingTalk Group](https://img.alicdn.com/tfs/TB1X2HOhYPpK1RjSZFFXXa5PpXa-970-1280.png)
+* [DingTalk Group](https://img.alicdn.com/tfs/TB1KgBhjXY7gK0jSZKzXXaikpXa-1170-818.png)
 * [Alibaba Cloud IoT Community](https://developer.aliyun.com/group/aliiot)
 
 ## License

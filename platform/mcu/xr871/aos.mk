@@ -2,7 +2,7 @@ NAME := mcu_xr871
 HOST_OPENOCD := xr871
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.1
+$(NAME)_VERSION    := 1.0.2
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu xr871
 
 include $(SOURCE_ROOT)/platform/mcu/xr871/config.mk
@@ -33,14 +33,12 @@ $(NAME)_SOURCES += hal/soc/adc.c \
                    hal/wifi_port.c \
                    hal/wifi.c \
                    hal/hal.c \
-                   hal/ota_port.c
 
 include $(SOURCE_ROOT)/platform/mcu/xr871/sdk_files.mk
 
 $(NAME)_SOURCES += $(XR871_CHIP_FILES) \
                    $(XR871_IMAGE_FILES) \
                    $(XR871_WLAN_FILES) \
-                   $(XR871_OTA_FILES) \
                    $(XR871_PM_FILES) \
                    $(XR871_EFPG_FILES) \
                    $(XR871_SYS_FILES) \
@@ -49,6 +47,9 @@ $(NAME)_SOURCES += $(XR871_CHIP_FILES) \
                    $(XR871_PROJECT_FILES) \
                    $(XR871_AUDIO_FILES)
 
+ifeq ($(AOS_COMP_OTA),1)
+$(NAME)_SOURCES += $(XR871_OTA_FILES)
+endif
 
 $(NAME)_PREBUILT_LIBRARY := \
                             drivers/lib/libamr.a \

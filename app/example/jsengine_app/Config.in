@@ -1,9 +1,0 @@
-config AOS_APP_JSENGINE_APP
-    bool "JSEngine Firmware"
-    select AOS_COMP_JSENGINE
-    help
-        build for JSEngine firmware
-
-if AOS_APP_JSENGINE_APP
-# Configurations for app jsengine_app
-endif

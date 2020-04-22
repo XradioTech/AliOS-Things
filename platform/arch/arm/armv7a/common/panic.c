@@ -2,10 +2,22 @@
  * Copyright (C) 2015-2017 Alibaba Group Holding Limited
  */
 
-#include "debug_api.h"
-#include "k_arch.h"
+#ifdef AOS_COMP_DEBUG
 
-#if (DEBUG_CONFIG_BACKTRACE > 0)
+#include "k_arch.h"
+#include "debug_api.h"
+
+/* part of ktask_t */
+typedef struct
+{
+    void *task_stack;
+}ktask_t_shadow;
+
+extern void krhino_task_deathbed(void);
+extern ktask_t_shadow *debug_task_find(char *name);
+extern int debug_task_is_running(ktask_t_shadow *task);
+extern void *debug_task_stack_bottom(ktask_t_shadow *task);
+
 #define BACK_TRACE_LIMIT 64
 
 extern void _interrupt_return_address();
@@ -149,9 +161,6 @@ int backtrace_task(char *taskname, int (*print_func)(const char *fmt, ...))
     return lvl;
 }
 
-#endif
-
-#if (DEBUG_CONFIG_PANIC > 0)
 #define REG_NAME_WIDTH 7
 
 static fault_context_t *s_fcontext;
@@ -253,17 +262,13 @@ void exceptionHandler(void *context)
         context = NULL;
     }
 
-#if (DEBUG_CONFIG_PANIC > 0)
     panicHandler(context);
-#else
+
     printf("exception occur!\n");
     /* app can add exception handler here */
     while (1)
         ;
-#endif
 }
-
-#if (DEBUG_CONFIG_BACKTRACE > 0)
 
 #define PANIC_STACK_LIMIT    0x100000
 
@@ -317,9 +322,8 @@ int backtrace_callee(char *PC, int *SP, char *LR,
     /* with frame pointer, this function is not needed */
     return 0;
 }
-#endif
 
-#else   /*#if (DEBUG_CONFIG_PANIC > 0)*/
+#else   /* #ifdef AOS_COMP_DEBUG */
 void exceptionHandler(void *context)
 {
     while(1);

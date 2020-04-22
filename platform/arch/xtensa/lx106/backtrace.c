@@ -1,3 +1,5 @@
+#ifdef AOS_COMP_DEBUG
+
 #include <stdio.h>
 #include "k_api.h"
 #include "debug_api.h"
@@ -258,7 +260,7 @@ int backtrace_task(char *taskname, int (*print_func)(const char *fmt, ...))
         print_func = ets_printf;
     }
 
-    task = debug_task_find(taskname);
+    task = krhino_task_find(taskname);
     if (task == NULL) {
         print_func("Task not found : %s\n", taskname);
         return 0;
@@ -286,4 +288,5 @@ int backtrace_callee(char *PC, int *SP, char *LR,
     backtraceContext(PC, LR, SP, print_func);
     return 1;
 }
+#endif
 

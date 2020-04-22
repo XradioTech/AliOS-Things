@@ -3,10 +3,10 @@ NAME := mcu_stm32f0xx
 HOST_OPENOCD := stm32f0xx
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.1
+$(NAME)_VERSION    := 1.0.2
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu stm32f0xx
 
-$(NAME)_COMPONENTS += arch_armv6m rhino newlib_stub
+$(NAME)_COMPONENTS += arch_armv6m rhino newlib_stub osal_aos
 
 GLOBAL_DEFINES += USE_HAL_DRIVER
 

@@ -2,65 +2,57 @@
  * Copyright (C) 2015-2017 Alibaba Group Holding Limited
  */
 
+#include "stm32f4xx_hal.h"
+
+#ifdef HAL_TIM_MODULE_ENABLED
+
 #include <k_api.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "board.h"
 #include "aos/hal/timer.h"
-#include "stm32f4xx_hal.h"
-#ifdef HAL_TIM_MODULE_ENABLED
 #include "hal_timer_stm32f4.h"
 #include "stm32f4xx_hal_adc.h"
 
-#define us2tick(us) \
-    ((us * RHINO_CONFIG_TICKS_PER_SECOND + 999999) / 1000000)
-
 /* Init and deInit function for adc1 */
-static int32_t timer3_init(timer_dev_t *tim);
-static int32_t timer0_init(timer_dev_t *tim);
-/* function used to transform hal para to stm32l4 para */
-/* int32_t timer_reload_mode_transform(uint8_t reload_mode_hal, uint8_t *reload_mode_stm32l4); */
-
-/* handle for adc */
-TIM_HandleTypeDef timer3_handle;
-uint32_t uwPrescalerValue = 0;
-hal_timer_cb_t pFun_timer3 = NULL;
-void * arg_timer3 = NULL;
+static int32_t timer_normal_init(timer_dev_t *tim);
 
 typedef struct {
-    uint8_t                inited;
-    TIM_HandleTypeDef      hal_timer_handle;
-}stm32_timer_t;
+    TIM_HandleTypeDef  htim;
+    uint8_t            inited;
+    hal_timer_cb_t     timer_handler;
+    void              *timer_arg;
+} stm32_timer_t;
 
 /* will be initialized in hal_can_init */
-static stm32_timer_t stm32_timer[PORT_TIMER_SIZE];
+static stm32_timer_t stm32_timer[PORT_TIMER_SIZE] = {0};
 
-/* Get TIMER Instanse & attribute from Logical Port */
-TIMER_MAPPING* get_timer_list_logical(const PORT_TIMER_TYPE port)
+static TIMER_MAPPING *get_mapping_entry_by_port(uint8_t port)
 {
-    int8_t i = 0;
-    TIMER_MAPPING* rc = NULL;
-    for(i=0; i<PORT_TIMER_SIZE; i++)
-    {
-        if(TIMER_MAPPING_TABLE[i].logical_func == port)
-        {
-            rc = &TIMER_MAPPING_TABLE[i];
-            break;
+    int i;
+
+    for (i = 0; i < PORT_TIMER_SIZE; i++) {
+        if (port == TIMER_MAPPING_TABLE[i].port) {
+            return &TIMER_MAPPING_TABLE[i];
         }
     }
-    return rc;
+
+    return NULL;
 }
 
-#ifdef TIM3
-void TIM3_IRQHandler(void)
+static TIMER_MAPPING *get_mapping_entry_by_logic_port(uint32_t hal_port)
 {
-    krhino_intrpt_enter();
-    if(stm32_timer[0].inited){
-        HAL_TIM_IRQHandler(&stm32_timer[0].hal_timer_handle);
+    int i;
+
+    for (i = 0; i < PORT_TIMER_SIZE; i++) {
+        if (hal_port == TIMER_MAPPING_TABLE[i].hal_timer) {
+            return &TIMER_MAPPING_TABLE[i];
+        }
     }
-    krhino_intrpt_exit();
+
+    return NULL;
 }
-#endif
 
 static void _timer_cb(void *timer, void *arg)
 {
@@ -76,125 +68,152 @@ int32_t hal_timer_init(timer_dev_t *tim)
        return -1;
     }
 
+
     if (stm32_timer[tim->port].inited == 1){
         return 0;
     }
 
-    TIMER_MAPPING* timerIns = get_timer_list_logical(tim->port);
+    TIMER_MAPPING* timerIns = get_mapping_entry_by_port(tim->port);
     if (timerIns != NULL)
     {
         memset(&stm32_timer[tim->port],0,sizeof(stm32_timer_t));
-        TIM_HandleTypeDef * const psttimhandle = &stm32_timer[tim->port].hal_timer_handle;
-        psttimhandle->Instance = timerIns->physical_port;
+        TIM_HandleTypeDef * const psttimhandle = &stm32_timer[tim->port].htim;
+        psttimhandle->Instance = (TIM_TypeDef*)timerIns->hal_timer;
         tim->priv = psttimhandle;
-        if (timerIns->physical_port == PORT_TIMER0) {
-            ret = timer0_init(tim);
-        }else if (timerIns->physical_port == TIM3){
-            ret = timer3_init(tim);
-        }
+        ret = timer_normal_init(tim);
     }
 
     return ret;
-
 }
 
-static int32_t timer0_init(timer_dev_t *tim)
+/**
+ * @note: APB1 CLK: TIM2, TIM3, TIM4, TIM5, TIM6, TIM7, TIM12, TIM13, TIM14
+ *        APB2 CLK: TIM1, TIM8, TIM9, TIM10, TIM11
+ */
+static int32_t timer_normal_init(timer_dev_t *tim)
 {
-    if (tim->config.reload_mode == TIMER_RELOAD_AUTO) {
-        krhino_timer_dyn_create((ktimer_t **)&tim->priv, "hwtmr", _timer_cb,
-                                us2tick(tim->config.period), us2tick(tim->config.period), tim, 0);
-    }
-    else {
-        krhino_timer_dyn_create((ktimer_t **)&tim->priv, "hwtmr", _timer_cb,
-                                us2tick(tim->config.period), 0, tim, 0);
-    }
 
-    stm32_timer[tim->port].inited = 1;
-}
+    RCC_ClkInitTypeDef  clkconfig;
+    uint32_t            uwTimclock;
+    uint32_t            Prescaler;
+    uint32_t            pFLatency;
+    uint32_t            hal_timer;
+    TIMER_MAPPING      *timerIns;
+    uint32_t            uwPrescalerValue = 0;
+    uint64_t            udwcycle;
 
-static int32_t timer3_init(timer_dev_t *tim)
-{
     int32_t ret = -1;
 
-    TIM_HandleTypeDef * const psttimhandle = &stm32_timer[tim->port].hal_timer_handle;
-    pFun_timer3 = tim->config.cb;
-    arg_timer3 = tim->config.arg;
+    TIM_HandleTypeDef * const psttimhandle = &stm32_timer[tim->port].htim;
+    stm32_timer[tim->port].timer_handler = tim->config.cb;
+    stm32_timer[tim->port].timer_arg = tim->config.arg;
+
+    /* Get clock configuration */
+    HAL_RCC_GetClockConfig(&clkconfig, &pFLatency);
+
+    timerIns = get_mapping_entry_by_port(tim->port);
+
+    switch (timerIns->hal_timer) {
+        case HAL_TIMER_1:
+#ifdef HAL_TIMER_8
+        case HAL_TIMER_8:
+#endif
+#ifdef HAL_TIMER_9
+        case HAL_TIMER_9:
+#endif
+#ifdef HAL_TIMER_10
+        case HAL_TIMER_10:
+#endif
+#ifdef HAL_TIMER_11
+        case HAL_TIMER_11:
+#endif
+            Prescaler = clkconfig.APB2CLKDivider;
+            uwTimclock = HAL_RCC_GetPCLK2Freq();
+            break;
+        case HAL_TIMER_2:
+        case HAL_TIMER_3:
+        case HAL_TIMER_4:
+#ifdef HAL_TIMER_5
+        case HAL_TIMER_5:
+#endif
+#ifdef HAL_TIMER_6
+        case HAL_TIMER_6:
+#endif
+#ifdef HAL_TIMER_7
+        case HAL_TIMER_7:
+#endif
+#ifdef HAL_TIMER_12
+        case HAL_TIMER_12:
+#endif
+#ifdef HAL_TIMER_13
+        case HAL_TIMER_13:
+#endif
+#ifdef HAL_TIMER_14
+        case HAL_TIMER_14:
+#endif
+            Prescaler = clkconfig.APB1CLKDivider;
+            uwTimclock = HAL_RCC_GetPCLK1Freq();
+            break;
+        default:
+            return -1;
+    }
+
+    /* TIM clock frequence: if APBx prescaler is 1, then TIMx clock frequence
+     * is PCKL1 or PCLK2, else is PCKL1 * 2 or PCLK2 * 2
+     */
+    if (Prescaler != RCC_HCLK_DIV1) {
+        uwTimclock *= 2;
+    }
 
     /* Compute the prescaler value to have TIMx counter clock equal to 10000 Hz */
-    uwPrescalerValue = (uint32_t)(SystemCoreClock / 200000) - 1;
-    psttimhandle->Init.Period            = tim->config.period - 1;
+    uwPrescalerValue = (uint32_t)(uwTimclock / 64000) - 1;
+    udwcycle = (uint64_t)tim->config.period;
+    psttimhandle->Init.Period            = ((udwcycle * 64000UL ) / 1000000) - 1;
     psttimhandle->Init.Prescaler         = uwPrescalerValue;
     psttimhandle->Init.ClockDivision     = 0;
     psttimhandle->Init.CounterMode       = TIM_COUNTERMODE_UP;
     psttimhandle->Init.RepetitionCounter = 0;
-/*
-ret = timer_reload_mode_transform(tim->config.reload_mode,
-                            (uint8_t *)&timer3_handle.Init.AutoReloadPreload);
-*/
-    ret = HAL_TIM_Base_Init(psttimhandle);
 
-    if (ret == 0 && (tim->config.reload_mode == TIMER_RELOAD_MANU)) {
+    if (tim->config.reload_mode == TIMER_RELOAD_MANU) {
         ret = HAL_TIM_OnePulse_Init(psttimhandle, TIM_OPMODE_SINGLE);
+    } else {
+        ret = HAL_TIM_Base_Init(psttimhandle);
     }
+
     stm32_timer[tim->port].inited = 1;
 
     return ret;
 }
 
-static int32_t timer0_start(timer_dev_t *tim)
-{
-    return krhino_timer_start(tim->priv);
-}
-
-static int32_t timer3_start(timer_dev_t *tim)
-{
-    return HAL_TIM_Base_Start_IT((TIM_HandleTypeDef *)tim->priv);
-}
-
 int32_t hal_timer_start(timer_dev_t *tim)
 {
+    TIMER_MAPPING* timerIns;
+
     int32_t ret = -1;
 
-    if(tim!=NULL && tim->port<PORT_TIMER_SIZE){
+    if(tim != NULL && tim->port < PORT_TIMER_SIZE) {
         if(!stm32_timer[tim->port].inited){
             ret = -1;
-        }else{
-            TIMER_MAPPING* timerIns = get_timer_list_logical(tim->port);
+        } else {
+            timerIns = get_mapping_entry_by_port(tim->port);
             if (timerIns != NULL)
             {
-                if (timerIns->physical_port == PORT_TIMER0) {
-                    ret = timer0_start(tim);
-                }else if (timerIns->physical_port == TIM3){
-                    ret = timer3_start(tim);
-                }
+                ret = HAL_TIM_Base_Start_IT(&stm32_timer[tim->port].htim);
             }
         }
     }
+
     return ret;
-}
-
-static void timer0_stop(timer_dev_t *tim)
-{
-    krhino_timer_stop(tim->priv);
-    krhino_timer_dyn_del(tim->priv);
-    tim->priv = NULL;
-}
-
-static void timer3_stop(timer_dev_t *tim)
-{
-    HAL_TIM_Base_Stop_IT((TIM_HandleTypeDef *)tim->priv);
 }
 
 void hal_timer_stop(timer_dev_t *tim)
 {
-    TIMER_MAPPING* timerIns = get_timer_list_logical(tim->port);
+    TIMER_MAPPING* timerIns;
+
+    timerIns = get_mapping_entry_by_port(tim->port);
     if (timerIns != NULL)
     {
-        if (timerIns->physical_port == PORT_TIMER0) {
-            timer0_stop(tim);
-        }else if (timerIns->physical_port == TIM3){
-            timer3_stop(tim);
-        }
+        HAL_TIM_Base_Stop_IT(&stm32_timer[tim->port].htim);
     }
 }
 
@@ -204,44 +223,140 @@ int32_t hal_timer_finalize(timer_dev_t *tim)
 
     if (tim != NULL)
     {
-        ret = HAL_TIM_Base_DeInit((TIM_HandleTypeDef *)tim->priv);
+        ret = HAL_TIM_Base_DeInit(&stm32_timer[tim->port].htim);
     }
 
     return ret;
 }
 
-/*
-int32_t timer_reload_mode_transform(uint8_t reload_mode_hal,
-        uint8_t *reload_mode_stm32l4)
+static void IRQ_Common(uint32_t hal_timer)
 {
-    uint32_t reload_mode = 0;
-    int32_t	ret = 0;
+    TIMER_MAPPING *entry;
+    uint8_t        port;
 
-    if(reload_mode_hal == TIMER_RELOAD_AUTO)
-    {
-        reload_mode = TIM_AUTORELOAD_PRELOAD_ENABLE;
-    }
-    else if(reload_mode_hal == TIMER_RELOAD_MANU)
-    {
-        reload_mode = TIM_AUTORELOAD_PRELOAD_DISABLE;
-    }
-    else
-    {
-        ret = -1;
+    krhino_intrpt_enter();
+
+    entry = get_mapping_entry_by_logic_port(hal_timer);
+    if (entry) {
+        port = entry->port;
+        if((PORT_TIMER_INVALID != port) && (stm32_timer[port].inited)){
+            HAL_TIM_IRQHandler(&stm32_timer[port].htim);
+        }
     }
 
-    if(ret == 0)
-    {
-        *reload_mode_stm32l4 = reload_mode;
-    }
-
-    return ret;
+    krhino_intrpt_exit();
 }
-*/
+
+/* TIM1 Break and TIM9          */
+void TIM1_BRK_TIM9_IRQHandler(void)
+{
+    if ((TIM9->SR &(TIM_FLAG_UPDATE)) == (TIM_FLAG_UPDATE)) {
+        IRQ_Common(HAL_TIMER_9);
+    } else {
+        IRQ_Common(HAL_TIMER_1);
+    }
+}
+
+/* TIM1 Update and TIM10        */
+void TIM1_UP_TIM10_IRQHandler(void)
+{
+    if ((TIM10->SR &(TIM_FLAG_UPDATE)) == (TIM_FLAG_UPDATE)) {
+        IRQ_Common(HAL_TIMER_10);
+    } else {
+        IRQ_Common(HAL_TIMER_1);
+    }
+}
+
+/* TIM1 Trigger and Commutation and TIM11 */
+void TIM1_TRG_COM_TIM11_IRQHandler(void)
+{
+    if ((TIM11->SR &(TIM_FLAG_UPDATE)) == (TIM_FLAG_UPDATE)) {
+        IRQ_Common(HAL_TIMER_11);
+    } else {
+        IRQ_Common(HAL_TIMER_1);
+    }
+}
+
+/* TIM1 Capture Compare         */
+void TIM1_CC_IRQHandler(void)
+{
+    IRQ_Common(HAL_TIMER_1);
+}
+
+void TIM2_IRQHandler(void)
+{
+    IRQ_Common(HAL_TIMER_2);
+}
+
+void TIM3_IRQHandler(void)
+{
+    IRQ_Common(HAL_TIMER_3);
+}
+
+void TIM4_IRQHandler(void)
+{
+    IRQ_Common(HAL_TIMER_4);
+}
+
+void TIM5_IRQHandler(void)
+{
+    IRQ_Common(HAL_TIMER_5);
+}
+
+void TIM6_DAC_IRQHandler(void)
+{
+    IRQ_Common(HAL_TIMER_6);
+}
+
+void TIM7_IRQHandler(void)
+{
+    IRQ_Common(HAL_TIMER_7);
+}
+
+/* TIM8 Break and TIM12         */
+void TIM8_BRK_TIM12_IRQHandler(void)
+{
+    if ((TIM12->SR &(TIM_FLAG_UPDATE)) == (TIM_FLAG_UPDATE)) {
+        IRQ_Common(HAL_TIMER_12);
+    } else {
+        IRQ_Common(HAL_TIMER_8);
+    }
+}
+
+/* TIM8 Update and TIM13        */
+void TIM8_UP_TIM13_IRQHandler(void)
+{
+    if ((TIM13->SR &(TIM_FLAG_UPDATE)) == (TIM_FLAG_UPDATE)) {
+        IRQ_Common(HAL_TIMER_13);
+    } else {
+        IRQ_Common(HAL_TIMER_8);
+    }
+}
+
+/* TIM8 Trigger and Commutation and TIM14 */
+void TIM8_TRG_COM_TIM14_IRQHandler(void)
+{
+    if ((TIM14->SR &(TIM_FLAG_UPDATE)) == (TIM_FLAG_UPDATE)) {
+        IRQ_Common(HAL_TIMER_14);
+    } else {
+        IRQ_Common(HAL_TIMER_8);
+    }
+}
+
+/* TIM8 Capture Compare */
+void TIM8_CC_IRQHandler(void)
+{
+    IRQ_Common(HAL_TIMER_8);
+}
+
+/* Update callback */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-    if (htim->Instance == TIM3) {
-        pFun_timer3(arg_timer3);
+    stm32_timer_t *timer = (stm32_timer_t *)htim;
+
+   if (timer && timer->timer_handler) {
+        timer->timer_handler(timer->timer_arg);
     }
 }
+
 #endif

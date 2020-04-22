@@ -262,7 +262,7 @@ bool ICACHE_FLASH_ATTR start_wifi_station(const char * ssid, const char * pass){
         return false;
     }
     wifi_set_phy_mode(PHY_MODE_11G);
-    
+
     if(!wifi_station_dhcpc_status()){
         printf("DHCP is not started. Starting it...\n");
         if(!wifi_station_dhcpc_start()){
@@ -304,6 +304,9 @@ bool ICACHE_FLASH_ATTR start_wifi_ap(const char * ssid, const char * pass){
     if(pass){
         sprintf(config.password, pass);
     }
+
+    config.max_connection = 4;
+
     return wifi_softap_set_config(&config);
 }
 
@@ -681,7 +684,7 @@ void ICACHE_FLASH_ATTR sniffer_wifi_promiscuous_rx(uint8_t *buf, uint16_t buf_le
                     data_cb(data, data_len, &info);
                 } else {
                     printf("[%s]%d, sniffer callback is NULL\n", __func__, __LINE__);
-                    break;                    
+                    break;
                 }
             }
         }
@@ -756,13 +759,17 @@ static int stop_ap(hal_wifi_module_t *m)
 static int get_wireless_info(hal_wifi_module_t *m, void *wireless_info)
 {
     hal_wireless_info_t *info = (hal_wireless_info_t *)wireless_info;
+    signed char rssi;
 
     LOGD("get wireless info\r\n");
 
     if (info == NULL)
         return -1;
 
-    info->rssi = wifi_station_get_rssi();
+    rssi = wifi_station_get_rssi();
+    if (rssi > 0)
+        rssi -= 128;
+    info->rssi = rssi;
 
     return 0;
 }

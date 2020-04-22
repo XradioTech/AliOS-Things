@@ -41,7 +41,7 @@ def main():
         INPUT_FILE = args[0]
 
     if not os.path.exists(INPUT_FILE):
-        print("Please input an existed input binary file")
+        print("Error: {} does not exist. Please specify a valid file".format(INPUT_FILE))
         sys.exit(2)
 
     for opt, arg in opts:
@@ -73,7 +73,7 @@ def main():
 
 #app = moc_app.read()
 # kernel = moc_kernel.read()
-    
+
 #  crc = CRC16( bytes(app[8::]) )
 
 #  moc_app_output.write( struct.pack('<L', os.path.getsize(MOC_APP_FILE)-8 ) )

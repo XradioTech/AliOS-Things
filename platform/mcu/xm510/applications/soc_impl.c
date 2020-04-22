@@ -6,7 +6,6 @@
 #include <k_api.h>
 #include <assert.h>
 #include "aos/hal/uart.h"
-#include <debug_api.h>
 
 #if (RHINO_CONFIG_HW_COUNT > 0)
 extern unsigned long long system_clock(void);
@@ -25,12 +24,6 @@ lr_timer_t soc_lr_hw_cnt_get(void)
     return (system_clock() / 1000000);
 }
 #endif /* RHINO_CONFIG_HW_COUNT */
-
-#if (RHINO_CONFIG_INTRPT_STACK_OVF_CHECK > 0)
-void soc_intrpt_stack_ovf_check(void)
-{
-}
-#endif
 
 extern void         *heap_start;
 extern void         *heap_len;

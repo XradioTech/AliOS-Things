@@ -5,7 +5,7 @@
 ## Directories
 
 ```sh
-lwip_test # test for lwip
+yts_run lwip # test for lwip
 ```
 
 ## Board Hardware Resources

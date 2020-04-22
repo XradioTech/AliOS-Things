@@ -2,9 +2,20 @@
  * Copyright (C) 2015-2017 Alibaba Group Holding Limited
  */
 
+#ifdef AOS_COMP_DEBUG
+
 #include "debug_api.h"
 
-#if (DEBUG_CONFIG_BACKTRACE > 0)
+/* part of ktask_t */
+typedef struct
+{
+    void *task_stack;
+}ktask_t_shadow;
+
+extern void krhino_task_deathbed(void);
+extern ktask_t_shadow *debug_task_find(char *name);
+extern int debug_task_is_running(ktask_t_shadow *task);
+extern void *debug_task_stack_bottom(ktask_t_shadow *task);
 
 #if defined(__CC_ARM)
 #ifdef __BIG_ENDIAN
@@ -318,13 +329,13 @@ int backtrace_task(char *taskname, int (*print_func)(const char *fmt, ...))
         print_func("Task not found : %s\n", taskname);
         return 0;
     }
-
+/*
     if (debug_task_is_ready(task)) {
         print_func("Status of task \"%s\" is 'Ready', Can not backtrace!\n",
                    taskname);
         return 0;
     }
-
+*/
     getPLSfromCtx(task->task_stack, &PC, &LR, &SP);
 
     print_func("TaskName  : %s\n", taskname);
@@ -339,9 +350,7 @@ int backtrace_task(char *taskname, int (*print_func)(const char *fmt, ...))
     return lvl;
 }
 
-#endif
 
-#if (DEBUG_CONFIG_PANIC > 0)
 #define REG_NAME_WIDTH 7
 
 typedef struct
@@ -461,7 +470,6 @@ void panicShowRegs(void *context, int (*print_func)(const char *fmt, ...))
     }
 }
 
-#if (DEBUG_CONFIG_BACKTRACE > 0)
 /* backtrace start with PC and SP, find LR from stack memory
    return levels os callstack */
 int backtrace_caller(char *PC, int *SP,
@@ -543,6 +551,5 @@ int backtrace_callee(char *PC, int *SP, char *LR,
 
     return lvl;
 }
-#endif
 
 #endif

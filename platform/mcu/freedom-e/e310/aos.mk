@@ -6,11 +6,11 @@ HOST_OPENOCD := e310
 HOST_ARCH := RISC-V
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.0
+$(NAME)_VERSION    := 1.0.1
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu e310
 
 $(NAME)_COMPONENTS += arch_risc_v32I
-$(NAME)_COMPONENTS += newlib_stub rhino
+$(NAME)_COMPONENTS += newlib_stub rhino osal_aos
 
 GLOBAL_INCLUDES += ../aos                                        \
                    ../freedom-e-sdk/bsp/env                      \

@@ -2,13 +2,13 @@ NAME := mcu_stm32l4xx_cube
 
 HOST_OPENOCD := stm32l4xx
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.1
+$(NAME)_VERSION    := 1.0.2
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu stm32l4xx_cube
 
 ifeq ($(AOS_2NDBOOT_SUPPORT), yes)
 $(NAME)_LIBSUFFIX := _2ndboot
 
-$(NAME)_COMPONENTS += ota_2ndboot
+$(NAME)_COMPONENTS += bootloader
 
 GLOBAL_INCLUDES := hal/2ndboot
 
@@ -34,21 +34,21 @@ GLOBAL_LDFLAGS += -mcpu=cortex-m4  \
 
 else
 
-ifeq ($(RHINO_CONFIG_USER_SPACE),y)
-$(NAME)_COMPONENTS += arch_armv7m-mk
-else
-$(NAME)_COMPONENTS += arch_armv7m
-endif
+$(NAME)_COMPONENTS-$(ENABLE_USPACE) += arch_armv7m-mk
+$(NAME)_COMPONENTS-$(!ENABLE_USPACE) += arch_armv7m
 
-$(NAME)_COMPONENTS += newlib_stub rhino
+$(NAME)_COMPONENTS += newlib_stub rhino osal_aos
 
 GLOBAL_DEFINES += USE_HAL_DRIVER
 
 GLOBAL_INCLUDES += Drivers/STM32L4xx_HAL_Driver/Inc        \
                    Drivers/STM32L4xx_HAL_Driver/Inc/Legacy \
-                   Drivers/CMSIS/Include                   \
                    Drivers/CMSIS/Device/ST/STM32L4xx/Include \
                    Rec/
+
+ifneq ($(CONFIG_UAI_USE_CMSIS_NN), y)
+GLOBAL_INCLUDES += Drivers/CMSIS/Include
+endif
 
 $(NAME)_SOURCES := Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal.c               \
                    Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_adc.c           \

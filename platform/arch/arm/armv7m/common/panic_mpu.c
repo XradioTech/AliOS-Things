@@ -2,18 +2,18 @@
  * Copyright (C) 2015-2017 Alibaba Group Holding Limited
  */
 
+#ifdef AOS_COMP_DEBUG
+
 #include <stdio.h>
 #include "panic_mpu.h"
 #include "k_compiler.h"
-#include "debug_api.h"
+#include "k_api.h"
 
 typedef struct {
     unsigned long start;
     unsigned long size;
     unsigned long mpusize;
 } mem_region_t;
-
-#if (DEBUG_CONFIG_PANIC > 0)
 
 static void mpu_enable(void);
 static void mpu_disable(void);
@@ -201,7 +201,7 @@ void debug_task_stack_ovf_check(char *task_name)
         return;
     }
 
-    task = debug_task_find(task_name);
+    task = krhino_task_find(task_name);
     if (task == NULL) {
         printf("error: task do not exist\r\n");
         return;

@@ -3,25 +3,11 @@ HOST_OPENOCD := dahua
 NAME := mcu_dahua
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.1
+$(NAME)_VERSION    := 1.0.2
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu dahua
-
-LWIP := 1
 
 $(NAME)_COMPONENTS += arch_cskyv2-l
 $(NAME)_COMPONENTS += rhino netmgr
-
-ifeq ($(LWIP),1)
-$(NAME)_COMPONENTS += lwip
-no_with_lwip       := 0
-GLOBAL_DEFINES     += WITH_LWIP
-endif
-
-AOS_NETWORK_SAL    ?= n
-ifeq (y,$(AOS_NETWORK_SAL))
-$(NAME)_COMPONENTS += sal netmgr
-module             ?= wifi.esp8266
-endif
 
 GLOBAL_DEFINES += CONFIG_AOS_UOTA_BREAKPOINT
 
@@ -59,12 +45,11 @@ $(NAME)_SOURCES += aos/aos.c                                    \
                    libs/posix/time/clock_gettime.c              \
                    hal_init/hal_init.c
 
-ifeq (y,$(AOS_NETWORK_SAL))
+ifneq (y,$(strip $(BSP_SUPPORT_EXTERNAL_MODULE)))
 $(NAME)_SOURCES += hal/wifi_port.c
-GLOBAL_INCLUDES += ../../../drivers/sal/wifi/esp8266
 endif
 
-ifeq ($(LWIP),1)
+ifeq (y,$(CONFIG_AOS_LWIP))
 $(NAME)_SOURCES += hal/eth_port.c
 endif
 
@@ -81,7 +66,7 @@ GLOBAL_INCLUDES += csi/csi/csi_core/include/core    \
                    csi/csi/csi_kernel/rhino/driver  \
                    hal
 
-GLOBAL_LDFLAGS  += -T board/dh5021a_evb/configs/gcc_eflash.ld
+GLOBAL_LDFLAGS  += -T platform/board/board_legacy/dh5021a_evb/configs/gcc_eflash.ld
 GLOBAL_INCLUDES += csi/csi/csi_driver/dahua/dh5021a/include
 
 $(NAME)_SOURCES += csi/csi/csi_driver/dahua/common/intc/dw_intc.c   \
@@ -101,7 +86,5 @@ $(NAME)_SOURCES += csi/csi/csi_driver/dahua/common/intc/dw_intc.c   \
                    csi/csi/csi_driver/dahua/dh5021a/ck_sys_freq.c   \
                    csi/csi/csi_driver/dahua/dh5021a/novic_irq_tbl.c
 
-#ifeq ($(LWIP),1)
 $(NAME)_SOURCES += csi/drivers/eth/csi_eth_enc28j60.c
-#endif
 

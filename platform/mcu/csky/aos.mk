@@ -3,25 +3,12 @@ HOST_OPENOCD := csky
 NAME := mcu_csky
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.1
+$(NAME)_VERSION    := 1.0.2
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu csky
-
-LWIP := 0
 
 $(NAME)_COMPONENTS += arch_cskyv2-l
 $(NAME)_COMPONENTS += rhino cli
-
-ifeq ($(LWIP),1)
-$(NAME)_COMPONENTS += lwip netmgr
-no_with_lwip       := 0
-GLOBAL_DEFINES     += WITH_LWIP
-endif
-
-AOS_NETWORK_SAL    ?= y
-ifeq (y,$(AOS_NETWORK_SAL))
-$(NAME)_COMPONENTS += sal netmgr
-module             ?= wifi.esp8266
-endif
+$(NAME)_COMPONENTS-$(MCU_CSKY_CONFIG_LWIP) += netmgr
 
 GLOBAL_DEFINES += CONFIG_AOS_UOTA_BREAKPOINT
 
@@ -57,13 +44,12 @@ $(NAME)_SOURCES += aos/aos.c                                \
                    hal/flash.c                              \
                    libs/posix/time/clock_gettime.c
 
-ifeq (y,$(AOS_NETWORK_SAL))
+ifneq (y,$(strip $(BSP_SUPPORT_EXTERNAL_MODULE)))
 $(NAME)_SOURCES += hal/wifi_port.c
-GLOBAL_INCLUDES += ../../../drivers/sal/wifi/esp8266
 $(NAME)_SOURCES += cli/uart_config.c
 endif
 
-ifeq ($(LWIP),1)
+ifeq (y, $(CONFIG_AOS_LWIP))
 $(NAME)_SOURCES += hal/eth_port.c
 endif
 
@@ -77,7 +63,7 @@ GLOBAL_INCLUDES += csi/csi_core/include        \
 
 ifeq ($(HOST_CHIP), zx297100)
 GLOBAL_DEFINES += CONFIG_HAVE_ICU
-GLOBAL_LDFLAGS += -T board/zx297100_evb/gcc_csky.ld
+GLOBAL_LDFLAGS += -T platform/board/board_legacy/zx297100_evb/gcc_csky.ld
 
 DRIVERDIR       := csi/csi_driver/sanechips/common
 CHIPDIR         := csi/csi_driver/sanechips/zx297100
@@ -108,7 +94,7 @@ $(NAME)_SOURCES += $(CHIPDIR)/novic_irq_tbl.c    \
                    $(DRIVERDIR)/zx29_pmu.c       \
                    $(DRIVERDIR)/zx29_bmu.c
 else
-GLOBAL_LDFLAGS += -T board/cb2201/gcc_csky.ld
+GLOBAL_LDFLAGS += -T platform/board/board_legacy/cb2201/gcc_csky.ld
 GLOBAL_INCLUDES += csi/csi_driver/csky/ch2201/include \
                    csi/csi_driver/csky/common/include
 
@@ -140,9 +126,8 @@ $(NAME)_SOURCES += csi/csi_driver/csky/common/dw_spi.c        \
                    csi/csi_driver/csky/ch2201/ck_sys_freq.c   \
                    csi/csi_driver/csky/ch2201/novic_irq_tbl.c \
                    csi/libs/libc/malloc.c
-#ifeq ($(LWIP),1)
+
 $(NAME)_SOURCES += csi/drivers/eth/csi_eth_enc28j60.c
-#endif
 endif
 
 include ./platform/mcu/csky/hal_init/hal_init.mk

@@ -30,9 +30,10 @@ DEPENDS_FILE := $(subst config,.depends,$(CONFIG_FILE))
 DEPENDENCY_DICT :=
 
 COMPONENT_DIRECTORIES := . \
-                         app/example   \
-                         app/profile   \
-                         board     \
+                         application/example/example_legacy   \
+                         application/example    \
+                         application/profile     \
+                         platform/board     \
                          kernel    \
                          platform  \
                          utility   \
@@ -54,7 +55,8 @@ COMPONENT_DIRECTORIES += $(APPDIR)
 #####################################################################################
 # Macro GET_BARE_LOCATION get relative path from $(SOURCE_ROOT) to component
 # $(1) is component name
-GET_BARE_LOCATION =$(patsubst $(call ESCAPE_BACKSLASHES,$(SOURCE_ROOT))%,%,$(strip $($(1)_LOCATION)))
+# remove : in windows path
+GET_BARE_LOCATION = $(subst :,,$(patsubst $(call ESCAPE_BACKSLASHES,$(SOURCE_ROOT))%,%,$(strip $($(1)_LOCATION))))
 
 #####################################################################################
 # Macro PREPROCESS_TEST_COMPONENT get test components from command line:
@@ -62,7 +64,7 @@ GET_BARE_LOCATION =$(patsubst $(call ESCAPE_BACKSLASHES,$(SOURCE_ROOT))%,%,$(str
 define PREPROCESS_TEST_COMPONENT
 $(if $(filter yts,$(COMPONENTS)), \
 $(if $(test), $(eval TEST_COMPONENTS := $(foreach tmpcomp,$(strip $(subst $(COMMA),$(SPACE),$(test))),$(if $(findstring _test,$(tmpcomp)),$(tmpcomp),$(addsuffix _test,$(tmpcomp))))),) \
-$(eval COMPONENTS += $(TEST_COMPONENTS)))
+$(eval COMPONENTS += $(filter-out $(COMPONENTS),$(TEST_COMPONENTS))))
 endef
 
 #####################################################################################
@@ -74,10 +76,14 @@ define FIND_VARIOUS_COMPONENT
 $(eval COMP := $(word 1,$(1)))
 $(call FIND_ONE_COMPONENT, $(COMP))
 
+$(eval NOT_PROCESSED := $(strip $(filter-out $(PROCESSED_COMPONENTS_LOCS),$(COMP))))
+
+ifneq (,$(NOT_PROCESSED))
 $(eval PROCESSED_COMPONENTS_LOCS += $(COMP))
 $(if $(strip $(filter-out $(PROCESSED_COMPONENTS_LOCS),$(COMPONENTS))),\
      $(call FIND_VARIOUS_COMPONENT,$(filter-out $(PROCESSED_COMPONENTS_LOCS),$(COMPONENTS))),\
 )
+endif
 
 endef
 
@@ -85,13 +91,12 @@ endef
 # Macro FIND_ONE_COMPONENT search component with name
 # $(1) is the name of component
 define FIND_ONE_COMPONENT
-
 $(eval COMP := $(1))
 $(eval COMP_LOCATION := $(subst .,/,$(COMP)))
 $(eval COMP_MAKEFILE_NAME := $(notdir $(COMP_LOCATION)))
 # Find the component makefile in directory list
 
-$(eval TEMP_MAKEFILE := $(if $($(COMP)_MAKEFILE),$($(COMP)_MAKEFILE),$(strip $(wildcard $(foreach dir, $(if $(APPDIR),$(APPDIR),) $(if $(CUBE_AOS_DIR),$(CUBE_AOS_DIR) $(CUBE_AOS_DIR)/remote,) $(addprefix $(SOURCE_ROOT)/,$(COMPONENT_DIRECTORIES)), $(dir)/$(COMP_LOCATION)/$(COMP_MAKEFILE_NAME).mk $(dir)/$(COMP_LOCATION)/aos.mk)))))
+$(eval TEMP_MAKEFILE := $(if $($(COMP)_MAKEFILE),$($(COMP)_MAKEFILE),$(strip $(wildcard $(foreach dir, $(if $(APPDIR),$(APPDIR) $(OUTPUT_DIR),) $(if $(CUBE_AOS_DIR),$(CUBE_AOS_DIR) $(CUBE_AOS_DIR)/remote,) $(addprefix $(SOURCE_ROOT)/,$(COMPONENT_DIRECTORIES)), $(dir)/$(COMP_LOCATION)/$(COMP_MAKEFILE_NAME).mk $(dir)/$(COMP_LOCATION)/aos.mk)))))
 # Check if component makefile was found - if not try downloading it and re-doing the makefile search
 $(if $(TEMP_MAKEFILE),,\
     $(info Unknown component: $(COMP) - directory or makefile for component not found. Ensure the $(COMP_LOCATION) directory contains aos.mk) \
@@ -123,9 +128,9 @@ $(foreach dep, $(deps_cube),\
 	$(eval deps_src := $(filter-out $(comp_dep),$(deps_src))))
 
 $(if $(findstring $(TEMP_MAKEFILE),$(ALL_MAKEFILES)),,\
-	$(eval ALL_MAKEFILES += $(TEMP_MAKEFILE)) \
-	$(eval COMPONENTS += $(deps)) \
-	$(eval REAL_COMPONENTS_LOCS += $(COMP)) \
+	$(eval ALL_MAKEFILES += $(filter-out $(ALL_MAKEFILES),$(TEMP_MAKEFILE))) \
+	$(eval COMPONENTS += $(filter-out $(COMPONENTS),$(deps))) \
+	$(eval REAL_COMPONENTS_LOCS += $(filter-out $(REAL_COMPONENTS_LOCS),$(COMP))) \
 	$(eval iotx_check_RET:=0)\
 	$(call PREPROCESS_TEST_COMPONENT, $(COMPONENTS), $(TEST_COMPONENTS)) \
 	DEPENDENCY_DICT += '$(NAME)': '$($(NAME)_COMPONENTS)',)
@@ -138,11 +143,9 @@ endef
 define PROCESS_ONE_COMPONENT
 $(eval COMP := $(1))
 $(eval COMP_LOCATION := $(subst .,/,$(COMP)))
-
 # Find the component makefile in directory list
-$(eval TEMP_MAKEFILE := $(if $($(COMP)_MAKEFILE),$($(COMP)_MAKEFILE),$(strip $(wildcard $(foreach dir, $(addprefix $(SOURCE_ROOT)/,$(COMPONENT_DIRECTORIES)), $(dir)/$(COMP_LOCATION)/aos.mk)))))
+$(eval TEMP_MAKEFILE := $(if $($(COMP)_MAKEFILE),$($(COMP)_MAKEFILE),$(strip $(wildcard $(foreach dir, $(if $(APPDIR),$(APPDIR) $(OUTPUT_DIR),) $(addprefix $(SOURCE_ROOT)/,$(COMPONENT_DIRECTORIES)), $(dir)/$(COMP_LOCATION)/aos.mk)))))
 $(eval TEMP_MAKEFILE := $(if $(filter %aos.mk,$(TEMP_MAKEFILE)),$(filter %aos.mk,$(TEMP_MAKEFILE)),$(TEMP_MAKEFILE)))
-
 # Clear all the temporary variables
 $(eval GLOBAL_INCLUDES:=)
 $(eval GLOBAL_LINK_SCRIPT:=)
@@ -249,7 +252,7 @@ AOS_SDK_FINAL_OUTPUT_FILE += $(BIN_OUTPUT_FILE)
 AOS_SDK_IMG1_XIP1_LD_FILE +=$(AOS_IMG1_XIP1_LD_FILE)
 AOS_SDK_IMG2_XIP2_LD_FILE +=$(AOS_IMG2_XIP2_LD_FILE)
 AOS_CPLUSPLUS_FLAGS += $(CPLUSPLUS_FLAGS)
-$(eval PROCESSED_COMPONENTS += $(NAME))
+$(eval PROCESSED_COMPONENTS += $(filter-out $(PROCESSED_COMPONENTS),$(NAME)))
 $(eval TMP_SOURCES := $(sort $(subst $($(NAME)_LOCATION),,$(addprefix $($(NAME)_LOCATION),$($(NAME)_SOURCES) $($(NAME)_SOURCES-y)))))
 $(eval $(NAME)_SOURCES := $(sort $(subst $($(NAME)_LOCATION),,$(wildcard $(addprefix $($(NAME)_LOCATION),$($(NAME)_SOURCES) $($(NAME)_SOURCES-y)) ))))
 $(foreach srcfile,$(TMP_SOURCES),$(if $(findstring *,$(srcfile)),,$(if $(filter $(srcfile),$($(NAME)_SOURCES)),,$(error $(NAME): Can not find source: "$($(NAME)_LOCATION)$(srcfile)" ...))))
@@ -270,17 +273,26 @@ define PROCESS_COMPONENT
 AOS_SDK_CFLAGS += -DMCU_FAMILY=\"$(HOST_MCU_FAMILY)\"
 $(eval CONFIG_IN_COMPONENTS := $(sort $(subst board_,,$(OBJ-y))))
 $(eval ONLY_IN_AOSMK := $(filter-out $(CONFIG_IN_COMPONENTS), $(REAL_COMPONENTS_LOCS)))
+$(if $(DEBUG_CONFIG), REAL_COMPONENTS_LOCS_ORIG := $(REAL_COMPONENTS_LOCS))
 $(eval ONLY_IN_CONFIGIN := $(if $(CONFIG_SUFFIX),,$(filter-out $(REAL_COMPONENTS_LOCS), $(CONFIG_IN_COMPONENTS))))
-$(eval ALL_COMPONENTS := $(REAL_COMPONENTS_LOCS) $(if $(CONFIG_SUFFIX),,$(ONLY_IN_CONFIGIN)))
+# Find dependency from makefile of the Config.in oriented components
+$(if $(ONLY_IN_CONFIGIN), \
+    $(eval COMPONENTS += $(ONLY_IN_CONFIGIN)) \
+    $(eval $(if $(CONFIG_SUFFIX),,$(call FIND_VARIOUS_COMPONENT, $(ONLY_IN_CONFIGIN)))) \
+,)
+$(eval ALL_COMPONENTS := $(REAL_COMPONENTS_LOCS))
 $(info *** All Components: $(ALL_COMPONENTS))
 $(if $(DEBUG_CONFIG), \
-    $(info *** MKFile Enabled: $(REAL_COMPONENTS_LOCS)) \
+    $(info *** MKFile Enabled: $(REAL_COMPONENTS_LOCS_ORIG)) \
     $(info *** Config Enabled: $(CONFIG_IN_COMPONENTS)) \
     $(if $(ONLY_IN_AOSMK), $(info *** MKFile Enabled Only: $(ONLY_IN_AOSMK)),) \
     $(if $(ONLY_IN_CONFIGIN), $(info *** Config Enabled Only: $(ONLY_IN_CONFIGIN)),), \
-    $(if $(ONLY_IN_CONFIGIN), $(info *** Config Enabled: $(ONLY_IN_CONFIGIN)),) \
 )
-$(foreach TMP_COMP, $(REAL_COMPONENTS_LOCS) $(ONLY_IN_CONFIGIN),$(call PROCESS_ONE_COMPONENT, $(TMP_COMP)))
+$(foreach TMP_COMP, $(REAL_COMPONENTS_LOCS),$(call PROCESS_ONE_COMPONENT, $(TMP_COMP)))
+ifneq ($(AOS_2NDBOOT_SUPPORT),yes)
+    $(eval TEMP_PROCESSED_COMPONENTS := $(subst bootloader, , $(PROCESSED_COMPONENTS)))
+    PROCESSED_COMPONENTS := $(TEMP_PROCESSED_COMPONENTS)
+endif
 
 endef
 
@@ -317,23 +329,50 @@ endif
 $(foreach comp, $(COMPONENTS), $(if $(wildcard $(APPDIR)/../$(comp) $(APPDIR)/$(comp) $(foreach dir, $(addprefix $(SOURCE_ROOT)/,$(COMPONENT_DIRECTORIES)), $(dir)/$(subst .,/,$(comp)) ) $($(comp)_LOCATION)),,$(error Unknown component: $(comp))))
 
 # Find the matching platform and application from the build string components
-PLATFORM_FULL   :=$(strip $(foreach comp,$(subst .,/,$(COMPONENTS)),$(if $(wildcard $(SOURCE_ROOT)/board/$(comp)),$(comp),)))
+PLATFORM_FULL   :=$(strip $(foreach comp,$(subst .,/,$(COMPONENTS)),$(if $(wildcard $(SOURCE_ROOT)/platform/board/$(comp)) ,$(comp),)))
+PLATFORM_FULL_LEGACY   :=$(strip $(foreach comp,$(subst .,/,$(COMPONENTS)),$(if $(wildcard $(SOURCE_ROOT)/platform/board/board_legacy/$(comp)),$(comp),)))
+PLATFORM_IS_LEGACY :=
+APP_FULL        :=$(strip $(foreach comp,$(subst .,/,$(COMPONENTS)),$(if $(wildcard $(SOURCE_ROOT)/application/example/$(comp) $(SOURCE_ROOT)/application/example/*/$(comp)),$(comp),)))
+APP_FULL_IS_EXAMPLE_LEGACY :=$(strip $(foreach comp,$(subst .,/,$(COMPONENTS)),$(if $(wildcard $(SOURCE_ROOT)/application/example/example_legacy/$(comp)),$(comp),)))
+APP_FULL_LEGACY    :=$(strip $(foreach comp,$(subst .,/,$(COMPONENTS)),$(if $(wildcard $(APPDIR)/../$(comp) $(APPDIR)/$(comp) $(SOURCE_ROOT)/application/$(comp) $(SOURCE_ROOT)/application/profile/$(comp) $(SOURCE_ROOT)/application/*/example_legacy/$(comp) $(SOURCE_ROOT)/application/*/example_legacy/*/$(comp) $(SOURCE_ROOT)/$(comp) $(SOURCE_ROOT)/test/develop/$(comp)),$(comp),)))
 
-APP_FULL        :=$(strip $(foreach comp,$(subst .,/,$(COMPONENTS)),$(if $(wildcard $(APPDIR)/../$(comp) $(APPDIR)/$(comp) $(SOURCE_ROOT)/app/$(comp) $(SOURCE_ROOT)/app/*/$(comp) $(SOURCE_ROOT)/$(comp) $(SOURCE_ROOT)/test/develop/$(comp)),$(comp),)))
+ifneq ($(APP_FULL),)
+ifneq ($(APP_FULL_IS_EXAMPLE_LEGACY),)
+#app is in application/example/example_legacy, set APP_FULL NULL
+APP_FULL        :=
+endif
+endif
+
+ifneq ($(PLATFORM_FULL_LEGACY),)
+ifneq ($(APP_FULL),)
+$(error board in dir board_legacy only support app in dir example_legacy:$(APP_FULL): $(PLATFORM_FULL_LEGACY) )
+endif
+ifneq ($(PLATFORM_FULL),)
+$(error mutiple board name in board_legacy:$(PLATFORM_FULL): $(PLATFORM_FULL_LEGACY) )
+else
+PLATFORM_FULL := $(PLATFORM_FULL_LEGACY)
+PLATFORM_IS_LEGACY := board_legacy/
+endif
+# legacy board use legacy app
+APP_FULL := $(APP_FULL_LEGACY)
+else
+# new board
+ifneq ($(APP_FULL),)
+
+else
+COMPONENTS += app_adapter
+# new board use legacy app
+APP_FULL := $(APP_FULL_LEGACY)
+endif
+endif
 
 PLATFORM    :=$(notdir $(PLATFORM_FULL))
 APP         :=$(notdir $(APP_FULL))
 
 PLATFORM_DIRECTORY := $(PLATFORM_FULL)
 
-# Set APP_VERSION used by OTA
-CONFIG_SYSINFO_APP_VERSION = app-1.0.0-$(CURRENT_TIME)
-$(info app_version:${CONFIG_SYSINFO_APP_VERSION})
-
 # Append PLATFORM (Board) and APP_VERSION to EXTRA_CFLAGS
-EXTRA_CFLAGS := \
-                -DPLATFORM=$(SLASH_QUOTE_START)$$(PLATFORM)$(SLASH_QUOTE_END) \
-                -DSYSINFO_APP_VERSION=\"$(CONFIG_SYSINFO_APP_VERSION)\"
+EXTRA_CFLAGS := -DPLATFORM=$(SLASH_QUOTE_START)$$(PLATFORM)$(SLASH_QUOTE_END)
 
 # Append "-include/--preinclude autoconf.h" to EXTRA_CFLAGS
 ifneq ($(filter armcc iar rvct, $(COMPILER)),)
@@ -352,9 +391,9 @@ EXTRA_ASMFLAGS += $(call GCC_INCLUDE_AUTOCONF_H)
 endif
 
 # Load platform makefile to make variables like WLAN_CHIP, HOST_OPENOCD & HOST_ARCH available to all makefiles
-$(eval CURDIR := $(SOURCE_ROOT)/board/$(PLATFORM_DIRECTORY)/)
+$(eval CURDIR := $(SOURCE_ROOT)/platform/board/$(PLATFORM_IS_LEGACY)$(PLATFORM_DIRECTORY)/)
 
-include $(SOURCE_ROOT)/board/$(PLATFORM_DIRECTORY)/aos.mk
+include $(SOURCE_ROOT)/platform/board/$(PLATFORM_IS_LEGACY)$(PLATFORM_DIRECTORY)/aos.mk
 
 $(eval CURDIR := $($(HOST_MCU_FAMILY)_LOCATION)/)
 include $($(HOST_MCU_FAMILY)_LOCATION)/aos.mk
@@ -408,57 +447,57 @@ endif
 
 $(info processing components: $(COMPONENTS))
 $(eval $(call FIND_VARIOUS_COMPONENT, $(COMPONENTS)))
-
 $(eval COMPONENTS := $(sort $(COMPONENTS)) )
 $(eval $(call PROCESS_COMPONENT, $(PROCESSED_COMPONENTS_LOCS)))
 
 AOS_SDK_INCLUDES += -I$(SOURCE_ROOT)/include \
                     -I$(SOURCE_ROOT)/include/hal \
+                    -I$(SOURCE_ROOT)/include/bus \
+                    -I$(SOURCE_ROOT)/include/cli \
                     -I$(SOURCE_ROOT)/include/hal/soc \
+                    -I$(SOURCE_ROOT)/include/dm \
+                    -I$(SOURCE_ROOT)/include/service \
+                    -I$(SOURCE_ROOT)/include/wireless \
+                    -I$(SOURCE_ROOT)/include/utility \
+                    -I$(SOURCE_ROOT)/include/peripherals \
                     -I$(SOURCE_ROOT)/include/network \
-                    -I$(SOURCE_ROOT)/include/network/bluetooth/breeze/api \
-                    -I$(SOURCE_ROOT)/include/network/bluetooth/breeze/core/include \
-                    -I$(SOURCE_ROOT)/include/network/bluetooth/bt_host/bt_common/include \
-                    -I$(SOURCE_ROOT)/include/network/bluetooth/bt_host/bt_common/port/include \
-                    -I$(SOURCE_ROOT)/include/network/bluetooth/bt_host/bt_common/tinycrypt/include \
-                    -I$(SOURCE_ROOT)/include/network/bluetooth/bt_host/include \
-                    -I$(SOURCE_ROOT)/include/network/bluetooth/bt_host/include/drivers \
-                    -I$(SOURCE_ROOT)/include/network/bluetooth/bt_host/profile \
-                    -I$(SOURCE_ROOT)/include/network/bluetooth/bt_mesh/inc \
-                    -I$(SOURCE_ROOT)/include/network/bluetooth/tmall_model \
+                    -I$(SOURCE_ROOT)/include/wireless/bluetooth \
+                    -I$(SOURCE_ROOT)/include/wireless/bluetooth/breeze \
+                    -I$(SOURCE_ROOT)/components/wireless/bluetooth/ble/host/include \
+                    -I$(SOURCE_ROOT)/components/wireless/bluetooth/ble/host/profile \
+                    -I$(SOURCE_ROOT)/include/wireless/bluetooth/blemesh \
                     -I$(SOURCE_ROOT)/include/network/coap \
                     -I$(SOURCE_ROOT)/include/network/hal \
                     -I$(SOURCE_ROOT)/include/network/http \
                     -I$(SOURCE_ROOT)/include/network/lwm2m \
                     -I$(SOURCE_ROOT)/include/network/umesh \
-                    -I$(SOURCE_ROOT)/include/network/nal/athost \
-                    -I$(SOURCE_ROOT)/include/network/nal/atparser \
-                    -I$(SOURCE_ROOT)/include/network/nal/sal \
-                    -I$(SOURCE_ROOT)/include/network/lwip \
+                    -I$(SOURCE_ROOT)/include/network/athost \
+                    -I$(SOURCE_ROOT)/include/network/sal \
                     -I$(SOURCE_ROOT)/include/network/netmgr \
-                    -I$(SOURCE_ROOT)/include/network/yloop
+                    -I$(SOURCE_ROOT)/include/network/rtp \
+                    -I$(SOURCE_ROOT)/include/utility/yloop
 
-ifeq ($(lorawanback), 0)
-AOS_SDK_INCLUDES += -I$(SOURCE_ROOT)/include/network/lorawan/lorawan_4_4_2 \
-                    -I$(SOURCE_ROOT)/include/network/lorawan/lorawan_4_4_2/mac \
-                    -I$(SOURCE_ROOT)/include/network/lorawan/lorawan_4_4_2/mac/region \
-                    -I$(SOURCE_ROOT)/include/network/lorawan/lorawan_4_4_2/radio \
-                    -I$(SOURCE_ROOT)/include/network/lorawan/lorawan_4_4_2/radio/sx1276 \
-                    -I$(SOURCE_ROOT)/include/network/lorawan/lorawan_4_4_2/system
-else ifeq ($(lorawanback), 1)
-AOS_SDK_INCLUDES += -I$(SOURCE_ROOT)/include/network/lorawan/lorawan_4_4_0 \
-                    -I$(SOURCE_ROOT)/include/network/lorawan/lorawan_4_4_0/mac \
-                    -I$(SOURCE_ROOT)/include/network/lorawan/lorawan_4_4_0/mac/region \
-                    -I$(SOURCE_ROOT)/include/network/lorawan/lorawan_4_4_0/radio \
-                    -I$(SOURCE_ROOT)/include/network/lorawan/lorawan_4_4_0/radio/sx1276 \
-                    -I$(SOURCE_ROOT)/include/network/lorawan/lorawan_4_4_0/system
+ifeq ($(AOS_COMP_LORAWAN_4_4_2), y)
+AOS_SDK_INCLUDES += -I$(SOURCE_ROOT)/include/wireless/lorawan/lorawan_4_4_2 \
+                    -I$(SOURCE_ROOT)/include/wireless/lorawan/lorawan_4_4_2/mac \
+                    -I$(SOURCE_ROOT)/include/wireless/lorawan/lorawan_4_4_2/mac/region \
+                    -I$(SOURCE_ROOT)/include/wireless/lorawan/lorawan_4_4_2/radio \
+                    -I$(SOURCE_ROOT)/include/wireless/lorawan/lorawan_4_4_2/radio/sx1276 \
+                    -I$(SOURCE_ROOT)/include/wireless/lorawan/lorawan_4_4_2/system
+else ifeq ($(AOS_COMP_LORAWAN_4_4_0), y)
+AOS_SDK_INCLUDES += -I$(SOURCE_ROOT)/include/wireless/lorawan/lorawan_4_4_0 \
+                    -I$(SOURCE_ROOT)/include/wireless/lorawan/lorawan_4_4_0/mac \
+                    -I$(SOURCE_ROOT)/include/wireless/lorawan/lorawan_4_4_0/mac/region \
+                    -I$(SOURCE_ROOT)/include/wireless/lorawan/lorawan_4_4_0/radio \
+                    -I$(SOURCE_ROOT)/include/wireless/lorawan/lorawan_4_4_0/radio/sx1276 \
+                    -I$(SOURCE_ROOT)/include/wireless/lorawan/lorawan_4_4_0/system
 endif
 
 AOS_SDK_DEFINES += $(EXTERNAL_AOS_GLOBAL_DEFINES)
 
 # Make sure the user has specified a component from each category
-$(if $(PLATFORM),,$(error No platform specified. Options are: $(notdir $(wildcard board/*))))
-$(if $(APP),,$(error No application specified. Options are: $(notdir $(wildcard app/example/*))))
+$(if $(PLATFORM),,$(error No platform specified. Options are: $(notdir $(wildcard platform/board/*))))
+$(if $(APP),,$(error No application specified. Options are: $(notdir $(wildcard application/example/*))))
 
 # Make sure a WLAN_CHIP, WLAN_CHIP_REVISION, WLAN_CHIP_FAMILY and HOST_OPENOCD have been defined
 #$(if $(WLAN_CHIP),,$(error No WLAN_CHIP has been defined))
@@ -596,3 +635,4 @@ $(CONFIG_FILE): $(AOS_SDK_MAKEFILES) | $(CONFIG_FILE_DIR)
 	$(QUIET)$(call WRITE_FILE_APPEND, $(CONFIG_FILE) ,KEIL_DEVICE := $(foreach comp,$(PROCESSED_COMPONENTS),$(if $($(comp)_KEIL_DEVICE),$($(comp)_KEIL_DEVICE),)))
 	$(QUIET)$(call WRITE_FILE_APPEND, $(CONFIG_FILE) ,KEIL_VENDOR := $(foreach comp,$(PROCESSED_COMPONENTS),$(if $($(comp)_KEIL_VENDOR),$($(comp)_KEIL_VENDOR),)))
 	$(QUIET)$(call WRITE_FILE_APPEND, $(CONFIG_FILE) ,IAR_OGCMENU := $(foreach comp,$(PROCESSED_COMPONENTS),$(if $($(comp)_IAR_OGCMENU),$($(comp)_IAR_OGCMENU),)))
+	$(QUIET)$(call WRITE_FILE_APPEND, $(CONFIG_FILE) ,CONFIG_SYSINFO_DEVICE_NAME 					:= $(CONFIG_SYSINFO_DEVICE_NAME))

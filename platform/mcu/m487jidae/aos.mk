@@ -2,10 +2,10 @@ NAME := mcu_m487jidae
 HOST_OPENOCD := m487jidae
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.1
+$(NAME)_VERSION    := 1.0.2
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu m487jidae
 
-$(NAME)_COMPONENTS += arch_armv7m rhino
+$(NAME)_COMPONENTS += arch_armv7m rhino osal_aos
 
 GLOBAL_INCLUDES += drivers/lwIP/include/netif \
                    drivers/lwIP/include \
@@ -162,5 +162,5 @@ GLOBAL_LDFLAGS += -mcpu=cortex-m4  \
 endif
 
 ifeq ($(HOST_OS),Win32)
-EXTRA_TARGET_MAKEFILES +=  $($(HOST_MCU_FAMILY)_LOCATION)/gen_image_bin.mk
+#EXTRA_TARGET_MAKEFILES +=  $($(HOST_MCU_FAMILY)_LOCATION)/gen_image_bin.mk
 endif

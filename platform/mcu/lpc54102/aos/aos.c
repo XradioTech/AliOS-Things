@@ -33,10 +33,6 @@ extern int application_start(int argc, char **argv);
 
 extern hal_wifi_module_t qca_4002_wmi;
 
-#ifdef DEV_SAL_MK3060
-extern hal_wifi_module_t aos_wifi_module_mk3060;
-#endif
-
 static void var_init()
 {
     kinit.argc = 0;
@@ -47,15 +43,12 @@ static void var_init()
 static int init_wifi()
 {
    int ret;
-#ifdef DEV_SAL_MK3060
-   PRINTF("Register WMI Wifi mk3060");
-   hal_wifi_register_module(&aos_wifi_module_mk3060);
-#else
+#if  !defined(AOS_COMP_SAL) && !defined(AOS_COMP_MAL)
    PRINTF("Register WMI Wifi 0x%x", &qca_4002_wmi);
    hal_wifi_register_module(&qca_4002_wmi);
-#endif
    ret = hal_wifi_init();
    PRINTF("hal_wifi_init return %d", ret);
+#endif
 }
 
 
@@ -64,11 +57,6 @@ extern int sensor_init(void);
 #if defined(AOS_SENSOR_TEMP_SENSIRION_HTS221) || defined(AOS_SENSOR_HUMI_SENSIRION_HTS221)
 extern i2c_dev_t HTS221_ctx;
 #endif
-
-void trace_start(void)
-{
-    printf("trace config close!!!\r\n");
-}
 
 static void sys_init(void)
 {
@@ -129,10 +117,10 @@ static void platform_init(void)
 
     BOARD_InitPins();
     BOARD_BootClockPLL96M(); /* Rev B device can only support max core frequency to 96Mhz.
-                                Rev C device can support 100Mhz,use BOARD_BootClockPLL100M() to boot core to 100Mhz. 
+                                Rev C device can support 100Mhz,use BOARD_BootClockPLL100M() to boot core to 100Mhz.
                                 DEVICE_ID1 register in SYSCON shows the device version.
                                 More details please refer to user manual and errata. */
-    BOARD_InitDebugConsole();	
+    BOARD_InitDebugConsole();
 
     i2c_init();
     spi_init();
@@ -211,7 +199,7 @@ int main(void)
     core_frequency = CLOCK_GetCoreClkFreq();
 
     SysTick_Config(core_frequency / RHINO_CONFIG_TICKS_PER_SECOND); //10ms
-    
+
     aos_init();
     krhino_task_dyn_create(&g_aos_app, "aos-init", 0, AOS_DEFAULT_APP_PRI, 0, AOS_START_STACK, (task_entry_t)sys_init, 1);
     aos_start();

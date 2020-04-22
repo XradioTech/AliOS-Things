@@ -7,18 +7,22 @@ CONFIG_BASEDIR := $(APPDIR)/
 export AOS_CONFIG_IN := $(APPDIR)/Config.in
 else
 CONFIG_BASEDIR :=
-export AOS_CONFIG_IN := $(SOURCE_ROOT)build/Config.in
+export AOS_CONFIG_IN := $(subst .//,./,$(SOURCE_ROOT)/build/Config.in)
 endif
 
 export AOS_CONFIG := $(CONFIG_BASEDIR).config
 export AOS_DEFCONFIG ?= $(CONFIG_BASEDIR).defconfig
 export TMP_DEFCONFIG := $(CONFIG_BASEDIR).defconfig
 
-export AOS_DEFCONFIG_DIR := $(SOURCE_ROOT)build/configs
+export AOS_DEFCONFIG_DIR := $(subst .//,./,$(SOURCE_ROOT)/build/configs)
 export AOS_CONFIG_DIR := $(BUILD_DIR)/config
 
 KCONFIG_TOOLPATH ?=
 KCONFIG_DIR := $(SOURCE_ROOT)/build/kconfig/$(HOST_OS)/
+
+CONVERT_AUTOCONF_AOSCONFIG := 1
+CONVERT_AOSCONFIG_CONFIG := 2
+CONVERT_AOSCONFIG_ASM := 3
 
 ifneq (,$(wildcard $(KCONFIG_DIR)COPYING))
 KCONFIG_TOOLPATH := $(KCONFIG_DIR)
@@ -57,12 +61,14 @@ export AOS_CONFIG_IN := $(subst ./,,$(AOS_CONFIG_IN))
 export AOS_DEFCONFIG := $(subst ./,,$(AOS_DEFCONFIG))
 export TMP_DEFCONFIG := $(subst ./,,$(TMP_DEFCONFIG))
 KCONFIG_URL := https://gitee.com/alios-things/kconfig-frontends-win32.git
+else
+$(error Not supported OS $(HOST_OS))
 endif
 
 export SYSCONFIG_H := $(SOURCE_ROOT)/build/configs/sysconfig.h
 
 # Don't read in .config for these targets
-noconfig_targets := menuconfig oldconfig silentoldconfig olddefconfig \
+noconfig_targets := menuconfig update oldconfig silentoldconfig olddefconfig \
     defconfig savedefconfig %_defconfig list-defconfig alldefconfig
 
 .PHONY: $(noconfig_targets)
@@ -78,12 +84,12 @@ $(DEFCONFIG_FILES): | $(KCONFIG_CONF)
 endif
 
 # Use -include for GCC and --preinclude for other ARM compilers
-GCC_INCLUDE_AUTOCONF_H = $(if $(wildcard $(AOS_CONFIG_DIR)/autoconf.h), -include $(AOS_CONFIG_DIR)/autoconf.h)
-ARMCC_INCLUDE_AUTOCONF_H = $(if $(wildcard $(AOS_CONFIG_DIR)/autoconf.h), --preinclude $(AOS_CONFIG_DIR)/autoconf.h)
+GCC_INCLUDE_AUTOCONF_H = $(if $(wildcard $(CONFIG_BASEDIR)aos_config.h), -include $(CONFIG_BASEDIR)aos_config.h)
+ARMCC_INCLUDE_AUTOCONF_H = $(if $(wildcard $(CONFIG_BASEDIR)aos_config.h), --preinclude $(CONFIG_BASEDIR)aos_config.h)
 # Use --cpreproc --cpreproc_opts=--preinclude,autoconf.h for armasm
-ARMASM_INCLUDE_AUTOCONF_H = $(if $(wildcard $(AOS_CONFIG_DIR)/autoconf.h), --cpreproc --cpreproc_opts=--preinclude$(COMMA)$(AOS_CONFIG_DIR)/autoconf.h)
+ARMASM_INCLUDE_AUTOCONF_H = $(if $(wildcard $(CONFIG_BASEDIR)aos_config.h), --cpreproc --cpreproc_opts=--preinclude$(COMMA)$(CONFIG_BASEDIR)aos_config.h)
 # Use -Dsymbol=\"value\" for iasmarm
-IASMARM_INCLUDE_AUTOCONF_H = $(if $(wildcard $(AOS_CONFIG_DIR)/autoconf.h), $(shell $(PYTHON) $(SCRIPTS_PATH)/aos_autoconf_convert.py $(AOS_CONFIG_DIR)/autoconf.h))
+IASMARM_INCLUDE_AUTOCONF_H = $(if $(wildcard $(CONFIG_BASEDIR)aos_config.h), $(shell $(PYTHON) $(SCRIPTS_PATH)/aos_autoconf_convert.py $(CONVERT_AOSCONFIG_ASM) $(CONFIG_BASEDIR)aos_config.h))
 
 GCC_INCLUDE_SYSCONFIG_H = $($(if $(wildcard $(SYSCONFIG_H)), -include $(SYSCONFIG_H)))
 ARMCC_INCLUDE_SYSCONFIG_H = $($(if $(wildcard $(SYSCONFIG_H)), --preinclude $(SYSCONFIG_H)))
@@ -101,12 +107,19 @@ endif
 $(KCONFIG_MCONF) $(KCONFIG_CONF):
 	$(QUIET)$(PYTHON) $(SCRIPTS_PATH)/aos_download_tools.py $(KCONFIG_URL) $(KCONFIG_DIR)
 
-menuconfig:
+menuconfig_only:
 	$(QUIET)$(COMMON_CONFIG_ENV) $(KCONFIG_MCONF) $(AOS_CONFIG_IN)
+
+menuconfig: menuconfig_only $(AOS_CONFIG_DIR)/autoconf.h
+
+update: $(AOS_CONFIG_DIR)/autoconf.h
+	$(QUIET)$(if $(APPDIR),\
+	$(QUIET)$(PYTHON) $(SCRIPTS_PATH)/gen_deps_topo.py $(APPDIR) $(word 2, $(subst @, ,$(CLEANED_BUILD_STRING))),)
 
 oldconfig silentoldconfig olddefconfig:
 	$(QUIET)$(call MKDIR, $(BUILD_DIR)/config)
 	$(QUIET)$(COMMON_CONFIG_ENV) $(KCONFIG_CONF) --$@ $(AOS_CONFIG_IN)
+	$(QUIET)$(PYTHON) $(SCRIPTS_PATH)/aos_autoconf_convert.py $(CONVERT_AUTOCONF_AOSCONFIG) $(AOS_CONFIG_DIR)/autoconf.h $(CONFIG_BASEDIR)aos_config.h
 
 # Create .defconfig
 $(TMP_DEFCONFIG):
@@ -167,3 +180,4 @@ $(AOS_CONFIG_DIR)/auto.conf $(AOS_CONFIG_DIR)/autoconf.h: $(AOS_CONFIG)
 	$(QUIET)$(ECHO) Creating $@ ...
 	$(QUIET)$(call MKDIR, $(BUILD_DIR)/config)
 	$(QUIET)$(COMMON_CONFIG_ENV) $(KCONFIG_CONF) --silentoldconfig $(AOS_CONFIG_IN)
+	$(QUIET)$(PYTHON) $(SCRIPTS_PATH)/aos_autoconf_convert.py $(CONVERT_AUTOCONF_AOSCONFIG) $(AOS_CONFIG_DIR)/autoconf.h $(CONFIG_BASEDIR)aos_config.h

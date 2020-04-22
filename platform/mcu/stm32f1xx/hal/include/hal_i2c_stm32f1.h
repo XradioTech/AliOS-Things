@@ -16,12 +16,17 @@ extern "C" {
 #include <stdbool.h>
 #include "board.h"
 
+#define HAL_I2C_GPIO_NEED_MAP 0xfe
+
 typedef struct {
     PORT_I2C_TYPE  i2c_func_p;
     void*          i2c_physic_p;
-}i2c_mapping_t;
 
-extern i2c_mapping_t i2c_mapping[PORT_I2C_SIZE];
+    uint16_t needmap;
+    uint16_t gpiomaps[2];
+}I2C_MAPPING;
+
+extern I2C_MAPPING i2c_mapping[PORT_I2C_SIZE];
 
 #ifdef __cplusplus
 }

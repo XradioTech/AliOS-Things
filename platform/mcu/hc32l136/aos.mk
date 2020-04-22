@@ -2,12 +2,12 @@ NAME := mcu_hc32l136
 HOST_OPENOCD := hc32l136
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.0
+$(NAME)_VERSION    := 1.0.1
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu hc32l136
 
 $(NAME)_COMPONENTS += arch_armv6m rhino
 
-GLOBAL_DEFINES += USE_HAL_DRIVER CONFIG_NO_TCPIP
+GLOBAL_DEFINES += USE_HAL_DRIVER
 
 GLOBAL_INCLUDES += drivers/        \
                    drivers/cmsis

@@ -2,12 +2,12 @@ NAME := mcu_hk32f103
 HOST_OPENOCD := hk32f103
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.0
+$(NAME)_VERSION    := 1.0.1
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu hk32f103
 
 $(NAME)_COMPONENTS += arch_armv7m rhino
 
-GLOBAL_DEFINES += USE_HAL_DRIVER CONFIG_NO_TCPIP STM32F103xB
+GLOBAL_DEFINES += USE_HAL_DRIVER STM32F103xB
 
 GLOBAL_INCLUDES += drivers/CMSIS/Include \
                    drivers/HK32F1xx_HAL_Driver/Inc

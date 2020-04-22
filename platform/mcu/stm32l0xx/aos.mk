@@ -5,12 +5,12 @@ HOST_OPENOCD := stm32l0xx
 SPI_WIFI_ENABLED := true
 
 $(NAME)_MBINS_TYPE := kernel
-$(NAME)_VERSION    := 1.0.1
+$(NAME)_VERSION    := 1.0.2
 $(NAME)_SUMMARY    := driver & sdk for platform/mcu stm32l0xx
 
 $(NAME)_COMPONENTS += arch_armv6m
 # $(NAME)_COMPONENTS += libc rhino hal netmgr mbedtls cjson cli
-$(NAME)_COMPONENTS += rhino
+$(NAME)_COMPONENTS += rhino osal_aos
 
 GLOBAL_DEFINES += STM32_USE_SPI_WIFI
 
