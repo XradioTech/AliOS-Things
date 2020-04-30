@@ -1,243 +1,284 @@
-#include <string.h>
+/*
+ * Copyright (C) 2017 XRADIO TECHNOLOGY CO., LTD. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *    1. Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *    2. Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the
+ *       distribution.
+ *    3. Neither the name of XRADIO TECHNOLOGY CO., LTD. nor the names of
+ *       its contributors may be used to endorse or promote products derived
+ *       from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 #include <stdio.h>
+#include <string.h>
+#include "sys/defs.h"
+#include "sys/list.h"
 #include "kernel/os/os_mutex.h"
 #include "audio/manager/audio_manager.h"
 
-#define MANAGER_NULL          0
-
-#if !MANAGER_NULL
-
-#ifndef __LIKELY_
-#define likely(x)             __builtin_expect(!!(x), 1)
-#endif
-#ifndef __UNLIKELY_
-#define unlikely(x)           __builtin_expect(!!(x), 0)
+#if (__CONFIG_AUDIO_HEAP_MODE == 1)
+#include "sys/sys_heap.h"
+#else
+#include <stdlib.h>
 #endif
 
-#define BUG_ON(c)	if (unlikely((c)!=0)) { \
-			               printf("Badness in %s at %s:%d\n", __func__, __FILE__, __LINE__);\
-			               return -1;\
-			}
-mgrctl_ctx g_mc;
+#define AUDIO_MANAGER_DEBUG_EN				0
 
-static void aud_set_dev_mask(AUDIO_Device dev)
+#if AUDIO_MANAGER_DEBUG_EN
+#define AUDIO_MANAGER_DEBUG(fmt, arg...)	printf("[AUDIO_MANAGER]"fmt, ##arg)
+#else
+#define AUDIO_MANAGER_DEBUG(fmt, arg...)
+#endif
+
+#define AUDIO_MANAGER_ERROR(fmt, arg...)	printf("[AUDIO_MANAGER]"fmt, ##arg)
+
+
+#define audio_mgr_lock(m)           		OS_MutexLock(m, OS_WAIT_FOREVER)
+#define audio_mgr_unlock         			OS_MutexUnlock
+#define audio_mgr_lock_init           		OS_MutexCreate
+#define audio_mgr_lock_deinit        		OS_MutexDelete
+
+
+LIST_HEAD_DEF(audio_manager_list);
+
+struct audio_manager_priv {
+	Snd_Card_Num card_num;
+	uint16_t     current_dev;
+	OS_Mutex_t   lock;
+	struct list_head node;
+};
+
+
+static void *audio_manager_zalloc(uint32_t size)
 {
-	HAL_SET_BIT(g_mc.current_dev, dev);
-}
+	void *p;
 
-static void aud_clr_dev_mask(AUDIO_Device dev)
-{
-	HAL_CLR_BIT(g_mc.current_dev, dev);
-}
+#if (__CONFIG_AUDIO_HEAP_MODE == 1)
+	p = psram_malloc(size);
+#else
+	p = malloc(size);
+#endif
 
-static uint8_t aud_get_dev_status(AUDIO_Device dev)
-{
-	return !!HAL_GET_BIT(g_mc.current_dev, dev);
-}
-
-int aud_mgr_maxvol()
-{
-	return VOLUME_MAX_LEVEL;
-}
-
-static int aud_set_mute(mgrctl_ctx* mc, uint32_t dev, int mute)
-{
-	BUG_ON(mute > 1 || mute < 0);
-	HAL_CODEC_MUTE_STATUS_Init(mute);
-	if (mc->playback == 0)
-		return 0;
-
-	if (HAL_CODEC_Mute(dev,mute) != 0)
-		return -1;
-
-	return 0;
-}
-
-static int aud_set_vol(mgrctl_ctx* mc, uint32_t dev, int level)
-{
-	BUG_ON(level > VOLUME_MAX_LEVEL || level < VOLUME_LEVEL0);
-
-	int volume = level;
-
-	HAL_CODEC_INIT_VOLUME_Set(dev, volume);
-	if (mc->playback == 0) {
-		return 0;
+	if (p != NULL) {
+		memset(p, 0, size);
+		return p;
 	}
-
-	if (HAL_CODEC_VOLUME_LEVEL_Set(dev,volume) != 0)
-		return -1;
-
-	return 0;
+	return NULL;
 }
 
-static int aud_set_dev(mgrctl_ctx* mc, uint32_t dev, uint8_t dev_en)
+static void audio_manager_free(void *p)
 {
-	BUG_ON(!(dev & AUDIO_DEV_ALL));
+	if (p) {
+#if (__CONFIG_AUDIO_HEAP_MODE == 1)
+		psram_free(p);
+#else
+		free(p);
+#endif
+		p = NULL;
+	}
+}
 
-	uint8_t i;
-	AUDIO_Device cur_dev;
-	uint16_t dev_mask = dev;
+static struct audio_manager_priv *card_num_to_audio_manager(Snd_Card_Num card_num)
+{
+	struct audio_manager_priv *audio_mgr_priv;
 
-	for (i = 0, cur_dev = (1 << AUDIO_IN_DEV_SHIFT); i < AUDIO_DEVICE_NUM; i++, cur_dev <<= 1) {
-		if (!(cur_dev & AUDIO_IN_DEV_ALL) && !(cur_dev & AUDIO_OUT_DEV_ALL))
-			cur_dev = (1 << AUDIO_OUT_DEV_SHIFT);
-
-		if (dev_en) {//device enable
-			if ((cur_dev & dev_mask) && (!aud_get_dev_status(cur_dev))) {
-				if (HAL_CODEC_ROUTE_Set(cur_dev, CODEC_DEV_ENABLE) != 0)
-					return -1;
-				aud_set_dev_mask(cur_dev);
-			}
-		} else {//device disable
-			if ((cur_dev & dev_mask) && aud_get_dev_status(cur_dev)) {
-				if (HAL_CODEC_ROUTE_Set(cur_dev, CODEC_DEV_DISABLE) != 0)
-					return -1;
-				aud_clr_dev_mask(cur_dev);
+	if(!list_empty(&audio_manager_list)){
+		list_for_each_entry(audio_mgr_priv, &audio_manager_list, node){
+			if(audio_mgr_priv->card_num == card_num){
+				return audio_mgr_priv;
 			}
 		}
 	}
 
-	return 0;
+	return NULL;
 }
 
-static int aud_set_eqscene(mgrctl_ctx* mc, uint8_t scene)
+int audio_manager_get_current_dev(Snd_Card_Num card_num)
 {
-	BUG_ON(scene < 0);
+	struct audio_manager_priv *audio_mgr_priv;
 
-	uint8_t scene_val = scene;
-	if (mc->playback == 0) {
-		return 0;
+	audio_mgr_priv = card_num_to_audio_manager(card_num);
+	if(audio_mgr_priv == NULL){
+		AUDIO_MANAGER_ERROR("Invalid sound card num [%d]!\n",(uint8_t)card_num);
+		return -1;
 	}
 
-	if (HAL_CODEC_EQ_SCENE_Set(scene_val) != 0)
-		return -1;
-
-	return 0;
+	return audio_mgr_priv->current_dev;
 }
 
-static int __set_volume(mgrctl* m, uint32_t dev, uint8_t vol)
+int audio_manager_reg_read(Snd_Card_Num card_num, uint32_t reg)
 {
-	mgrctl_ctx* mc;
-	mc = (mgrctl_ctx*)m;
-	if (aud_set_vol(mc, dev, vol) != 0)
+	struct audio_manager_priv *audio_mgr_priv;
+
+	audio_mgr_priv = card_num_to_audio_manager(card_num);
+	if(audio_mgr_priv == NULL){
+		AUDIO_MANAGER_ERROR("Invalid sound card num [%d]!\n",(uint8_t)card_num);
 		return -1;
-	return 0;
+	}
+
+	return HAL_SndCard_CodecRegRead(card_num, reg);
 }
 
-static int __set_path(mgrctl* m, uint32_t dev, uint8_t dev_en)
+int audio_manager_reg_write(Snd_Card_Num card_num, uint32_t reg, uint32_t val)
 {
-	int ret = 0;
-	mgrctl_ctx* mc;
-	mc = (mgrctl_ctx*)m;
-	if (aud_set_dev(mc, dev, dev_en) != 0)
+	struct audio_manager_priv *audio_mgr_priv;
+
+	audio_mgr_priv = card_num_to_audio_manager(card_num);
+	if(audio_mgr_priv == NULL){
+		AUDIO_MANAGER_ERROR("Invalid sound card num [%d]!\n",(uint8_t)card_num);
 		return -1;
+	}
+
+	return HAL_SndCard_CodecRegWrite(card_num, reg, val);
+}
+
+int audio_maneger_ioctl(Snd_Card_Num card_num, Snd_Card_Ioctl_Cmd cmd, uint32_t cmd_param[], uint32_t cmd_param_len)
+{
+	struct audio_manager_priv *audio_mgr_priv;
+	AUDIO_MANAGER_DEBUG("--->%s\n",__FUNCTION__);
+
+	audio_mgr_priv = card_num_to_audio_manager(card_num);
+	if(audio_mgr_priv == NULL){
+		AUDIO_MANAGER_ERROR("Invalid sound card num [%d]!\n",(uint8_t)card_num);
+		return -1;
+	}
+
+	return HAL_SndCard_Ioctl(card_num, cmd, cmd_param, cmd_param_len);
+}
+
+int audio_manager_handler(Snd_Card_Num card_num, Audio_Manager_Cmd cmd, Audio_Device dev, uint32_t param)
+{
+	int ret = -1;
+	struct audio_manager_priv *audio_mgr_priv;
+	AUDIO_MANAGER_DEBUG("--->%s\n",__FUNCTION__);
+
+	audio_mgr_priv = card_num_to_audio_manager(card_num);
+	if(audio_mgr_priv == NULL){
+		AUDIO_MANAGER_ERROR("Invalid sound card num [%d]!\n",(uint8_t)card_num);
+		return -1;
+	}
+
+	audio_mgr_lock(&audio_mgr_priv->lock);
+
+	switch(cmd){
+		case AUDIO_MANAGER_SET_VOLUME_LEVEL:
+			ret = HAL_SndCard_SetVolume(card_num, dev, ((uint16_t)param & ~VOLUME_SET_MASK) | VOLUME_SET_LEVEL);
+			break;
+
+		case AUDIO_MANAGER_SET_VOLUME_GAIN:
+			ret = HAL_SndCard_SetVolume(card_num, dev, ((uint16_t)param & ~VOLUME_SET_MASK) | VOLUME_SET_GAIN);
+			break;
+
+		case AUDIO_MANAGER_SET_ROUTE:
+			ret = HAL_SndCard_SetRoute(card_num, dev, (Audio_Dev_State)param);
+			if(!ret){
+				if((Audio_Dev_State)param == AUDIO_DEV_EN){
+					audio_mgr_priv->current_dev |= dev;
+				} else {
+					audio_mgr_priv->current_dev &= ~dev;
+				}
+			}
+			break;
+
+		case AUDIO_MANAGER_SET_MUTE:
+			ret = HAL_SndCard_SetMute(card_num, dev, (Audio_Mute_State)param);
+			break;
+
+		default:
+			AUDIO_MANAGER_ERROR("Invalid audio manager command!\n");
+			break;
+	}
+
+	audio_mgr_unlock(&audio_mgr_priv->lock);
+
 	return ret;
 }
 
-static int __set_mute(mgrctl* m, uint32_t dev, uint8_t mute)
+
+int audio_manager_init(void)
 {
-	mgrctl_ctx* mc;
-	mc = (mgrctl_ctx*)m;
-	if (aud_set_mute(mc, dev, mute) != 0)
+	char *audio_mgr_temp;
+	uint8_t *card_num, card_nums, i;
+	struct audio_manager_priv *audio_mgr_priv;
+	AUDIO_MANAGER_DEBUG("--->%s\n",__FUNCTION__);
+
+	/* Get snd card nums */
+	card_nums = HAL_SndCard_GetCardNums();
+	if(!card_nums){
+		AUDIO_MANAGER_ERROR("card nums is 0!\n");
 		return -1;
-	return 0;
-}
-
-static int __set_eqscene(mgrctl* m, uint8_t scene)
-{
-	mgrctl_ctx* mc;
-	mc = (mgrctl_ctx*)m;
-	if (aud_set_eqscene(mc, scene) != 0)
-		return -1;
-	return 0;
-}
-
-static struct mgrctl_ops mgr_ops =
-{
-	.volume 	= __set_volume,
-	.path		= __set_path,
-	.mute 		= __set_mute,
-	.eqscene	= __set_eqscene,
-};
-
-static int set_mute(mgrctl* m, uint32_t dev, uint8_t mute)
-{
-	return m->ops->mute(m, dev, mute);
-}
-
-static int set_volume(mgrctl* m, uint32_t dev, uint8_t vol)
-{
-	return m->ops->volume(m, dev, vol);
-}
-
-static int set_path(mgrctl* m, uint32_t dev, uint8_t dev_en)
-{
-	return m->ops->path(m, dev, dev_en);
-}
-
-static int set_eqscene(mgrctl* m, uint8_t scene)
-{
-	return m->ops->eqscene(m, scene);
-}
-
-/**
- * event:
- *	0: volume event
- *	1: dev event
- */
-int aud_mgr_handler(AudioManagerCommand event, uint32_t dev, uint32_t param)
-{
-	BUG_ON(event >= AUDIO_DEVICE_MANAGER_NONE);
-
-	mgrctl_ctx* mc = &g_mc;
-	MANAGER_MUTEX_LOCK(&(mc->lock));
-
-	switch (event) {
-		case AUDIO_DEVICE_MANAGER_VOLUME :
-			set_volume(&(mc->base), dev, param);
-			break;
-		case AUDIO_DEVICE_MANAGER_MUTE:
-			set_mute(&(mc->base), dev, param);
-			break;
-		case AUDIO_DEVICE_MANAGER_PATH :
-			set_path(&(mc->base), dev, param);
-			break;
-		case AUDIO_DEVICE_MANAGER_EQSCENE :
-			set_eqscene(&(mc->base), param);
-			break;
-		default:
-			break;
 	}
 
-	MANAGER_MUTEX_UNLOCK(&(mc->lock));
-	return 0;
-}
+	/* Malloc buffer and init*/
+	audio_mgr_temp = (char *)audio_manager_zalloc(sizeof(struct audio_manager_priv) * card_nums);
+	card_num = (uint8_t *)audio_manager_zalloc(sizeof(uint8_t) * card_nums);
 
-mgrctl_ctx * aud_mgr_ctx()
-{
-	mgrctl_ctx* mc = &g_mc;
-	return mc;
-}
-
-int aud_mgr_init()
-{
-	mgrctl_ctx* mc = &g_mc;
-	memset(mc, 0, sizeof(*mc));
-
-	mc->base.ops = &mgr_ops;
-
-	if (MANAGER_MUTEX_INIT(&(mc->lock)) != 0)
+	if(!audio_mgr_temp || !card_num){
+		AUDIO_MANAGER_ERROR("Malloc audio manager buffer Fail!\n");
+		audio_manager_free(audio_mgr_temp);
+		audio_manager_free(card_num);
 		return -1;
-	mc->is_initialize = 1;
+	}
+
+	HAL_SndCard_GetAllCardNum(card_num);
+
+	/* Init struct audio_manager_priv and list add */
+	for(i=0; i<card_nums; i++){
+		//Init struct audio_manager_priv
+		audio_mgr_priv = (struct audio_manager_priv *)(audio_mgr_temp + sizeof(struct audio_manager_priv)*i);
+		audio_mgr_priv->card_num = (Snd_Card_Num)card_num[i];
+		audio_mgr_lock_init(&audio_mgr_priv->lock);
+
+		//list add
+		list_add(&audio_mgr_priv->node, &audio_manager_list);
+	}
+
+	/* Free get card num buffer */
+	audio_manager_free(card_num);
+
 	return 0;
 }
 
-int aud_mgr_deinit()
+int audio_manager_deinit(void)
 {
-	mgrctl_ctx* mc = &g_mc;
-	mc->is_initialize = 0;
-	memset(mc, 0, sizeof(*mc));
-	MANAGER_NUTEX_DESTROY(&(mc->lock));
+	AUDIO_MANAGER_DEBUG("--->%s\n",__FUNCTION__);
+	struct audio_manager_priv *audio_mgr_priv, *next;
+
+	/* Check audio manager list empty or not */
+	if(list_empty(&audio_manager_list)){
+		AUDIO_MANAGER_DEBUG("Audio manager list is empty, don't need to deinit\n");
+		return 0;
+	}
+
+	/* Get audio manager priv to deinit */
+	list_for_each_entry_safe(audio_mgr_priv, next, &audio_manager_list, node){
+		//audio manager priv deinit
+		audio_mgr_lock_deinit(&audio_mgr_priv->lock);
+
+		//delete the audio manager list and free audio manager priv buffer
+		list_del(&audio_mgr_priv->node);
+		audio_manager_free(audio_mgr_priv);
+	}
+
 	return 0;
 }
-#endif /* MANAGER_NULL */
+
+

@@ -4,6 +4,7 @@ XR872_CHIP_PATH  := drivers/src/driver/chip
 XR872_CHIP_FILES := \
                    $(XR872_CHIP_PATH)/flashchip/flash_chip.c     \
                    $(XR872_CHIP_PATH)/flashchip/flash_chip_cfg.c  \
+				   $(XR872_CHIP_PATH)/flashchip/flash_P25QXXH.c  \
                    $(XR872_CHIP_PATH)/hal_icache.c \
                    $(XR872_CHIP_PATH)/hal_dcache.c  \
                    $(XR872_CHIP_PATH)/hal_adc.c                  \

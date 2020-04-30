@@ -9,7 +9,7 @@ MKIMAGE_TOOL := "$(SOURCE_ROOT)/$($(HOST_MCU_FAMILY)_LOCATION)/drivers/tools/mki
 XZ_TOOL := "$(SOURCE_ROOT)/$($(HOST_MCU_FAMILY)_LOCATION)/drivers/tools/xz"
 else # Linux32
 ifeq ($(HOST_OS),Linux64)
-MKIMAGE_TOOL := "$(SOURCE_ROOT)/$($(HOST_MCU_FAMILY)_LOCATION)/drivers/tools/mkimage_64"
+MKIMAGE_TOOL := "$(SOURCE_ROOT)/$($(HOST_MCU_FAMILY)_LOCATION)/drivers/tools/mkimage"
 XZ_TOOL := "$(SOURCE_ROOT)/$($(HOST_MCU_FAMILY)_LOCATION)/drivers/tools/xz64"
 else # Linux64
 $(error not surport for $(HOST_OS))
@@ -31,7 +31,7 @@ else
 IMAGE_OTA :=
 endif
 
-IMAGE_CFG_FILE ?= "$(SOURCE_ROOT)/$($(HOST_MCU_FAMILY)_LOCATION)/drivers/image_cfg/image-${APP}.cfg"
+IMAGE_CFG_FILE ?= "$(SOURCE_ROOT)/$($(HOST_MCU_FAMILY)_LOCATION)/drivers/project/image_cfg/image-${APP}.cfg"
 IMAGE_PACK_DIR ?= "$(SOURCE_ROOT)/$($(HOST_MCU_FAMILY)_LOCATION)/drivers/pack"
 BINARY_DIR ?= $(SOURCE_ROOT)out/$(CLEANED_BUILD_STRING)/binary
 
@@ -39,6 +39,7 @@ mkimage:
 	$(OBJCOPY) -O binary -R .xip -R .eh_frame -R .init -R .fini -R .comment -R .ARM.attributes $(BINARY_DIR)/$(CLEANED_BUILD_STRING).elf $(BINARY_DIR)/$(CLEANED_BUILD_STRING).bin
 	$(OBJCOPY) -O binary -j .xip $(BINARY_DIR)/$(CLEANED_BUILD_STRING).elf $(BINARY_DIR)/$(CLEANED_BUILD_STRING).xip.bin
 	$(CP) -vf $(SOURCE_ROOT)/$($(HOST_MCU_FAMILY)_LOCATION)/drivers/bin/xradio_v2/*.bin  $(IMAGE_PACK_DIR)/
+	$(CP) -vf $(SOURCE_ROOT)/$($(HOST_MCU_FAMILY)_LOCATION)/drivers/bin/xradio_v2/boot/xr872/*.bin  $(IMAGE_PACK_DIR)/
 	$(CP) -vf $(SOURCE_ROOT)out/$(CLEANED_BUILD_STRING)/binary/$(CLEANED_BUILD_STRING).bin  $(IMAGE_PACK_DIR)/app.bin
 	$(CP) -vf $(SOURCE_ROOT)out/$(CLEANED_BUILD_STRING)/binary/$(CLEANED_BUILD_STRING).xip.bin  $(IMAGE_PACK_DIR)/app-xip.bin
 	$(CP) -vf $(MKIMAGE_TOOL)  $(IMAGE_PACK_DIR)/mkimage

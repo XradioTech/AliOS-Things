@@ -37,7 +37,6 @@
  *       Using/Enabling SWD may cause flash read/write error.
  */
 #define BOARD_SWD_EN		PRJCONF_SWD_EN
-#define BOARD_CSI_SDC_EN	PRJCONF_CSI_SDC_EN
 
 static const GPIO_PinMuxParam g_pinmux_uart0[] = {
 	{ GPIO_PORT_B, GPIO_PIN_0,  { GPIOB_P0_F2_UART0_TX,   GPIO_DRIVING_LEVEL_1, GPIO_PULL_UP } }, /* TX */
@@ -94,13 +93,8 @@ static const GPIO_PinMuxParam g_pinmux_irtx[] = {
 
 __xip_rodata
 static const GPIO_PinMuxParam g_pinmux_i2c0[] = {
-#if BOARD_CSI_SDC_EN || defined(__CONFIG_CHIP_XR808)
-	{ GPIO_PORT_A, GPIO_PIN_19,  { GPIOA_P19_F3_I2C0_SCL,   GPIO_DRIVING_LEVEL_1, GPIO_PULL_UP } },
-	{ GPIO_PORT_A, GPIO_PIN_20,  { GPIOA_P20_F3_I2C0_SDA,   GPIO_DRIVING_LEVEL_1, GPIO_PULL_UP } },
-#else
-	{ GPIO_PORT_A, GPIO_PIN_4,  { GPIOA_P4_F4_I2C0_SCL,   GPIO_DRIVING_LEVEL_1, GPIO_PULL_UP } },
-	{ GPIO_PORT_A, GPIO_PIN_5,  { GPIOA_P5_F4_I2C0_SDA,   GPIO_DRIVING_LEVEL_1, GPIO_PULL_UP } },
-#endif
+	{ GPIO_PORT_A, GPIO_PIN_19,  { GPIOA_P19_F3_I2C0_SCL,   GPIO_DRIVING_LEVEL_1, GPIO_PULL_NONE } },
+	{ GPIO_PORT_A, GPIO_PIN_20,  { GPIOA_P20_F3_I2C0_SDA,   GPIO_DRIVING_LEVEL_1, GPIO_PULL_NONE } },
 };
 
 __xip_rodata
@@ -159,8 +153,10 @@ __xip_rodata
 static const GPIO_PinMuxParam g_pinmux_spi1_cs0[] = {
 #if defined(__CONFIG_CHIP_XR872)
 	{ GPIO_PORT_A, GPIO_PIN_3,  { GPIOA_P3_F2_SPI1_CS0,   GPIO_DRIVING_LEVEL_1, GPIO_PULL_UP } },
+    { GPIO_PORT_B, GPIO_PIN_19,  { GPIOx_Pn_F0_INPUT,      GPIO_DRIVING_LEVEL_1, GPIO_PULL_UP }},
 #elif defined(__CONFIG_CHIP_XR808)
 	{ GPIO_PORT_A, GPIO_PIN_22,  { GPIOA_P22_F5_SPI1_CS0,   GPIO_DRIVING_LEVEL_1, GPIO_PULL_UP } },
+	{ GPIO_PORT_B, GPIO_PIN_19,  { GPIOx_Pn_F0_INPUT,      GPIO_DRIVING_LEVEL_1, GPIO_PULL_UP }},
 #endif
 };
 
@@ -168,11 +164,13 @@ static const GPIO_PinMuxParam g_pinmux_spi1_cs0[] = {
 __xip_rodata
 static const GPIO_PinMuxParam g_pinmux_spi1_cs1[] = {
 	{ GPIO_PORT_A, GPIO_PIN_6,  { GPIOA_P6_F3_SPI1_CS1,   GPIO_DRIVING_LEVEL_1, GPIO_PULL_UP } },
+	{ GPIO_PORT_B, GPIO_PIN_20,  { GPIOx_Pn_F0_INPUT,      GPIO_DRIVING_LEVEL_1, GPIO_PULL_UP }},
 };
 
 __xip_rodata
 static const GPIO_PinMuxParam g_pinmux_spi1_cs2[] = {
 	{ GPIO_PORT_A, GPIO_PIN_7,  { GPIOA_P7_F3_SPI1_CS2,   GPIO_DRIVING_LEVEL_1, GPIO_PULL_UP } },
+	{ GPIO_PORT_B, GPIO_PIN_21,  { GPIOx_Pn_F0_INPUT,      GPIO_DRIVING_LEVEL_1, GPIO_PULL_UP }},
 };
 #endif
 
@@ -234,18 +232,12 @@ static const GPIO_PinMuxParam g_pinmux_pwm[] = {
 
 __xip_rodata
 static const GPIO_PinMuxParam g_pinmux_sd0[BOARD_SD0_DATA_BITS + 2] = {
-#if BOARD_CSI_SDC_EN
-	{ GPIO_PORT_B, GPIO_PIN_16,	{ GPIOB_P16_F3_SD_CMD,	  GPIO_DRIVING_LEVEL_2, GPIO_PULL_UP } },	/* CMD */
-	{ GPIO_PORT_B, GPIO_PIN_17,	{ GPIOB_P17_F3_SD_DATA0,  GPIO_DRIVING_LEVEL_2, GPIO_PULL_UP } },	/* CLK */
-	{ GPIO_PORT_B, GPIO_PIN_18,	{ GPIOB_P18_F3_SD_CLK,	  GPIO_DRIVING_LEVEL_2, GPIO_PULL_UP } },	/* D0 */
-#else
-	{ GPIO_PORT_A, GPIO_PIN_0,  { GPIOA_P0_F3_SD_CMD,     GPIO_DRIVING_LEVEL_2, GPIO_PULL_UP } },	/* CMD */
-	{ GPIO_PORT_A, GPIO_PIN_2,  { GPIOA_P2_F3_SD_CLK,     GPIO_DRIVING_LEVEL_2, GPIO_PULL_UP } },	/* CLK */
-	{ GPIO_PORT_A, GPIO_PIN_1,  { GPIOA_P1_F3_SD_DATA0,   GPIO_DRIVING_LEVEL_2, GPIO_PULL_UP } },	/* D0 */
+	{ GPIO_PORT_B, GPIO_PIN_16,  { GPIOB_P16_F3_SD_CMD,     GPIO_DRIVING_LEVEL_2, GPIO_PULL_UP } },	/* CMD */
+	{ GPIO_PORT_B, GPIO_PIN_18,  { GPIOB_P18_F3_SD_CLK,     GPIO_DRIVING_LEVEL_2, GPIO_PULL_UP } },	/* CLK */
+	{ GPIO_PORT_B, GPIO_PIN_17,  { GPIOB_P17_F3_SD_DATA0,   GPIO_DRIVING_LEVEL_2, GPIO_PULL_UP } },	/* D0 */
 //	{ GPIO_PORT_A, GPIO_PIN_3,  { GPIOA_P3_F3_SD_DATA1,   GPIO_DRIVING_LEVEL_2, GPIO_PULL_UP } },	/* D1 */
 //	{ GPIO_PORT_A, GPIO_PIN_4,  { GPIOA_P4_F3_SD_DATA2,   GPIO_DRIVING_LEVEL_2, GPIO_PULL_UP } },	/* D2 */
 //	{ GPIO_PORT_A, GPIO_PIN_5,  { GPIOA_P5_F3_SD_DATA3,   GPIO_DRIVING_LEVEL_2, GPIO_PULL_UP } },	/* D3 */
-#endif
 };
 
 __xip_rodata
@@ -282,9 +274,10 @@ static const GPIO_PinMuxParam g_pinmux_csi[] = {
 };
 
 
-#define BOARD_PA_PORT    		GPIO_PORT_A
-#define BOARD_PA_PIN     		GPIO_PIN_3
-#define BOARD_PA_ON_DELAY     	10
+#define BOARD_PA_PORT    			GPIO_PORT_A
+#define BOARD_PA_PIN     			GPIO_PIN_3
+#define BOARD_PA_ON_DELAY_BEFORE	5
+#define BOARD_PA_ON_DELAY_AFTER		100
 
 __xip_rodata
 static const GPIO_PinMuxParam g_pinmux_pa_switch[] = {
@@ -294,31 +287,14 @@ static const GPIO_PinMuxParam g_pinmux_pa_switch[] = {
 __xip_rodata
 static const Pa_Switch_Ctl pa_switch_ctl = {
 	.on_state  = GPIO_PIN_HIGH,
-	.on_delay  = BOARD_PA_ON_DELAY,
+	.on_delay_before = BOARD_PA_ON_DELAY_BEFORE,
+	.on_delay_after  = BOARD_PA_ON_DELAY_AFTER,
 	.pin_param = g_pinmux_pa_switch,
 	.pin_param_cnt = HAL_ARRAY_SIZE(g_pinmux_pa_switch),
 };
 
-#define BOARD_LINEIN_DET_EN   	0
 
-#if BOARD_LINEIN_DET_EN
-#define BOARD_LINEIN_DET_PORT    	GPIO_PORT_A
-#define BOARD_LINEIN_DET_PIN    	GPIO_PIN_16
-#define BOARD_LINEIN_DET_PIN_MODE	GPIOx_Pn_F6_EINT
-
-__xip_rodata
-static const GPIO_PinMuxParam g_pinmux_linein_det[] = {
-	{ BOARD_LINEIN_DET_PORT, BOARD_LINEIN_DET_PIN, { BOARD_LINEIN_DET_PIN_MODE,  GPIO_DRIVING_LEVEL_1, GPIO_PULL_UP } },
-};
-
-__xip_rodata
-static const Linein_Detect_Ctl linein_det_ctl = {
-	.insert_state  = GPIO_PIN_HIGH,
-	.pin_param     = g_pinmux_linein_det,
-	.pin_param_cnt = HAL_ARRAY_SIZE(g_pinmux_linein_det),
-};
-#endif
-
+#if PRJCONF_INTERNAL_SOUNDCARD_EN
 __xip_rodata const static struct snd_card_board_config xradio_internal_codec_snd_card = {
 	.card_num = SND_CARD_0,
 	.card_name = HAL_SND_CARD_NAME(XRADIO_INTERNAL_CODEC_NAME, SND_CARD_SUFFIX),
@@ -326,20 +302,18 @@ __xip_rodata const static struct snd_card_board_config xradio_internal_codec_snd
 	.platform_link = XRADIO_PLATFORM_NULL,
 
 	.pa_switch_ctl = &pa_switch_ctl,
-#if BOARD_LINEIN_DET_EN
-	.linein_detect_ctl = &linein_det_ctl,
-#else
-	.linein_detect_ctl = NULL,
-#endif
 
 	.codec_sysclk_src = SYSCLK_SRC_PLL,
 	.codec_pllclk_src = 0,	//xradio_internal_codec not use
 	.codec_pll_freq_in = 0,	//xradio_internal_codec not use
 	.i2s_fmt = 0,			//xradio_internal_codec not use
 };
+#endif
 
 const static struct snd_card_board_config *snd_cards_board_cfg[] = {
+#if PRJCONF_INTERNAL_SOUNDCARD_EN
 	&xradio_internal_codec_snd_card,
+#endif
 };
 #endif
 
@@ -492,12 +466,6 @@ static HAL_Status board_get_pinmux_info(uint32_t major, uint32_t minor, uint32_t
 					info[0].pinmux = snd_cards_board_cfg[i]->pa_switch_ctl->pin_param;
 					info[0].count  = snd_cards_board_cfg[i]->pa_switch_ctl->pin_param_cnt;
 				}
-			#if BOARD_LINEIN_DET_EN
-				if(snd_cards_board_cfg[i]->linein_detect_ctl){
-					info[1].pinmux = snd_cards_board_cfg[i]->linein_detect_ctl->pin_param;
-					info[1].count  = snd_cards_board_cfg[i]->linein_detect_ctl->pin_param_cnt;
-				}
-			#endif
 			}
 		}
 		break;

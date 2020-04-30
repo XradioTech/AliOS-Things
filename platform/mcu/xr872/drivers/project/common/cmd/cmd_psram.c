@@ -35,12 +35,13 @@
 #include "cmd_psram.h"
 #include "image/image.h"
 
+#include "driver/chip/hal_dcache.h"
 #include "driver/chip/hal_rtc.h"
 #include "driver/chip/psram/psram.h"
 #include "driver/chip/psram/hal_psramctrl.h"
-#include "driver/chip/hal_dcache.h"
+#include "driver/chip/private/hal_os.h"
 
-#define CMD_PSRAM_EXE_AND_BENCH /* run code and read write data in psram */
+//#define CMD_PSRAM_EXE_AND_BENCH /* run code and read write data in psram */
 
 #ifdef CMD_PSRAM_EXE_AND_BENCH
 #define __CMD_SRAM_RODATA __psram_rodata
@@ -73,6 +74,9 @@
 		             __func__, __LINE__, ##arg);\
 	} while (0)
 
+#ifdef __CONFIG_PSRAM_MALLOC_TRACE
+extern uint32_t psram_malloc_heap_info(int verbose);
+#endif
 
 __CMD_SRAM_DATA
 static uint32_t dmaPrintFlgCpu = 0;
@@ -98,6 +102,7 @@ static int psram_dma_read_write(uint32_t write, uint32_t addr,
 	DMA_DataWidth dma_data_width;
 	OS_Semaphore_t *dma_sem;
 	uint32_t wt_saddr, wt_eaddr;
+    int32_t dcacheWT_idx = -1;
 
 	dma_ch = HAL_DMA_Request();
 	if (dma_ch == DMA_CHANNEL_INVALID) {
@@ -157,7 +162,11 @@ static int psram_dma_read_write(uint32_t write, uint32_t addr,
 
 	wt_saddr = rounddown2(addr, 16);
 	wt_eaddr = roundup2((uint32_t)addr + len, 16);
-	HAL_Dcache_SetWriteThrough(1, 1, wt_saddr, wt_eaddr);
+	dcacheWT_idx = HAL_Dcache_Enable_WriteThrough(wt_saddr, wt_eaddr);
+    if(dcacheWT_idx == -1) {
+        ret = -1;
+        goto out;
+    }
 
 	if (write)
 		HAL_DMA_Start(dma_ch, (uint32_t)buf, (uint32_t)addr, len);
@@ -165,18 +174,22 @@ static int psram_dma_read_write(uint32_t write, uint32_t addr,
 		HAL_DMA_Start(dma_ch, (uint32_t)addr, (uint32_t)buf, len);
 
 	ret = OS_SemaphoreWait(dma_sem, 2000);
-	if (ret != OS_OK)
-		CMD_PSRAM_ERR("sem wait failed: %d\n", ret);
+	if (ret != OS_OK) {
+        CMD_PSRAM_ERR("sem wait failed: %d\n", ret);
+        ret = -1;
+    }
 
-	HAL_Dcache_SetWriteThrough(1, 0, 0, 0);
+	HAL_Dcache_Disable_WriteThrough(dcacheWT_idx);
 
 	HAL_DMA_Stop(dma_ch);
+
+out:
 	HAL_DMA_DeInit(dma_ch);
 	HAL_DMA_Release(dma_ch);
 
 	OS_SemaphoreDelete(dma_sem);
 
-	return 0;
+	return ret;
 }
 
 typedef int (*psram_read_write)(uint32_t write, uint32_t addr, uint8_t *buf, uint32_t len, void *arg);
@@ -232,8 +245,10 @@ static int psram_sbus_cpu_read_write(uint32_t write, uint32_t addr, uint8_t *buf
 __CMD_SRAM_TEXT
 static int psram_sbus_dma_read_write(uint32_t write, uint32_t addr, uint8_t *buf, uint32_t len, void *arg)
 {
+    int ret = 0;
 	struct psram_chip *chip;
 	uint32_t wt_saddr, wt_eaddr;
+    int32_t dcacheWT_idx = -1;
 
 	chip = psram_open(0);
 	if (!chip) {
@@ -244,18 +259,22 @@ static int psram_sbus_dma_read_write(uint32_t write, uint32_t addr, uint8_t *buf
 	wt_saddr = rounddown2(addr, 16);
 	wt_eaddr = roundup2((uint32_t)addr + len, 16);
 
-	HAL_Dcache_SetWriteThrough(0, 1, wt_saddr, wt_eaddr);
-
+	dcacheWT_idx = HAL_Dcache_Enable_WriteThrough(wt_saddr, wt_eaddr);
+    if(dcacheWT_idx == -1) {
+        ret = -1;
+        goto out;
+    }
 	if (write)
 		psram_sbus_dma_write(chip, addr, buf, len);
 	else
 		psram_sbus_dma_read(chip, addr, buf, len);
 
-	HAL_Dcache_SetWriteThrough(0, 0, 0, 0);
+	HAL_Dcache_Disable_WriteThrough(dcacheWT_idx);
 
+out:
 	psram_close(chip);
 
-	return 0;
+	return ret;
 }
 
 __CMD_SRAM_DATA
@@ -285,6 +304,9 @@ enum cmd_status cmd_info_exec(char *cmd)
 	psram_info_dump(chip);
 	psram_close(0);
 
+#ifdef __CONFIG_PSRAM_MALLOC_TRACE
+	psram_malloc_heap_info(cmd_atoi(cmd));
+#endif
 	return CMD_STATUS_OK;
 }
 
@@ -453,7 +475,7 @@ static enum cmd_status cmd_psram_membist_exec(char *cmd)
 	}
 
 	if (mode == 0) {
-		size = IDCACHE_END_ADDR - (uint32_t)__psram_end__;
+		size = DCACHE_END_ADDR - (uint32_t)__psram_end__;
 		while (!add && size >= 1024) {
 			add = psram_malloc(size);
 			size -= 1024;
@@ -461,8 +483,8 @@ static enum cmd_status cmd_psram_membist_exec(char *cmd)
 		}
 		size += 1024;
 	} else if (mode == 1) {
-		add = (uint32_t *)IDCACHE_START_ADDR;
-		size = IDCACHE_END_ADDR - IDCACHE_START_ADDR;
+		add = (uint32_t *)DCACHE_START_ADDR;
+		size = DCACHE_END_ADDR - DCACHE_START_ADDR;
 	}
 	size /= 4;
 	CMD_SRAM_DBG("%s,%d start:%p size:%d KB\n", __func__, __LINE__, add, size / (1024/4));
@@ -517,11 +539,11 @@ static void cmd_psram_bench_task(void *arg)
 	switch (mode) {
 	case 0:
 	case 1:
-		if (start_addr < (uint32_t)__PSRAM_Base ||
-		    start_addr >= ((uint32_t)__PSRAM_Base + 8*1024*1024)) {
+		if (start_addr < (uint32_t)__PSRAM_BASE ||
+		    start_addr >= ((uint32_t)__PSRAM_BASE + 8*1024*1024)) {
 			CMD_PSRAM_ERR("invalid argument start_addr:%x, should >= 0x%x and < 0x%x\n",
-			        start_addr, (uint32_t)__PSRAM_Base,
-			        ((uint32_t)__PSRAM_Base + 8*1024*1024));
+			        start_addr, (uint32_t)__PSRAM_BASE,
+			        ((uint32_t)__PSRAM_BASE + 8*1024*1024));
 			goto out;
 		}
 		break;
@@ -550,11 +572,13 @@ static void cmd_psram_bench_task(void *arg)
 			buf[j] = j;
 
 		//HAL_Dcache_DUMP_MissHit();
-		HAL_Dcache_FlushCleanAll();
+		HAL_Dcache_CleanAll();
+		HAL_Dcache_FlushAll();
 		tick_start = OS_GetTicks();
 		err = psram_rw_op[mode](1, start_addr, (uint8_t *)buf, bench_size, NULL);
 		tick_use1 = OS_GetTicks() - tick_start;
-		HAL_Dcache_FlushCleanAll();
+		HAL_Dcache_CleanAll();
+		HAL_Dcache_FlushAll();
 		tick_use2 = OS_GetTicks() - tick_start;
 		//HAL_Dcache_DUMP_MissHit();
 		if (!tick_use1)
@@ -578,11 +602,13 @@ static void cmd_psram_bench_task(void *arg)
 			buf[j] = 0;
 
 		//HAL_Dcache_DUMP_MissHit();
-		HAL_Dcache_FlushCleanAll();
+		HAL_Dcache_CleanAll();
+		HAL_Dcache_FlushAll();
 		tick_start = OS_GetTicks();
 		err = psram_rw_op[mode](0, start_addr, (uint8_t *)buf, bench_size, NULL);
 		tick_use1 = OS_GetTicks() - tick_start;
-		HAL_Dcache_FlushCleanAll();
+		HAL_Dcache_CleanAll();
+		HAL_Dcache_FlushAll();
 		tick_use2 = OS_GetTicks() - tick_start;
 		//HAL_Dcache_DUMP_MissHit();
 		if (!tick_use1)
@@ -1005,10 +1031,7 @@ static enum cmd_status cmd_psram_malloc_exec(char *cmd)
 	}
 
 	add = psram_malloc(size);
-	printf("%s malloc:%p\n", __func__, add);
-
-	if (wt)
-		HAL_Dcache_SetWriteThrough(0, 1, (uint32_t)add, (uint32_t)add + size);
+	CMD_SYSLOG("%s malloc:%p\n", __func__, add);
 
 	return CMD_STATUS_OK;
 }
@@ -1029,10 +1052,7 @@ static enum cmd_status cmd_psram_free_exec(char *cmd)
 	}
 
 	psram_free(add);
-	printf("%s free:%p\n", __func__, add);
-
-	if (wt)
-		HAL_Dcache_SetWriteThrough(0, 0, 0, 0);
+	CMD_SYSLOG("%s free:%p\n", __func__, add);
 
 	return CMD_STATUS_OK;
 }
@@ -1046,6 +1066,7 @@ static enum cmd_status cmd_psram_wt_exec(char *cmd)
 	void *add;
 	uint32_t idx, en, size;
 	uint32_t cnt;
+    int32_t dcacheWT_idx = -1;
 
 	cnt = cmd_sscanf(cmd, "%d %d 0x%x 0x%x", &idx, &en, (unsigned int *)&add, &size);
 	if (cnt != 4) {
@@ -1060,7 +1081,11 @@ static enum cmd_status cmd_psram_wt_exec(char *cmd)
 		return CMD_STATUS_INVALID_ARG;
 	}
 
-	HAL_Dcache_SetWriteThrough(idx, en, (uint32_t)add, (uint32_t)add + size);
+	dcacheWT_idx = HAL_Dcache_Enable_WriteThrough((uint32_t)add, (uint32_t)add + size);
+    if(dcacheWT_idx == -1) {
+        CMD_ERR("cmd_psram_wt_exec failed\n");
+        return CMD_STATUS_FAIL;
+    }
 
 	return CMD_STATUS_OK;
 }
@@ -1071,8 +1096,8 @@ static enum cmd_status cmd_psram_wt_exec(char *cmd)
 __CMD_SRAM_TEXT
 static enum cmd_status cmd_psram_flush_clean_exec(char *cmd)
 {
-	HAL_Dcache_FlushCleanAll();
-
+	HAL_Dcache_CleanAll();
+	HAL_Dcache_FlushAll();
 	return CMD_STATUS_OK;
 }
 
@@ -1139,6 +1164,224 @@ static enum cmd_status cmd_psram_check_exec(char *cmd)
 	return CMD_STATUS_OK;
 }
 
+__CMD_SRAM_TEXT
+static enum cmd_status cmd_psram_space_exec(char *cmd)
+{
+	extern uint8_t __psram_end__[];
+    printf("psram heap space [%p, %p), total size %u Bytes, free size %u Bytes\n",
+	           __psram_end__, (uint32_t*)((uint32_t)__PSRAM_BASE+(uint32_t)__PSRAM_LENGTH),
+	           (uint32_t)__PSRAM_BASE + (uint32_t)__PSRAM_LENGTH - (uint32_t)__psram_end__, psram_GetFreeHeapSize());
+	return CMD_STATUS_OK;
+}
+
+#define PSRAM_PERFORMANCE_TEST_MAX_SIZE (32*1024)
+#define PSRAM_PERFORMANCE_TEST_READ         (0)
+#define PSRAM_PERFORMANCE_TEST_WRITE        (1)
+#define PSRAM_PERFORMANCE_TEST_READCACHE    (2)
+#define PSRAM_PERFORMANCE_TEST_WRITECACHE   (3)
+
+__CMD_SRAM_TEXT
+static uint32_t numToCacheLineCfg(uint32_t num, uint32_t operate)
+{
+    uint32_t cacheLine = ~0;
+    if( (operate == PSRAM_PERFORMANCE_TEST_READ) || (operate == PSRAM_PERFORMANCE_TEST_READCACHE) ) {
+        switch(num) {
+        case 8:
+            cacheLine = PSRAMC_CACHE_LL_64BIT;
+            break;
+        case 16:
+            cacheLine = PSRAMC_CACHE_LL_128BIT;
+            break;
+        case 32:
+            cacheLine = PSRAMC_CACHE_LL_256BIT;
+            break;
+        default:
+            CMD_ERR("Invalid read cache line, supported read 8/16/32 Bytes obly\n");
+        }
+    } else if( (operate == PSRAM_PERFORMANCE_TEST_WRITE) || (operate == PSRAM_PERFORMANCE_TEST_WRITECACHE) ) {
+        switch(num) {
+        case 8:
+            cacheLine = PSRAMC_WR_CACHE_LINE_LEN_8B;
+            break;
+        case 16:
+            cacheLine = PSRAMC_WR_CACHE_LINE_LEN_16B;
+            break;
+        case 32:
+            cacheLine = PSRAMC_WR_CACHE_LINE_LEN_32B;
+            break;
+        case 64:
+            cacheLine = PSRAMC_WR_CACHE_LINE_LEN_64B;
+            break;
+        case 80:
+            cacheLine = PSRAMC_WR_CACHE_LINE_LEN_80B;
+            break;
+        case 96:
+            cacheLine = PSRAMC_WR_CACHE_LINE_LEN_96B;
+            break;
+        case 112:
+            cacheLine = PSRAMC_WR_CACHE_LINE_LEN_112B;
+            break;
+        default:
+            CMD_ERR("Invalid write cache line, supported write 8/16/32/64/80/96/112 Bytes obly\n");
+        }
+    }
+
+    return cacheLine;
+}
+
+__CMD_SRAM_TEXT
+static enum cmd_status cmd_psram_performance_exec(char *cmd)
+{
+    uint8_t* pPsramPtr;
+    uint8_t* pSramPtr;
+    uint8_t* pSramOldPtr;
+    uint64_t time1;
+    uint64_t time2;
+    uint64_t time3;
+    uint64_t time4;
+    uint32_t len;
+    uint32_t ret;
+    char opStr[16];
+    uint32_t operate;
+    uint32_t cache_line;
+    uint32_t hitMissCnt[32];
+    __psram_data  __attribute__ ((aligned (16))) static uint8_t psramArr[PSRAM_PERFORMANCE_TEST_MAX_SIZE];
+    ret = cmd_sscanf(cmd, "%s %d", opStr, &cache_line);
+    if (ret != 2) {
+        CMD_PSRAM_ERR("invalid argument %s\n", cmd);
+        return CMD_STATUS_INVALID_ARG;
+    }
+    if(cmd_strcmp(opStr, "read") == 0) {
+        operate = PSRAM_PERFORMANCE_TEST_READ;
+    } else if(cmd_strcmp(opStr, "write") == 0) {
+        operate = PSRAM_PERFORMANCE_TEST_WRITE;
+    } else if(cmd_strcmp(opStr, "readcache") == 0) {
+        operate = PSRAM_PERFORMANCE_TEST_READCACHE;
+    } else if(cmd_strcmp(opStr, "writecache") == 0) {
+        operate = PSRAM_PERFORMANCE_TEST_WRITECACHE;
+    } else {
+        CMD_PSRAM_ERR("invalid argument %s\n", cmd);
+        return CMD_STATUS_INVALID_ARG;
+    }
+    cache_line = numToCacheLineCfg(cache_line, operate);
+    if(cache_line == ~0) {
+        return CMD_STATUS_INVALID_ARG;
+    }
+
+    pPsramPtr = (uint8_t*)psram_malloc(PSRAM_PERFORMANCE_TEST_MAX_SIZE);
+    if(pPsramPtr == NULL) {
+        CMD_PSRAM_ERR("psram_malloc failed\n");
+        return CMD_STATUS_FAIL;
+    }
+    pSramOldPtr = (uint8_t*)cmd_malloc(PSRAM_PERFORMANCE_TEST_MAX_SIZE+32);
+    if(pSramOldPtr == NULL) {
+        psram_free(pPsramPtr);
+        CMD_PSRAM_ERR("cmd_malloc failed\n");
+        return CMD_STATUS_FAIL;
+    }
+    pSramPtr = (uint8_t*)((uint32_t)pSramOldPtr & ~0xF);
+    //printf("pPsramPtr=%p, pSramPtr=%p, psramArr=%p\n", pPsramPtr, pSramPtr, psramArr);
+
+    if(operate == PSRAM_PERFORMANCE_TEST_READ) {
+        HAL_PsramCtrl_Set_RD_BuffSize(cache_line);
+        for(uint32_t unit=1; unit<=PSRAM_PERFORMANCE_TEST_MAX_SIZE; unit=unit*2) {
+            HAL_DisableIRQ();
+            time1 = (uint64_t)(((uint64_t)RTC->FREERUN_CNT_H << 32) |  RTC->FREERUN_CNT_L);
+            for(len=0; len<PSRAM_PERFORMANCE_TEST_MAX_SIZE; len+=unit) {
+                cmd_memcpy(pSramPtr+len, pPsramPtr+len, unit);//read
+            }
+            time2 = (uint64_t)(((uint64_t)RTC->FREERUN_CNT_H << 32) |  RTC->FREERUN_CNT_L);
+            HAL_EnableIRQ();
+            CMD_SYSLOG("Read unit %6d bytes performance = %f MB/s\n",
+                unit, ((float)(PSRAM_PERFORMANCE_TEST_MAX_SIZE)/((uint32_t)(time2 - time1)*1000000/32768U)));
+        }
+    } else if (operate == PSRAM_PERFORMANCE_TEST_WRITE) {
+        HAL_PsramCtrl_Set_WR_BuffSize(cache_line);
+        for(uint32_t unit=1; unit<=PSRAM_PERFORMANCE_TEST_MAX_SIZE; unit=unit*2) {
+            HAL_DisableIRQ();
+            time1 = (uint64_t)(((uint64_t)RTC->FREERUN_CNT_H << 32) |  RTC->FREERUN_CNT_L);
+            for(len=0; len<PSRAM_PERFORMANCE_TEST_MAX_SIZE; len+=unit) {
+                cmd_memcpy(pPsramPtr+len, pSramPtr+len, unit);//write
+            }
+            time2 = (uint64_t)(((uint64_t)RTC->FREERUN_CNT_H << 32) |  RTC->FREERUN_CNT_L);
+            HAL_EnableIRQ();
+            CMD_SYSLOG("Write unit %6d bytes performance = %f MB/s\n",
+                unit, ((float)(PSRAM_PERFORMANCE_TEST_MAX_SIZE)/((uint32_t)(time2 - time1)*1000000/32768U)));
+        }
+    } else if (operate == PSRAM_PERFORMANCE_TEST_READCACHE) {
+        HAL_PsramCtrl_Set_RD_BuffSize(cache_line);
+        for(uint32_t unit=1; unit<=PSRAM_PERFORMANCE_TEST_MAX_SIZE; unit=unit*2) {
+            HAL_DisableIRQ();
+            HAL_Dcache_CleanAll();
+            HAL_Dcache_FlushAll();
+            hitMissCnt[0] = DCACHE_CTRL->MISS_COUNT_L;
+            hitMissCnt[1] = DCACHE_CTRL->HIT_COUNT_L;
+            time1 = (uint64_t)(((uint64_t)RTC->FREERUN_CNT_H << 32) |  RTC->FREERUN_CNT_L);
+            for(len=0; len<PSRAM_PERFORMANCE_TEST_MAX_SIZE; len+=unit) {
+                cmd_memcpy(pSramPtr+len, psramArr+len, unit);//read
+            }
+            time2 = (uint64_t)(((uint64_t)RTC->FREERUN_CNT_H << 32) |  RTC->FREERUN_CNT_L);
+            hitMissCnt[2] = DCACHE_CTRL->MISS_COUNT_L;
+            hitMissCnt[3] = DCACHE_CTRL->HIT_COUNT_L;
+            time3 = (uint64_t)(((uint64_t)RTC->FREERUN_CNT_H << 32) |  RTC->FREERUN_CNT_L);
+            for(len=0; len<PSRAM_PERFORMANCE_TEST_MAX_SIZE; len+=unit) {
+                cmd_memcpy(pSramPtr+len, psramArr+len, unit);//read2
+            }
+            time4 = (uint64_t)(((uint64_t)RTC->FREERUN_CNT_H << 32) |  RTC->FREERUN_CNT_L);
+            hitMissCnt[4] = DCACHE_CTRL->MISS_COUNT_L;
+            hitMissCnt[5] = DCACHE_CTRL->HIT_COUNT_L;
+            HAL_EnableIRQ();
+            CMD_SYSLOG("1:Read cache unit %6d bytes performance = %f MB/s\n",
+                unit, ((float)(PSRAM_PERFORMANCE_TEST_MAX_SIZE)/((uint32_t)(time2 - time1)*1000000/32768U)));
+            CMD_SYSLOG("hit=%d, miss=%d, hit/miss=%2f:1\n", (hitMissCnt[3]-hitMissCnt[1]), (hitMissCnt[2]-hitMissCnt[0]),
+                (float)(hitMissCnt[3]-hitMissCnt[1])/(hitMissCnt[2]-hitMissCnt[0]));
+
+            CMD_SYSLOG("2:Read cache unit %6d bytes performance = %f MB/s\n",
+                unit, ((float)(PSRAM_PERFORMANCE_TEST_MAX_SIZE)/((uint32_t)(time4 - time3)*1000000/32768U)));
+            CMD_SYSLOG("hit=%d, miss=%d, hit/miss=%2f:1\n\n", (hitMissCnt[5]-hitMissCnt[3]), (hitMissCnt[4]-hitMissCnt[2]),
+                (float)(hitMissCnt[5]-hitMissCnt[3])/(hitMissCnt[4]-hitMissCnt[2]));
+        }
+    } else if (operate == PSRAM_PERFORMANCE_TEST_WRITECACHE) {
+        HAL_PsramCtrl_Set_WR_BuffSize(cache_line);
+        for(uint32_t unit=1; unit<=PSRAM_PERFORMANCE_TEST_MAX_SIZE; unit=unit*2) {
+            HAL_DisableIRQ();
+            HAL_Dcache_CleanAll();
+            HAL_Dcache_FlushAll();
+            hitMissCnt[0] = DCACHE_CTRL->MISS_COUNT_L;
+            hitMissCnt[1] = DCACHE_CTRL->HIT_COUNT_L;
+            time1 = (uint64_t)(((uint64_t)RTC->FREERUN_CNT_H << 32) |  RTC->FREERUN_CNT_L);
+            for(len=0; len<PSRAM_PERFORMANCE_TEST_MAX_SIZE; len+=unit) {
+                cmd_memcpy(psramArr+len, pSramPtr+len, unit);//write
+            }
+            time2 = (uint64_t)(((uint64_t)RTC->FREERUN_CNT_H << 32) |  RTC->FREERUN_CNT_L);
+            hitMissCnt[2] = DCACHE_CTRL->MISS_COUNT_L;
+            hitMissCnt[3] = DCACHE_CTRL->HIT_COUNT_L;
+
+            time3 = (uint64_t)(((uint64_t)RTC->FREERUN_CNT_H << 32) |  RTC->FREERUN_CNT_L);
+            for(len=0; len<PSRAM_PERFORMANCE_TEST_MAX_SIZE; len+=unit) {
+                cmd_memcpy(psramArr+len, pSramPtr+len, unit);//write2
+            }
+            time4 = (uint64_t)(((uint64_t)RTC->FREERUN_CNT_H << 32) |  RTC->FREERUN_CNT_L);
+            hitMissCnt[4] = DCACHE_CTRL->MISS_COUNT_L;
+            hitMissCnt[5] = DCACHE_CTRL->HIT_COUNT_L;
+
+            HAL_EnableIRQ();
+            CMD_SYSLOG("1:Write cache unit %6d bytes performance = %f MB/s\n",
+                unit, ((float)(PSRAM_PERFORMANCE_TEST_MAX_SIZE)/((uint32_t)(time2 - time1)*1000000/32768U)));
+            CMD_SYSLOG("hit=%d, miss=%d, hit/miss=%2f:1\n", (hitMissCnt[3]-hitMissCnt[1]), (hitMissCnt[2]-hitMissCnt[0]),
+                (float)(hitMissCnt[3]-hitMissCnt[1])/(hitMissCnt[2]-hitMissCnt[0]));
+
+            CMD_SYSLOG("2:Write cache unit %6d bytes performance = %f MB/s\n",
+                unit, ((float)(PSRAM_PERFORMANCE_TEST_MAX_SIZE)/((uint32_t)(time4 - time3)*1000000/32768U)));
+            CMD_SYSLOG("hit=%d, miss=%d, hit/miss=%2f:1\n\n", (hitMissCnt[5]-hitMissCnt[3]), (hitMissCnt[4]-hitMissCnt[2]),
+                (float)(hitMissCnt[5]-hitMissCnt[3])/(hitMissCnt[4]-hitMissCnt[2]));
+        }
+    }
+
+    cmd_free(pSramOldPtr);
+    psram_free(pPsramPtr);
+    return CMD_STATUS_OK;
+}
 
 static const struct cmd_data g_psram_cmds[] = {
 	{ "info",       cmd_info_exec},
@@ -1146,6 +1389,7 @@ static const struct cmd_data g_psram_cmds[] = {
 	{ "read",       cmd_psram_read_exec },
 	{ "write",      cmd_psram_write_exec },
 	{ "membist",    cmd_psram_membist_exec },
+	{ "performance",cmd_psram_performance_exec },
 	{ "bench",      cmd_psram_bench_exec },
 	{ "press",      cmd_psram_press_exec },
 	{ "malloc",     cmd_psram_malloc_exec },
@@ -1154,6 +1398,7 @@ static const struct cmd_data g_psram_cmds[] = {
 	{ "flush_clean",cmd_psram_flush_clean_exec },
     { "clean",      cmd_psram_clean_exec },
     { "check",      cmd_psram_check_exec },
+    { "space",      cmd_psram_space_exec },
 };
 
 enum cmd_status cmd_psram_exec(char *cmd)

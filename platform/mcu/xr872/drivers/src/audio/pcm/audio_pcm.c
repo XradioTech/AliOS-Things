@@ -26,62 +26,83 @@
  *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include "driver/chip/hal_codec.h"
+#include "sys/defs.h"
+#include "sys/list.h"
 #include "driver/chip/hal_i2s.h"
 #include "driver/chip/hal_dmic.h"
 #include "driver/chip/hal_i2c.h"
 #include "audio/pcm/audio_pcm.h"
-#include "audio/manager/audio_manager.h"
-#include "./../../driver/chip/hal_os.h"
+#include "kernel/os/os_mutex.h"
 
-#define Oops(x)                         do {printf("[PCM]"); printf x; } while (0)
-#define AUDIO_OUT_DEVICE_DEFAULT		AUDIO_OUT_DEV_SPEAKER
-#define AUDIO_IN_DEVICE_DEFAULT			AUDIO_IN_DEV_MAINMIC
-
-#ifndef PCM_ASSERT
-#define PCM_WARN_MESSAGE(x)     do {printf(x);} while(0)
-
-#define PCM_ASSERT(message, assertion) do { if(!(assertion)) { \
-                                        PCM_WARN_MESSAGE(message); \
-                                        return -1; \
-                                      } \
-                                 } while(0)
+#if (__CONFIG_AUDIO_HEAP_MODE == 1)
+#include "sys/sys_heap.h"
+#else
+#include <stdlib.h>
 #endif
 
+#define AUDIO_PCM_DEBUG_EN				0
+
+
+#if AUDIO_PCM_DEBUG_EN
+#define AUDIO_PCM_DEBUG(fmt, arg...)	printf("[AUDIO_PCM]"fmt, ##arg)
+#else
+#define AUDIO_PCM_DEBUG(fmt, arg...)
+#endif
+
+#define AUDIO_PCM_ERROR(fmt, arg...)	printf("[AUDIO_PCM]"fmt, ##arg)
+
+
+#define pcm_lock(m)         			OS_MutexLock(m, 0)
+#define pcm_unlock       				OS_MutexUnlock
+#define pcm_lock_init    				OS_MutexCreate
+#define pcm_lock_deinit					OS_MutexDelete
+
+
+LIST_HEAD_DEF(audio_pcm_list);
+
 struct play_priv {
-	struct pcm_config *config;
-	unsigned char     *cache;
-	unsigned int      length;
-	unsigned int      trigger;
+	uint8_t	 *cache;
+	uint32_t length;
+	uint32_t half_buf_size;
 };
 
 struct cap_priv {
-	struct pcm_config *config;
+	uint32_t half_buf_size;
 };
 
-struct audio_priv {
-	struct play_priv  play_priv;
-	struct cap_priv   cap_priv;
-	HAL_Mutex         play_lock;
-	HAL_Mutex         write_lock;
-	HAL_Mutex         cap_lock;
+struct pcm_priv {
+	//card num
+	Snd_Card_Num card_num;
+
+	//play/cap priv
+	struct play_priv play_priv;
+	struct cap_priv  cap_priv;
+
+	//mutex
+	OS_Mutex_t play_lock;
+	OS_Mutex_t cap_lock;
+	OS_Mutex_t write_lock;
+
+	//list node
+	struct list_head node;
 };
 
-static struct audio_priv snd_pcm_priv;
 
-#define pcm_lock(n)               HAL_MutexLock(&((snd_pcm_priv).n##_lock), OS_WAIT_FOREVER)
-#define pcm_unlock(n)             HAL_MutexUnlock(&((snd_pcm_priv).n##_lock))
-#define pcm_lock_init(n)          HAL_MutexInit(&((snd_pcm_priv).n##_lock))
-#define pcm_lock_deinit(n)        HAL_MutexDeinit(&((snd_pcm_priv).n##_lock))
-
-void* pcm_zalloc(unsigned int size)
+void* pcm_zalloc(uint32_t size)
 {
 	void *p;
-	if ((p = malloc(size)) != NULL){
-		memset(p,0,size);
+
+#if (__CONFIG_AUDIO_HEAP_MODE == 1)
+	p = psram_malloc(size);
+#else
+	p = malloc(size);
+#endif
+
+	if (p != NULL) {
+		memset(p, 0, size);
 		return p;
 	}
 	return NULL;
@@ -89,400 +110,341 @@ void* pcm_zalloc(unsigned int size)
 
 void pcm_free(void *p)
 {
-	if (p) {
+	if(p){
+#if (__CONFIG_AUDIO_HEAP_MODE == 1)
+		psram_free(p);
+#else
 		free(p);
+#endif
 		p = NULL;
 	}
-	return;
 }
 
-unsigned int pcm_get_buffer_size(struct pcm_config *config)
+static struct pcm_priv *card_num_to_pcm_priv(Snd_Card_Num card_num)
 {
-	return config->period_count * config->period_size;
+	struct pcm_priv *audio_pcm_priv;
+
+	if(!list_empty(&audio_pcm_list)){
+		list_for_each_entry(audio_pcm_priv, &audio_pcm_list, node){
+			if(audio_pcm_priv->card_num == card_num){
+				return audio_pcm_priv;
+			}
+		}
+	}
+
+	return NULL;
 }
 
-unsigned int pcm_format_to_bits(enum pcm_format format)
-{
-	switch (format) {
-		case PCM_FORMAT_S32_LE:
-		case PCM_FORMAT_S24_LE:
-			return 32;
-		case PCM_FORMAT_S16_LE:
-			return 16;
-		default:
-			Oops(("invalid pcm format...\n"));
-			return 0;
-	};
-}
 
-unsigned int pcm_frames_to_bytes(struct pcm_config *config, unsigned int frames)
+int snd_pcm_read(Snd_Card_Num card_num, void *data, uint32_t count)
 {
-	return frames * config->channels *
-		(pcm_format_to_bits(config->format) >> 3);
-}
+	struct pcm_priv *audio_pcm_priv;
+	uint32_t half_buf_size, read_size;
 
-int snd_pcm_write(struct pcm_config *config, unsigned int card, void *data, unsigned int count)
-{
-	PCM_ASSERT("Invalid card.\n", (card == SOUND_CARD_EXTERNAL_AUDIOCODEC));
-	int len = 0, ret = 0, buf_size = 0, size = 0;
-	uint8_t *data_ptr = NULL;
-
-	if (pcm_lock(write) != 0) {
-		Oops(("Obtain write lock err.\n"));
+	/* Check parms to be valid */
+	if(!data || !count){
+		AUDIO_PCM_ERROR("Invalid data/count params!\n");
 		return -1;
 	}
 
-	buf_size = pcm_frames_to_bytes(config,pcm_get_buffer_size(config))/2;;
+	/* Get audio_pcm_priv */
+	audio_pcm_priv = card_num_to_pcm_priv(card_num);
+	if(audio_pcm_priv == NULL){
+		AUDIO_PCM_ERROR("Invalid sound card num [%d]!\n",(uint8_t)card_num);
+		return -1;
+	}
+
+	/* Calculate read_size */
+	half_buf_size = audio_pcm_priv->cap_priv.half_buf_size;
+	if(count < half_buf_size)	return -1;
+	read_size = (count / half_buf_size) * half_buf_size;
+
+	/* Pcm read */
+	return HAL_SndCard_PcmRead(card_num, data, read_size);
+}
+
+int snd_pcm_write(Snd_Card_Num card_num, void *data, uint32_t count)
+{
+	int ret;
+	uint8_t *data_ptr;
+	struct play_priv *ppriv;
+	struct pcm_priv *audio_pcm_priv;
+	uint32_t  half_buf_size, write_size, cache_remain=0;
+
+	/* Check parms to be valid */
+	if(!data || !count){
+		AUDIO_PCM_ERROR("Invalid data/count params!\n");
+		return -1;
+	}
+
+	/* Get audio_pcm_priv */
+	audio_pcm_priv = card_num_to_pcm_priv(card_num);
+	if(audio_pcm_priv == NULL){
+		AUDIO_PCM_ERROR("Invalid sound card num [%d]!\n",(uint8_t)card_num);
+		return -1;
+	}
+
+	/* Check play cache */
+	if(audio_pcm_priv->play_priv.cache == NULL){
+		AUDIO_PCM_ERROR("Play Cache is NULL!\n");
+		return -1;
+	}
+
+	/* Get write lock */
+	if (pcm_lock(&audio_pcm_priv->write_lock) != OS_OK) {
+		AUDIO_PCM_ERROR("Obtain write lock err.\n");
+		return -1;
+	}
+
+	/* Init misc */
 	data_ptr = data;
-	size = count;
+	write_size = count;
+	ppriv = &audio_pcm_priv->play_priv;
+	half_buf_size = audio_pcm_priv->play_priv.half_buf_size;
 
-	struct play_priv *ppriv = &(snd_pcm_priv.play_priv);
-	if (ppriv->length != 0) {
-		len = buf_size - ppriv->length;
-		if (ppriv->cache == NULL) {
-			pcm_unlock(write);
-			return -1;
-		}
-		if (len > size) {
-			memcpy(ppriv->cache + ppriv->length, data_ptr, size);
-			ppriv->length += size;
-			pcm_unlock(write);
+	/* Cache has data to write */
+	if (ppriv->length) {
+		cache_remain = half_buf_size - ppriv->length;
+		if (cache_remain > write_size) {
+			memcpy(ppriv->cache + ppriv->length, data_ptr, write_size);
+			ppriv->length += write_size;
+			pcm_unlock(&audio_pcm_priv->write_lock);
 			return count;
-		} else
-			memcpy(ppriv->cache + ppriv->length, data_ptr, len);
-
-		HAL_I2S_Write_DMA((void *)ppriv->cache, buf_size);
-		ppriv->length = 0;
+		} else {
+			memcpy(ppriv->cache + ppriv->length, data_ptr, cache_remain);
+			HAL_SndCard_PcmWrite(card_num, ppriv->cache, half_buf_size);
+			ppriv->length = 0;
+			data_ptr += cache_remain;
+			write_size -= cache_remain;
+			if(!write_size){
+				pcm_unlock(&audio_pcm_priv->write_lock);
+				return count;
+			}
+		}
 	}
 
-	data_ptr = data_ptr +len;
-	size -= len;
-
-	ret = HAL_I2S_Write_DMA(data_ptr, size);
-
-	if (ret > 0 && ret != size) {
+	/* Pcm write */
+	ret = HAL_SndCard_PcmWrite(card_num, data_ptr, write_size);
+	if (ret>0 && ret<write_size) {	//remain some data that not enough half_buf_size data to write, save to cache
 		data_ptr += ret;
-		ppriv->length = size - ret;
+		ppriv->length = write_size - ret;
 		memcpy(ppriv->cache, data_ptr, ppriv->length);
-	}else if (ret == size) {
+	} else if (ret == write_size) {	//all data write complete
 		ppriv->length = 0;
-	} else {
-		ppriv->length = size;
+	} else if(ret == 0) {			//ret=0, not enough half_buf_size data to write, save to cache
+		ppriv->length = write_size<half_buf_size ? write_size : half_buf_size;
 		memcpy(ppriv->cache, data_ptr, ppriv->length);
+	} else {						//ret<0, write fail
+		pcm_unlock(&audio_pcm_priv->write_lock);
+		return cache_remain ? cache_remain : -1;
 	}
 
-#if 0
-
-	#include "fs/fatfs/ff.h"
-        FRESULT result;
-        FATFS fs;
-        FIL file;
-        memset(&fs, 0, sizeof(fs));
-	unsigned int writenum = 0;
-        fs.drv = 1;
-        if ((result = f_mount(&fs, "0:/", 1)) != FR_OK) // = "0:" = "0:/" = ""
-                printf("failed to mount\n");
-        else if ((result = f_open(&file, "0:/5.pcm", FA_OPEN_ALWAYS|FA_READ|FA_WRITE)) != FR_OK)
-                printf("[music file]failed to open,%s\n","0:/5.pcm");
-        if ((result = f_write(&file, data, count, &writenum)) != FR_OK)
-		printf("write failed(%d).\n",result);
-
-	f_close(&file);
-
-#endif
-	pcm_unlock(write);
+	pcm_unlock(&audio_pcm_priv->write_lock);
 	return count;
 }
 
-int snd_pcm_flush(struct pcm_config *config, unsigned int card)
+int snd_pcm_flush(Snd_Card_Num card_num)
 {
-	PCM_ASSERT("Invalid card.\n", (card == SOUND_CARD_EXTERNAL_AUDIOCODEC));
+	uint32_t i, half_buf_size;
+	struct play_priv *ppriv;
+	struct pcm_priv *audio_pcm_priv;
+	AUDIO_PCM_DEBUG("--->%s\n",__FUNCTION__);
 
-	struct play_priv *ppriv = &(snd_pcm_priv.play_priv);
-	PCM_ASSERT("Cache is NULL.\n", (ppriv->cache != NULL));
-	int buf_size = pcm_frames_to_bytes(config,pcm_get_buffer_size(config));
+	/* Get audio_pcm_priv */
+	audio_pcm_priv = card_num_to_pcm_priv(card_num);
+	if(audio_pcm_priv == NULL){
+		AUDIO_PCM_ERROR("Invalid sound card num [%d]!\n",(uint8_t)card_num);
+		return -1;
+	}
 
-	pcm_lock(write);
+	/* Check play cache */
+	if(audio_pcm_priv->play_priv.cache == NULL){
+		AUDIO_PCM_ERROR("Play Cache is NULL!\n");
+		return -1;
+	}
 
-	buf_size = buf_size / 2;
-	if (ppriv->length != 0){
-		memset(ppriv->cache + ppriv->length, 0, buf_size - ppriv->length);
-		HAL_I2S_Write_DMA((void *)ppriv->cache, buf_size);
+	/* Get write lock */
+	if (pcm_lock(&audio_pcm_priv->write_lock) != OS_OK) {
+		AUDIO_PCM_ERROR("Obtain write lock err.\n");
+		return -1;
+	}
+
+	/* Init misc */
+	ppriv = &audio_pcm_priv->play_priv;
+	half_buf_size = audio_pcm_priv->play_priv.half_buf_size;
+
+	/* Cache has data to write */
+	if(ppriv->length){
+		memset(ppriv->cache + ppriv->length, 0, half_buf_size - ppriv->length);
+		HAL_SndCard_PcmWrite(card_num, ppriv->cache, half_buf_size);
 		ppriv->length = 0;
 	}
 
-	int delay = 0;
-	memset(ppriv->cache, 0, buf_size);
-	for(delay = 0; delay < 2; delay ++) {
-		HAL_I2S_Write_DMA((void *)ppriv->cache, buf_size);
+	/* play void frames */
+	memset(ppriv->cache, 0, half_buf_size);
+	for(i=0; i<2; i++) {
+		HAL_SndCard_PcmWrite(card_num, ppriv->cache, half_buf_size);
 	}
-	pcm_unlock(write);
 
+	pcm_unlock(&audio_pcm_priv->write_lock);
 	return 0;
 }
 
-int snd_pcm_read(struct pcm_config *config, unsigned int card, void *data, unsigned int count)
+int snd_pcm_open(Snd_Card_Num card_num, Audio_Stream_Dir stream_dir, struct pcm_config *pcm_cfg)
 {
-	PCM_ASSERT("Invalid card.\n", (card < SOUND_CARD_NULL));
-	void *buf = data;
-	int size = 0;
-	int  buf_size = pcm_frames_to_bytes(config,pcm_get_buffer_size(config))/2;;
-	if (buf_size > count)
+	uint32_t buf_size;
+	struct pcm_priv *audio_pcm_priv;
+	AUDIO_PCM_DEBUG("--->%s\n",__FUNCTION__);
+
+	/* Get audio_pcm_priv */
+	audio_pcm_priv = card_num_to_pcm_priv(card_num);
+	if(audio_pcm_priv == NULL){
+		AUDIO_PCM_ERROR("Invalid sound card num [%d]!\n",(uint8_t)card_num);
 		return -1;
-	size = (count / buf_size) * buf_size;
-	if (card == SOUND_CARD_EXTERNAL_AUDIOCODEC)
-		return HAL_I2S_Read_DMA(buf, size);
-	else if (card == SOUND_CARD_INTERNAL_DMIC)
-		return HAL_DMIC_Read_DMA(buf, size);
-	return -1;
-}
-
-int snd_pcm_open(struct pcm_config *config, unsigned int card, unsigned int flags)
-{
-	PCM_ASSERT("Wrong card and flags param.\n", ((card == 1) && (PCM_OUT == flags)) != 1);
-	mgrctl_ctx *mgr_ctx = aud_mgr_ctx();
-	if (card == AUDIO_CARD0) {
-		DATA_Param codec_data;
-		memset(&codec_data, 0, sizeof(codec_data));
-
-		MANAGER_MUTEX_LOCK(&(mgr_ctx->lock));
-		if (mgr_ctx->is_initialize) {
-			if (PCM_OUT == flags) {
-				if ((mgr_ctx->current_dev & AUDIO_OUT_DEV_SPEAKER) ||
-								(mgr_ctx->current_dev & AUDIO_OUT_DEV_HEADPHONE)) {
-					codec_data.isDevEnable = 1;
-				}
-				codec_data.audioDev = AUDIO_OUT_DEVICE_DEFAULT;
-			} else {
-				if ((mgr_ctx->current_dev & AUDIO_IN_DEV_MAINMIC) ||
-								(mgr_ctx->current_dev & AUDIO_IN_DEV_HEADPHONEMIC)) {
-					codec_data.isDevEnable = 1;
-				}
-				codec_data.audioDev = AUDIO_IN_DEVICE_DEFAULT;
-			}
-		} else {
-			codec_data.audioDev =  (PCM_OUT == flags) ? AUDIO_OUT_DEVICE_DEFAULT : AUDIO_IN_DEVICE_DEFAULT;
-		}
-		MANAGER_MUTEX_UNLOCK(&(mgr_ctx->lock));
-
-		codec_data.direction = flags;
-		codec_data.sampleRate = config->rate;
-		codec_data.mixMode = config->mix_mode;
-
-		if (HAL_CODEC_Open(&codec_data) != HAL_OK) {
-			Oops(("Codec open failed..\n"));
-			return -1;
-		}
-		if (!codec_data.isDevEnable)
-			mgr_ctx->current_dev |= codec_data.audioDev;
-
-		I2S_DataParam i2s_data;
-		memset(&i2s_data, 0, sizeof(i2s_data));
-		i2s_data.direction = (PCM_OUT == flags) ? PLAYBACK : RECORD;
-		i2s_data.bufSize = pcm_frames_to_bytes(config,pcm_get_buffer_size(config));
-		i2s_data.channels = config->channels;
-
-		if (i2s_data.direction == PLAYBACK) {
-			if (pcm_lock(play) != 0) {
-				Oops(("obtain play lock err...\n"));
-				return -1;
-			}
-			struct play_priv *ppriv = &(snd_pcm_priv.play_priv);
-			ppriv->cache = pcm_zalloc(i2s_data.bufSize/2);
-			if (ppriv->cache == NULL) {
-				pcm_unlock(play);
-				Oops(("obtain play cache failed...\n"));
-				return -1;
-			}
-			ppriv->length = 0;
-			ppriv->config = config;
-
-		} else {
-			if (pcm_lock(cap) != 0) {
-				Oops(("obtain cap lock err...\n"));
-				return -1;
-			}
-
-			struct cap_priv *cpriv = &(snd_pcm_priv.cap_priv);
-			cpriv->config = config;
-		}
-		i2s_data.resolution = (config->format == PCM_FORMAT_S16_LE) ? I2S_SR16BIT : I2S_SR32BIT;
-
-		switch (config->rate) {
-			case 48000:
-				i2s_data.sampleRate = I2S_SR48K;
-				break;
-			case 44100:
-				i2s_data.sampleRate = I2S_SR44K;
-				break;
-			case 8000:
-				i2s_data.sampleRate = I2S_SR8K;
-				break;
-			case 12000:
-				i2s_data.sampleRate = I2S_SR12K;
-				break;
-			case 16000:
-				i2s_data.sampleRate = I2S_SR16K;
-				break;
-			case 24000:
-				i2s_data.sampleRate = I2S_SR24K;
-				break;
-			case 32000:
-				i2s_data.sampleRate = I2S_SR32K;
-				break;
-			case 11025:
-				i2s_data.sampleRate = I2S_SR11K;
-				break;
-			case 22050:
-				i2s_data.sampleRate = I2S_SR22K;
-				break;
-			default:
-				break;
-		}
-
-		if (HAL_I2S_Open(&i2s_data) != HAL_OK) {
-			Oops(("I2S open failed..\n"));
-			return -1;
-		}
-
-		if (i2s_data.direction == PLAYBACK) {
-			if (HAL_CODEC_MUTE_STATUS_Get() == 0) {
-				if (codec_data.audioDev == AUDIO_OUT_DEV_SPEAKER)
-					HAL_CODEC_Trigger(codec_data.audioDev, 1);
-			}
-		}
-		MANAGER_MUTEX_LOCK(&(mgr_ctx->lock));
-		if (i2s_data.direction == PLAYBACK)
-			mgr_ctx->playback = 1;
-		else
-			mgr_ctx->record = 1;
-		MANAGER_MUTEX_UNLOCK(&(mgr_ctx->lock));
-	} else {
-
-		DMIC_DataParam dmic_data;
-		memset(&dmic_data, 0, sizeof(dmic_data));
-		if (pcm_lock(cap) != 0) {
-			Oops(("obtain cap lock err...\n"));
-			return -1;
-		}
-		switch (config->rate) {
-			case 48000:
-				dmic_data.sampleRate = DMIC_SR48KHZ;
-				break;
-			case 44100:
-				dmic_data.sampleRate = DMIC_SR44KHZ;
-				break;
-			case 24000:
-				dmic_data.sampleRate = DMIC_SR24KHZ;
-				break;
-			case 22050:
-				dmic_data.sampleRate = DMIC_SR22KHZ;
-				break;
-			case 12000:
-				dmic_data.sampleRate = DMIC_SR12KHZ;
-				break;
-			case 11025:
-				dmic_data.sampleRate = DMIC_SR11KHZ;
-				break;
-			case 32000:
-				dmic_data.sampleRate = DMIC_SR32KHZ;
-				break;
-			case 16000:
-				dmic_data.sampleRate = DMIC_SR16KHZ;
-				break;
-			case 8000:
-				dmic_data.sampleRate = DMIC_SR8KHZ;
-				break;
-
-			default:
-				break;
-		}
-		dmic_data.bufSize = pcm_frames_to_bytes(config,pcm_get_buffer_size(config));
-		dmic_data.channels = config->channels;
-		dmic_data.resolution = (config->format == PCM_FORMAT_S16_LE) ? DMIC_RES16BIT : DMIC_RES24BIT;
-
-		if (HAL_DMIC_Open(&dmic_data) != HAL_OK) {
-			Oops(("Dmic open failed..\n"));
-			pcm_unlock(cap);
-			return -1;
-		}
-
-		MANAGER_MUTEX_LOCK(&(mgr_ctx->lock));
-		mgr_ctx->record = 1;
-		MANAGER_MUTEX_UNLOCK(&(mgr_ctx->lock));
 	}
-	return 0;
-}
 
-int snd_pcm_close(unsigned int card, unsigned int flags)
-{
-	 PCM_ASSERT("Wrong card and flags param..\n", ((card == 1) && (PCM_OUT == flags)) != 1);
-	 int dir = (PCM_OUT == flags) ? PLAYBACK : RECORD;
-	 mgrctl_ctx *mgr_ctx = aud_mgr_ctx();
-	 if (card == AUDIO_CARD0) {
-		uint16_t dev;
-
-		MANAGER_MUTEX_LOCK(&(mgr_ctx->lock));
-		if (mgr_ctx->is_initialize)
-			dev = mgr_ctx->current_dev;
-		else
-			dev = AUDIO_OUT_DEVICE_DEFAULT;
-		MANAGER_MUTEX_UNLOCK(&(mgr_ctx->lock));
-
-		if (dir == PLAYBACK) {
-			if (AUDIO_OUT_DEV_SPEAKER & dev)
-				HAL_CODEC_Trigger(AUDIO_OUT_DEV_SPEAKER, 0);
+	/* Init audio_pcm_priv */
+	if (stream_dir == PCM_OUT) {
+		//play lock
+		if (pcm_lock(&audio_pcm_priv->play_lock) != OS_OK) {
+			AUDIO_PCM_ERROR("Obtain play lock err...\n");
+			return -1;
 		}
 
-		HAL_CODEC_Close(dir);
-
-		HAL_I2S_Close(dir);
-
-		if (PCM_OUT == flags) {
-			pcm_free(snd_pcm_priv.play_priv.cache);
-			memset(&(snd_pcm_priv.play_priv), 0, sizeof(struct play_priv));
-			pcm_unlock(play);
-
-		} else {
-			memset(&(snd_pcm_priv.cap_priv), 0, sizeof(struct cap_priv));
-			pcm_unlock(cap);
+		// Malloc play cache buffer
+		buf_size = pcm_frames_to_bytes(pcm_cfg, pcm_config_to_frames(pcm_cfg));
+		audio_pcm_priv->play_priv.cache = pcm_zalloc(buf_size/2);
+		if (audio_pcm_priv->play_priv.cache == NULL) {
+			pcm_unlock(&audio_pcm_priv->play_lock);
+			AUDIO_PCM_ERROR("obtain play cache failed...\n");
+			return -1;
 		}
-
-		MANAGER_MUTEX_LOCK(&(mgr_ctx->lock));
-		if (PCM_OUT == flags) {
-			mgr_ctx->playback = 0;
-			mgr_ctx->current_dev &= ~AUDIO_OUT_DEV_ALL;
-		} else {
-			mgr_ctx->record = 0;
-			mgr_ctx->current_dev &= ~(AUDIO_IN_DEV_MAINMIC | AUDIO_IN_DEV_HEADPHONEMIC);
-		}
-		MANAGER_MUTEX_UNLOCK(&(mgr_ctx->lock));
+		audio_pcm_priv->play_priv.length = 0;
+		audio_pcm_priv->play_priv.half_buf_size = buf_size/2;
 	} else {
-		MANAGER_MUTEX_LOCK(&(mgr_ctx->lock));
-		mgr_ctx->record = 0;
-		MANAGER_MUTEX_UNLOCK(&(mgr_ctx->lock));
-		HAL_DMIC_Close();
-		memset(&(snd_pcm_priv.cap_priv), 0, sizeof(struct cap_priv));
-		pcm_unlock(cap);
+		//cap lock
+		if (pcm_lock(&audio_pcm_priv->cap_lock) != OS_OK) {
+			AUDIO_PCM_ERROR("obtain cap lock err...\n");
+			return -1;
+		}
+		audio_pcm_priv->cap_priv.half_buf_size = pcm_frames_to_bytes(pcm_cfg, pcm_config_to_frames(pcm_cfg))/2;
 	}
+
+	/* Open snd card */
+	if (HAL_SndCard_Open(card_num, stream_dir, pcm_cfg) != HAL_OK) {
+		AUDIO_PCM_ERROR("Sound card-[%d] open Fai!\n",card_num);
+		if (stream_dir == PCM_OUT) {
+			pcm_free(audio_pcm_priv->play_priv.cache);
+			memset(&(audio_pcm_priv->play_priv), 0, sizeof(struct play_priv));
+			pcm_unlock(&audio_pcm_priv->play_lock);
+		} else {
+			memset(&(audio_pcm_priv->cap_priv), 0, sizeof(struct cap_priv));
+			pcm_unlock(&audio_pcm_priv->cap_lock);
+		}
+		return -1;
+	}
+
 	return 0;
 }
 
-int snd_pcm_init()
+int snd_pcm_close(Snd_Card_Num card_num, Audio_Stream_Dir stream_dir)
 {
-	struct audio_priv* audio_priv = &snd_pcm_priv;
+	struct pcm_priv *audio_pcm_priv;
+	AUDIO_PCM_DEBUG("--->%s\n",__FUNCTION__);
 
-	memset(audio_priv, 0, sizeof(*audio_priv));
-	pcm_lock_init(play);
-	pcm_lock_init(write);
-	pcm_lock_init(cap);
+	/* Get audio_pcm_priv */
+	audio_pcm_priv = card_num_to_pcm_priv(card_num);
+	if(audio_pcm_priv == NULL){
+		AUDIO_PCM_ERROR("Invalid sound card num [%d]!\n",(uint8_t)card_num);
+		return -1;
+	}
+
+	/* Close snd card */
+	HAL_SndCard_Close(card_num, stream_dir);
+
+	/* deinit audio_pcm_priv */
+	if (stream_dir == PCM_OUT) {
+		pcm_free(audio_pcm_priv->play_priv.cache);
+		memset(&(audio_pcm_priv->play_priv), 0, sizeof(struct play_priv));
+		pcm_unlock(&audio_pcm_priv->play_lock);
+	} else {
+		memset(&(audio_pcm_priv->cap_priv), 0, sizeof(struct cap_priv));
+		pcm_unlock(&audio_pcm_priv->cap_lock);
+	}
+
 	return 0;
 }
 
-int snd_pcm_deinit()
+int snd_pcm_init(void)
 {
-	pcm_lock_deinit(play);
-	pcm_lock_deinit(write);
-	pcm_lock_deinit(cap);
+	char *pcm_priv_temp;
+	uint8_t *card_num, card_nums, i;
+	struct pcm_priv* audio_pcm_priv;
+	AUDIO_PCM_DEBUG("--->%s\n",__FUNCTION__);
+
+	/* Get snd card nums */
+	card_nums = HAL_SndCard_GetCardNums();
+	if(!card_nums){
+		AUDIO_PCM_ERROR("card nums is 0!\n");
+		return -1;
+	}
+
+	/* Malloc buffer and init */
+	pcm_priv_temp = (char  *)pcm_zalloc(sizeof(struct pcm_priv) * card_nums);
+	card_num = (uint8_t *)pcm_zalloc(sizeof(uint8_t) * card_nums);
+
+	if(!pcm_priv_temp || !card_num){
+		AUDIO_PCM_ERROR("Malloc audio pcm buffer Fail!\n");
+		pcm_free(pcm_priv_temp);
+		pcm_free(card_num);
+		return -1;
+	}
+
+	HAL_SndCard_GetAllCardNum(card_num);
+
+	/* Init struct pcm_priv and list add */
+	for(i=0; i<card_nums; i++){
+		//Init struct pcm_priv
+		audio_pcm_priv = (struct pcm_priv *)(pcm_priv_temp + sizeof(struct pcm_priv)*i);
+		audio_pcm_priv->card_num = (Snd_Card_Num)card_num[i];
+		pcm_lock_init(&audio_pcm_priv->play_lock);
+		pcm_lock_init(&audio_pcm_priv->cap_lock);
+		pcm_lock_init(&audio_pcm_priv->write_lock);
+
+		//list add
+		list_add(&audio_pcm_priv->node, &audio_pcm_list);
+	}
+
+	/* Free get card num buffer */
+	pcm_free(card_num);
+
 	return 0;
 }
+
+int snd_pcm_deinit(void)
+{
+	struct pcm_priv *audio_pcm_priv, *next;
+	AUDIO_PCM_DEBUG("--->%s\n",__FUNCTION__);
+
+	/* Check audio pcm list empty or not */
+	if(list_empty(&audio_pcm_list)){
+		AUDIO_PCM_DEBUG("Audio pcm list is empty, don't need to deinit\n");
+		return 0;
+	}
+
+	/* Get audio pcm priv to deinit */
+	list_for_each_entry_safe(audio_pcm_priv, next, &audio_pcm_list, node){
+		//audio pcm priv deinit
+		pcm_lock_deinit(&audio_pcm_priv->play_lock);
+		pcm_lock_deinit(&audio_pcm_priv->cap_lock);
+		pcm_lock_deinit(&audio_pcm_priv->write_lock);
+
+		//delete the audio pcm list and free audio pcm priv buffer
+		list_del(&audio_pcm_priv->node);
+		pcm_free(audio_pcm_priv);
+	}
+
+	return 0;
+}
+
+

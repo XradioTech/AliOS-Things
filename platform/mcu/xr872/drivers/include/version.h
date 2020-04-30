@@ -32,7 +32,7 @@
 
 #define SDK_VERSION_MAJOR 1
 #define SDK_VERSION_MINOR 0
-#define SDK_VERSION_PATCH 0
+#define SDK_VERSION_PATCH 2
 
 #define SDK_VERSION_NUM ((SDK_VERSION_MAJOR << 16) | \
                          (SDK_VERSION_MINOR << 8)  | \
@@ -44,6 +44,6 @@
                         _SDK_VERSTR(SDK_VERSION_MINOR) "." \
                         _SDK_VERSTR(SDK_VERSION_PATCH)
 
-#define SDK_STAGE_STR "rc1"
+#define SDK_STAGE_STR ""
 
 #endif /* _VERSION_H_ */

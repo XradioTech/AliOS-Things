@@ -35,8 +35,9 @@
 #ifndef _PSRAM_H
 #define _PSRAM_H
 #include "driver/chip/hal_def.h"
-//#include "kernel/os/FreeRTOS/os_semaphore.h"
 #include "kernel/os/os_semaphore.h"
+#include "sys/sys_heap.h"
+
 //---------PSRAM SPI/QPI Command set-------
 #define SQ_Read				0x03
 #define SQ_Fast_Read			0x0B    /* 66MHz, wait 4 cycle every read */
@@ -226,6 +227,28 @@ struct psram_request {
 
 struct psram_ctrl;
 
+extern uint8_t __PSRAM_BASE[];
+extern uint8_t __PSRAM_END[];
+extern uint8_t __PSRAM_LENGTH[];
+extern uint8_t __psram_start__[];
+extern uint8_t __psram_end__[];
+extern uint8_t __psram_data_start__[];
+extern uint8_t __psram_data_end__[];
+extern uint8_t __psram_bss_start__[];
+extern uint8_t __psram_bss_end__[];
+extern uint8_t __DMAHEAP_PSRAM_BASE[];
+extern uint8_t __DMAHEAP_PSRAM_END[];
+extern uint8_t __DMAHEAP_PSRAM_LENGTH[];
+
+#define PSRAM_START_ADDR        ((uint32_t)(__PSRAM_BASE))
+#define PSRAM_END_ADDR          ((uint32_t)(__PSRAM_END))
+#define PSRAM_LENGTH            ((uint32_t)(__PSRAM_LENGTH))
+
+#define DMAHEAP_PSRAM_BASE          ((uint32_t)(__DMAHEAP_PSRAM_BASE))
+#define DMAHEAP_PSRAM_END           ((uint32_t)(__DMAHEAP_PSRAM_END))
+#define DMAHEAP_PSRAM_LENGTH        ((uint32_t)(__DMAHEAP_PSRAM_LENGTH))
+
+
 int32_t psram_init(struct psram_chip *chip, struct psram_ctrl *ctrl, PSRAMChip_InitParam *param);
 int32_t psram_deinit(struct psram_chip *chip);
 int32_t Psram_Read_Id(struct psram_chip *chip);
@@ -254,10 +277,6 @@ int32_t psram_sbus_dma_write(struct psram_chip *chip, uint32_t page_addr,
 struct psram_chip *psram_open(uint32_t id);
 HAL_Status psram_close(struct psram_chip *chip);
 void psram_info_dump(struct psram_chip *chip);
-
-void *psram_malloc( size_t xWantedSize );
-void *psram_realloc( uint8_t *srcaddr,size_t xWantedSize );
-void *psram_calloc( size_t xNmemb, size_t xMembSize );
-void psram_free( void *pv );
+size_t psram_GetFreeHeapSize( void );
 
 #endif /* _PSRAM_H */

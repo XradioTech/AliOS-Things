@@ -60,15 +60,6 @@ __STATIC_INLINE void SystemChipAdjust(void)
 		               (uint32_t)val << PRCM_DCDC_BANDGAP_TRIM_SHIFT);
 	}
 #elif (__CONFIG_CHIP_ARCH_VER == 2)
-	uint32_t cpu_clock = HAL_GetCPUClock();
-	if (cpu_clock > 240000000) {
-		HAL_PRCM_SetLDO1Volt(PRCM_LDO1_VOLT_1325MV, PRCM_LDO1_RET_VOLT_725MV);
-	} else if (cpu_clock > 160000000) {
-		HAL_PRCM_SetLDO1Volt(PRCM_LDO1_VOLT_1225MV, PRCM_LDO1_RET_VOLT_725MV);
-	} else {
-		HAL_PRCM_SetLDO1Volt(PRCM_LDO1_VOLT_1225MV, PRCM_LDO1_RET_VOLT_725MV);
-	}
-
 	/* don't care about efuse, force to use default value */
 	HAL_MODIFY_REG(PRCM->DCXO_CTRL, PRCM_ICTRL_OFFSET_MASK, 0x10 << PRCM_ICTRL_OFFSET_SHIFT);
 #endif
@@ -88,8 +79,12 @@ void SystemInit(void)
 	if (HAL_GlobalGetTopLdoVsel() == 0) {
 		HAL_PRCM_SetTOPLDOVoltage(PRCM_TOPLDO_VOLT_1V8_DEFAULT);
 	}
-	HAL_PRCM_SetLDO1Volt(PRCM_LDO1_VOLT_1275MV, PRCM_LDO1_RET_VOLT_725MV);
 	HAL_PRCM_SetRTCLDOVoltage(PRCM_RTC_LDO_RETENTION_VOLT_675MV, PRCM_RTC_LDO_WORK_VOLT_1075MV);
+#ifdef __CONFIG_WLAN
+	HAL_CLR_BIT(PRCM->SYS1_SLEEP_CTRL, PRCM_SYS_WLAN_SRAM_116K_SWM5_BIT);
+#else
+	HAL_SET_BIT(PRCM->SYS1_SLEEP_CTRL, PRCM_SYS_WLAN_SRAM_116K_SWM5_BIT);
+#endif
 #endif
 #if 0
 	/* overwite efuse values */

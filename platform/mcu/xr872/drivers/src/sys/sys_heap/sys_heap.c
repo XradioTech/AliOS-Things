@@ -84,7 +84,7 @@ task.h is included from an application file. */
 #define MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 
 #include "FreeRTOS.h"
-#include "task.h"
+#include "kernel/os/os_thread.h"
 #include "sys/sys_heap.h"
 #undef MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 
@@ -107,7 +107,7 @@ void *sys_heap_malloc( sys_heap_t *sysHeap, size_t size )
     BlockLink_t *pxBlock, *pxPreviousBlock, *pxNewBlockLink;
     void *pvReturn = NULL;
 
-    vTaskSuspendAll();
+    OS_ThreadSuspendScheduler();
     {
         /* If this is the first call to malloc then the heap will require
         initialisation to setup the list of free blocks. */
@@ -208,7 +208,7 @@ void *sys_heap_malloc( sys_heap_t *sysHeap, size_t size )
     }
 
 out:
-    ( void ) xTaskResumeAll();
+    ( void ) OS_ThreadResumeScheduler();
 
 #if( configUSE_MALLOC_FAILED_HOOK == 1 )
     {
@@ -249,14 +249,14 @@ void sys_heap_free( sys_heap_t *sysHeap, void *ptr )
                 allocated. */
                 pxLink->xBlockSize &= ~(sysHeap->xBlockAllocatedBit);
 
-                vTaskSuspendAll();
+                OS_ThreadSuspendScheduler();
                 {
                     /* Add this block to the list of free blocks. */
                     sysHeap->xFreeBytesRemaining += pxLink->xBlockSize;
                     traceFREE( ptr, pxLink->xBlockSize );
                     sys_heap_prvInsertBlockIntoFreeList( sysHeap, ( ( BlockLink_t * ) pxLink ) );
                 }
-                ( void ) xTaskResumeAll();
+                ( void ) OS_ThreadResumeScheduler();
             } else {
                 mtCOVERAGE_TEST_MARKER();
             }
@@ -389,7 +389,7 @@ void *sys_heap_realloc( sys_heap_t *sysHeap, uint8_t *ptr, size_t size )
     void *pvReturn = NULL;
 
     BlockLink_t *pxBlockold,*pxBlockjudge;
-    vTaskSuspendAll();
+    OS_ThreadSuspendScheduler();
     {
         /* If this is the first call to malloc then the heap will require
         initialisation to setup the list of free blocks. */
@@ -443,6 +443,8 @@ void *sys_heap_realloc( sys_heap_t *sysHeap, uint8_t *ptr, size_t size )
                     }
                 } else {
                     pvReturn = sys_heap_malloc(sysHeap, (((pxBlockold->xBlockSize)&(~(sysHeap->xBlockAllocatedBit)))-(sysHeap->xHeapStructSize))+size);
+                    if(pvReturn == 0)
+                        goto out;
                     memcpy((uint8_t*)pvReturn,ptr,((pxBlockold->xBlockSize&(~(sysHeap->xBlockAllocatedBit)))-sysHeap->xHeapStructSize));
                     sys_heap_free(sysHeap, ptr);
                 }
@@ -454,7 +456,7 @@ void *sys_heap_realloc( sys_heap_t *sysHeap, uint8_t *ptr, size_t size )
         }
     }
 out:
-    ( void ) xTaskResumeAll();
+    ( void ) OS_ThreadResumeScheduler();
     configASSERT( ( ( ( size_t ) pvReturn ) & (( size_t ) (sysHeap->portByte_Alignment_Mask)) ) == 0 );
     return pvReturn;
 }

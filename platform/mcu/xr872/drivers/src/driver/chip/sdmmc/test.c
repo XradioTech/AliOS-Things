@@ -185,6 +185,7 @@ int32_t mmc_test_exit(uint16_t sd_id, uint16_t host_id)
 		mmc_card_delete(sdmmc_test->card_id);
 	}
 	HAL_SDC_Deinit(0);
+	HAL_SDC_Destory(sdmmc_test->card->host);//
 
 #ifdef CONFIG_DETECT_CARD
 	OS_SemaphoreDelete(&sdmmc_test->card_present_sem);

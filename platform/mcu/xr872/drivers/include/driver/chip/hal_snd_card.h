@@ -46,6 +46,7 @@
 
 
 /* Codec name */
+#define XRADIO_CODEC_NULL_NAME			"xradio_codec_null"
 #define XRADIO_INTERNAL_CODEC_NAME		"xradio_internal_codec"
 #define AC107_CODEC_NAME				"ac107_codec"
 
@@ -80,9 +81,14 @@ typedef enum {
 	CODEC_IOCTL_PCM_READ,
 	CODEC_IOCTL_PCM_WRITE,
 	CODEC_IOCTL_HW_CONFIG,
+	CODEC_IOCTL_SW_CONFIG,
 	CODEC_IOCTL_SET_ADDA_DIRECT,
 	CODEC_IOCTL_CMD_MAX = CODEC_IOCTL_SET_ADDA_DIRECT,
-}Codec_Ioctl_Cmd;
+
+	PLATFORM_IOCTL_HW_CONFIG,
+	PLATFORM_IOCTL_SW_CONFIG,
+	PLATFORM_IOCTL_CMD_MAX = PLATFORM_IOCTL_SW_CONFIG,
+}Snd_Card_Ioctl_Cmd;
 
 
 #define I2S_ROLE_MASK		0x000f
@@ -152,7 +158,8 @@ typedef enum {
 typedef enum {
 	SND_CARD_0,
 	SND_CARD_1,
-	SND_CARD_MAX = SND_CARD_1,
+	SND_CARD_2,
+	SND_CARD_MAX = SND_CARD_2,
 }Snd_Card_Num;
 
 
@@ -160,7 +167,6 @@ typedef enum {
 #define VOLUME_SET_LEVEL	(0x0000)
 #define VOLUME_SET_GAIN		(0x8000)
 #define VOLUME_SET_MASK		(0x8000)
-#define VOLUME_INVALID		(0x7fff)
 
 /* Volume Level */
 typedef enum {
@@ -332,18 +338,12 @@ struct pcm_config {
 
 /* PA Switch Control */
 typedef struct {
-	uint16_t	  on_delay;
+	uint16_t on_delay_before;
+	uint16_t on_delay_after;
 	GPIO_PinState on_state;
 	const GPIO_PinMuxParam *pin_param;
 	uint8_t		  pin_param_cnt;
 } Pa_Switch_Ctl;
-
-/* LINEIN Detect Control */
-typedef struct {
-	GPIO_PinState insert_state;
-	const GPIO_PinMuxParam *pin_param;
-	uint8_t		  pin_param_cnt;
-} Linein_Detect_Ctl;
 
 /* snd card board config */
 struct snd_card_board_config {
@@ -353,8 +353,7 @@ struct snd_card_board_config {
 	Codec_Attr    codec_link;
 	Platform_Attr platform_link;
 
-	const Pa_Switch_Ctl     *pa_switch_ctl;
-	const Linein_Detect_Ctl *linein_detect_ctl;
+	const Pa_Switch_Ctl *pa_switch_ctl;
 
 	Codec_Sysclk_Src codec_sysclk_src;
 	Codec_Pllclk_Src codec_pllclk_src;
@@ -367,7 +366,6 @@ struct snd_card_board_config {
 
 #define AUDIO_IN_DEV_SHIFT		(0)
 #define AUDIO_OUT_DEV_SHIFT		(8)
-#define AUDIO_DEFAULT_DEV_MASK	(HAL_BIT(31))
 
 typedef enum {
 	AUDIO_IN_DEV_AMIC	= HAL_BIT(AUDIO_IN_DEV_SHIFT),		/*< AMIC > */
@@ -405,7 +403,7 @@ HAL_Status HAL_SndCard_Close(Snd_Card_Num card_num, Audio_Stream_Dir stream_dir)
 HAL_Status HAL_SndCard_SetVolume(Snd_Card_Num card_num, Audio_Device dev, uint16_t volume);
 HAL_Status HAL_SndCard_SetRoute(Snd_Card_Num card_num, Audio_Device dev, Audio_Dev_State state);
 HAL_Status HAL_SndCard_SetMute(Snd_Card_Num card_num, Audio_Device dev, Audio_Mute_State mute);
-HAL_Status HAL_SndCard_Ioctl(Snd_Card_Num card_num, Codec_Ioctl_Cmd cmd, uint32_t cmd_param[], uint32_t cmd_param_len);
+HAL_Status HAL_SndCard_Ioctl(Snd_Card_Num card_num, Snd_Card_Ioctl_Cmd cmd, uint32_t cmd_param[], uint32_t cmd_param_len);
 
 int HAL_SndCard_PcmRead(Snd_Card_Num card_num, uint8_t *buf, uint32_t size);
 int HAL_SndCard_PcmWrite(Snd_Card_Num card_num, uint8_t *buf, uint32_t size);

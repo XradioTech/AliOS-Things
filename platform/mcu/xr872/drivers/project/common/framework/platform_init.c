@@ -34,6 +34,7 @@
 #include "image/image.h"
 
 #include "common/board/board.h"
+#include "common/board/board_common.h"
 #include "sysinfo.h"
 #if PRJCONF_NET_EN
 #include "net_ctrl.h"
@@ -42,7 +43,7 @@
 #include "sys_ctrl/sys_ctrl.h"
 #include "fwk_debug.h"
 
-#if PRJCONF_INTERNAL_SOUNDCARD_EN || PRJCONF_AC107_SOUNDCARD_EN
+#if PRJCONF_INTERNAL_SOUNDCARD_EN || PRJCONF_AC107_SOUNDCARD_EN || PRJCONF_I2S_NULL_SOUNDCARD_EN
 #include "audio/manager/audio_manager.h"
 #include "audio/pcm/audio_pcm.h"
 #if PRJCONF_AUDIO_CTRL_EN
@@ -56,10 +57,15 @@
 #if (PRJCONF_CE_EN && PRJCONF_PRNG_INIT_SEED) || (PRJCONF_NET_EN)
 #include "efpg/efpg.h"
 #endif
+#include "driver/chip/system_chip.h"
+#include "driver/chip/hal_prcm.h"
 #include "driver/chip/hal_icache.h"
 #include "driver/chip/hal_dcache.h"
 #ifdef __CONFIG_PSRAM
 #include "psram.h"
+#include "driver/chip/psram/psram.h"
+#include "sys/sys_heap.h"
+#include "sys/param.h"
 #endif
 
 #ifdef __CONFIG_XIP
@@ -68,6 +74,10 @@
 
 #ifdef __CONFIG_XPLAYER
 #include "cedarx/cedarx.h"
+#endif
+
+#if (__CONFIG_CHIP_ARCH_VER == 2)
+#include "driver/chip/hal_trng.h"
 #endif
 
 #define PLATFORM_SHOW_DEBUG_INFO	1	/* for internal debug only */
@@ -105,7 +115,11 @@ static void platform_show_info(void)
 #endif
 
 	FWK_LOG(1, "\nplatform information ===============================================\n");
-	FWK_LOG(1, "XRADIO Skylark SDK "SDK_VERSION_STR" "SDK_STAGE_STR" "__DATE__" "__TIME__"\n\n");
+	FWK_LOG(1, "XRADIO Skylark SDK "SDK_VERSION_STR SDK_STAGE_STR" "__DATE__" "__TIME__"\n\n");
+    uint8_t vsel = HAL_GlobalGetDigLdoVsel();
+    if(((vsel & 0xC) != 0) && ((vsel & 0x3) == 0)) {
+        FWK_LOG(1, "WRN: wrong efuse digldo vsel 0x%x\n", vsel);
+    }
 
 	FWK_LOG(dbg_en, "__text_start__ %p\n", __text_start__);
 	FWK_LOG(dbg_en, "__text_end__   %p\n", __text_end__);
@@ -127,9 +141,14 @@ static void platform_show_info(void)
 #endif
 	FWK_LOG(dbg_en, "\n");
 
-	FWK_LOG(1, "heap space [%p, %p), size %u\n\n",
+	FWK_LOG(1, "sram heap space [%p, %p), total size %u Bytes\n",
 	           __end__, _estack - PRJCONF_MSP_STACK_SIZE,
 	           _estack - __end__ - PRJCONF_MSP_STACK_SIZE);
+#ifdef __CONFIG_PSRAM
+    FWK_LOG(1, "psram heap space [%p, %p), total size %u Bytes\n\n",
+	           __psram_end__, (uint32_t*)((uint32_t)__PSRAM_BASE+(uint32_t)__PSRAM_LENGTH),
+	           (uint32_t)__PSRAM_BASE + (uint32_t)__PSRAM_LENGTH - (uint32_t)__psram_end__);
+#endif
 
 	FWK_LOG(1,      "cpu  clock %9u Hz\n", HAL_GetCPUClock());
 	FWK_LOG(dbg_en, "ahb1 clock %9u Hz\n", HAL_GetAHB1Clock());
@@ -155,6 +174,15 @@ static void platform_show_info(void)
 #if (defined(__CONFIG_SECURE_BOOT))
 	FWK_LOG(1, "    %-14s: enable\n", "Security Boot");
 #endif
+
+#if (BOARD_LOSC_EXTERNAL == 1)
+	FWK_LOG(1, "    %-14s: enable\n", "EXT LF OSC");
+#elif (BOARD_LOSC_EXTERNAL == 0)
+	FWK_LOG(1, "    %-14s: enable\n", "INT LF OSC");
+#else
+	FWK_LOG(1, "\n%s error(%d)\n", "BOARD_LOSC_EXTERNAL", BOARD_LOSC_EXTERNAL);
+#endif
+
 	FWK_LOG(1, "\n");
 #endif
 
@@ -188,6 +216,108 @@ static void platform_xip_init(void)
 	HAL_Xip_Init(PRJCONF_IMG_FLASH, addr + IMAGE_HEADER_SIZE);
 }
 #endif /* __CONFIG_XIP */
+
+void platform_set_cpu_clock(PRCM_SysClkFactor factor)
+{
+	extern uint32_t SystemCoreClock;
+	uint32_t clk = HAL_PRCM_SysClkFactor2Hz(factor);
+
+	if (clk != SystemCoreClock) {
+		HAL_PRCM_SetCPUAClk(PRCM_CPU_CLK_SRC_SYSCLK, factor);
+		SystemCoreClockUpdate();
+#ifdef __CONFIG_OS_FREERTOS
+		extern void vPortSetupTimerInterrupt(void);
+		vPortSetupTimerInterrupt();
+#endif
+	}
+}
+
+#if SYS_AVS_EN
+#include "driver/chip/hal_util.h"
+#include "driver/chip/hal_prcm.h"
+#include "driver/chip/hal_psensor.h"
+#define AVS_MIN_SOC_VOLT    (PRCM_LDO1_VOLT_1225MV >> PRCM_LDO1_VOLT_SHIFT)
+#define AVS_MAX_SOC_VOLT    (PRCM_LDO1_VOLT_1375MV >> PRCM_LDO1_VOLT_SHIFT)
+
+static __always_inline uint32_t cpufreq_to_psensor(PRCM_SysClkFactor freq)
+{
+    switch(freq) {
+    case PRCM_SYS_CLK_FACTOR_384M:
+        return ((28500 << 16) | (26500 << 0));
+    case PRCM_SYS_CLK_FACTOR_320M:
+        return ((28100 << 16) | (26100 << 0));
+    case PRCM_SYS_CLK_FACTOR_274M:
+        return ((27700 << 16) | (25700 << 0));
+    case PRCM_SYS_CLK_FACTOR_240M:
+        return ((27300 << 16) | (25300 << 0));
+    default:
+        return ((28500 << 16) | (25300 << 0));
+    }
+}
+
+static void avs_timer_callback(void *arg)
+{
+    uint32_t workVolt;
+    uint32_t psensor;
+    uint32_t temp;
+    uint16_t minPsensor;
+    uint16_t maxPsensor;
+    temp = cpufreq_to_psensor((uint32_t)BOARD_CPU_CLK_FACTOR);
+    minPsensor = temp & 0xFFFF;
+    maxPsensor = (temp >> 16) & 0xFFFF;
+
+    psensor = HAL_Psensor_GetValue();
+    workVolt = HAL_PRCM_GetLDO1WorkVolt();
+    FWK_DBG("AVS: minPsensor=%d, maxPsensor=%d, workVolt = %d, psensor=%d\n",
+            minPsensor, maxPsensor, workVolt, psensor);
+    if(psensor < minPsensor) {
+        for(int i=workVolt+1; i<=AVS_MAX_SOC_VOLT; i++) {
+            HAL_PRCM_SetLDO1WorkVolt( i<< PRCM_LDO1_VOLT_SHIFT);
+            HAL_UDelay(10);
+            psensor = HAL_Psensor_GetValue();
+            if(psensor >= minPsensor) {
+                platform_set_cpu_clock(BOARD_CPU_CLK_FACTOR);
+                return;
+            }
+        }
+        platform_set_cpu_clock(PRCM_SYS_CLK_FACTOR_240M);
+        FWK_WRN("AVS: change cpu frequency to safe value\n");
+    } else if(psensor > maxPsensor) {
+        for(int i=workVolt-1; i>=AVS_MIN_SOC_VOLT; i--) {
+            HAL_PRCM_SetLDO1WorkVolt( i<< PRCM_LDO1_VOLT_SHIFT);
+            HAL_UDelay(10);
+            psensor = HAL_Psensor_GetValue();
+            if((psensor >= minPsensor) && (psensor < maxPsensor)) {
+                return;
+            } else if(psensor < minPsensor) {
+                HAL_PRCM_SetLDO1WorkVolt((i+1) << PRCM_LDO1_VOLT_SHIFT);
+                return;
+            }
+        }
+    } else {
+        platform_set_cpu_clock(BOARD_CPU_CLK_FACTOR);
+    }
+
+    return;
+}
+
+int32_t platform_avs_init(void)
+{
+    OS_Timer_t timer;
+    avs_timer_callback(NULL);
+    /* create OS timer to avs */
+	OS_TimerSetInvalid(&timer);
+    if (OS_TimerCreate(&timer, OS_TIMER_PERIODIC, avs_timer_callback,
+                        NULL, 5000) != OS_OK) {
+        FWK_WRN("AVS: timer create failed\n");
+        return -1;
+    }
+    /* start OS timer to avs */
+    OS_TimerStart(&timer);
+    return 0;
+}
+
+#endif /* PRJCONF_SYS_AVS_EN */
 
 #if PRJCONF_WDG_EN
 static void platform_wdg_feed(void *arg)
@@ -227,6 +357,7 @@ static void platform_wdg_start(void)
 #if (PRJCONF_CE_EN && PRJCONF_PRNG_INIT_SEED)
 #define RAND_SYS_TICK() ((SysTick->VAL & 0xffffff) | (OS_GetTicks() << 24))
 
+#if (__CONFIG_CHIP_ARCH_VER == 1)
 static void platform_prng_init_seed(void)
 {
 	uint32_t seed[6];
@@ -264,6 +395,50 @@ static void platform_prng_init_seed(void)
 
 	HAL_PRNG_SetSeed(seed);
 }
+#elif (__CONFIG_CHIP_ARCH_VER == 2)
+static void platform_prng_init_seed(void)
+{
+	uint32_t seed[6];
+	HAL_Status status;
+	int i;
+
+	for (i = 0; i < 5; ++i) {
+		status = HAL_TRNG_Extract(0, seed);
+		if (status == HAL_OK) {
+			seed[4] = seed[0] ^ seed[1];
+			seed[5] = seed[2] ^ seed[3];
+			FWK_DBG("prng seed %08x %08x %08x %08x %08x %08x\n",
+					seed[0], seed[1], seed[2], seed[3], seed[4], seed[5]);
+			break;
+		} else {
+			FWK_WRN("gen trng fail %d\n", status);
+		}
+	}
+
+	if (status != HAL_OK) {
+		ADC_InitParam initParam;
+		initParam.delay = 0;
+		initParam.freq = 1000000;
+		initParam.mode = ADC_CONTI_CONV;
+		status = HAL_ADC_Init(&initParam);
+		if (status != HAL_OK) {
+			FWK_WRN("adc init err %d\n", status);
+		} else {
+			status = HAL_ADC_Conv_Polling(ADC_CHANNEL_VBAT, &seed[0], 1000);
+			if (status != HAL_OK) {
+				FWK_WRN("adc conv err %d\n", status);
+			}
+			HAL_ADC_DeInit();
+		}
+
+		seed[0] ^= RAND_SYS_TICK();
+		efpg_read(EFPG_FIELD_CHIPID, (uint8_t *)&seed[1]); /* 16-byte */
+		seed[5] = RAND_SYS_TICK();
+	}
+
+	HAL_PRNG_SetSeed(seed);
+}
+#endif /* __CONFIG_CHIP_ARCH_VER */
 #endif /* (PRJCONF_CE_EN && PRJCONF_PRNG_INIT_SEED) */
 
 #ifdef __CONFIG_XPLAYER
@@ -291,6 +466,7 @@ __weak void platform_cedarx_init(void)
 	CedarxParserRegisterAMR();
 	CedarxParserRegisterMP3();
 	CedarxParserRegisterWAV();
+	CedarxParserRegisterTS();
 
 	CedarxDecoderListInit();
 	CedarxDecoderRegisterAAC();
@@ -320,7 +496,8 @@ __weak void platform_cedarx_init(void)
 
 #if (__CONFIG_CHIP_ARCH_VER == 2)
 #if ((__CONFIG_CACHE_POLICY & 0xF) != 0)
-DCache_Config g_dcache_cfg = {
+__sram_rodata
+static DCache_Config g_dcache_cfg = {
     .vc_en = 1,
     .wrap_en = 1,
     .way_mode = ((__CONFIG_CACHE_POLICY & 0xF) >> 1),
@@ -333,7 +510,8 @@ DCache_Config g_dcache_cfg = {
 #endif
 
 #if (((__CONFIG_CACHE_POLICY>>4) & 0xF) != 0)
-ICache_Config g_icache_cfg = {
+__sram_rodata
+static ICache_Config g_icache_cfg = {
     .vc_en = 0,
     .wrap_en = 0,
     .way_mode = (((__CONFIG_CACHE_POLICY>>4) & 0xF) >> 1),
@@ -341,28 +519,28 @@ ICache_Config g_icache_cfg = {
 #endif
 #endif
 
-__nonxip_text
+__sram_text
 void platform_cache_init(void)
 {
 #if (__CONFIG_CHIP_ARCH_VER == 1)
-    #ifdef __CONFIG_XIP
-        ICache_Config cache_cfg = { 0 };
-        uint32_t addr;
-        addr = image_get_section_addr(IMAGE_APP_XIP_ID);
-        if (addr == IMAGE_INVALID_ADDR) {
-            FWK_NX_ERR("no xip section\n");
-            return;
-        }
-        cache_cfg.addr_bias = addr + IMAGE_HEADER_SIZE;
-        HAL_ICache_Init(&cache_cfg);
-    #endif
+  #ifdef __CONFIG_XIP
+    ICache_Config cache_cfg = { 0 };
+    uint32_t addr;
+    addr = image_get_section_addr(IMAGE_APP_XIP_ID);
+    if (addr == IMAGE_INVALID_ADDR) {
+        FWK_NX_ERR("no xip section\n");
+        return;
+    }
+    cache_cfg.addr_bias = addr + IMAGE_HEADER_SIZE;
+    HAL_ICache_Init(&cache_cfg);
+  #endif
 #else
-    #if (((__CONFIG_CACHE_POLICY>>4) & 0xF) != 0)
+  #if (((__CONFIG_CACHE_POLICY>>4) & 0xF) != 0)
     HAL_ICache_Init(&g_icache_cfg);
-    #endif
-    #if ((__CONFIG_CACHE_POLICY & 0xF) != 0)
+  #endif
+  #if ((__CONFIG_CACHE_POLICY & 0xF) != 0)
     HAL_Dcache_Init(&g_dcache_cfg);
-    #endif
+  #endif
 #endif
 }
 
@@ -370,7 +548,7 @@ void platform_cache_init(void)
 //extern void image_set_dbg_mask(uint16_t dbg_mask);  //rom debug
 
 /* init basic platform hardware and services */
-__nonxip_text
+__sram_text
 __weak void platform_init_level0(void)
 {
 	pm_start();
@@ -378,23 +556,61 @@ __weak void platform_init_level0(void)
 
 	HAL_Flash_Init(PRJCONF_IMG_FLASH);
 	//image_set_dbg_mask(0xffff);//rom debug
+#if (__CONFIG_OTA_POLICY == 0x00)
+	
 	image_init(PRJCONF_IMG_FLASH, PRJCONF_IMG_ADDR, PRJCONF_IMG_MAX_SIZE);
+#else
+	image_init(PRJCONF_IMG_FLASH, PRJCONF_IMG_ADDR, 0);
+#endif
+#if (defined(__CONFIG_XIP))
+    platform_xip_init();
+#endif
+#if ((defined(__CONFIG_PSRAM)) && ((__CONFIG_CACHE_POLICY & 0xF) != 0))
+    /*psram have to enable dcache*/
+    platform_psram_init();
+#endif
 #if (defined(__CONFIG_XIP) || defined(__CONFIG_PSRAM))
     platform_cache_init();
 #endif
 
-/*psram have to enable dcache*/
-#if ((defined(__CONFIG_PSRAM)) && ((__CONFIG_CACHE_POLICY & 0xF) != 0))
-	platform_psram_init();
-#endif
-#if (defined(__CONFIG_XIP))
-	platform_xip_init();
+#if (defined(__CONFIG_PSRAM) && (!defined(__CONFIG_PSRAM_ALL_CACHEABLE)))
+    HAL_Dcache_Enable_WriteThrough(rounddown2((uint32_t)__psram_bss_end__, 16), rounddown2(PSRAM_END_ADDR - DMAHEAP_PSRAM_LENGTH, 16));
 #endif
 }
+
+#ifdef __CONFIG_WLAN_AP
+__weak const wlan_ap_default_conf_t g_wlan_ap_default_conf = {
+	.ssid = "AP-XRADIO",
+	.ssid_len = 9,
+	.psk = "123456789",
+	.hw_mode = WLAN_AP_HW_MODE_IEEE80211G,
+	.ieee80211n = 0,
+	.key_mgmt = WPA_KEY_MGMT_PSK,
+	.wpa_pairwise_cipher = WPA_CIPHER_TKIP,
+	.rsn_pairwise_cipher = WPA_CIPHER_CCMP,
+	.proto = WPA_PROTO_WPA | WPA_PROTO_RSN,
+	.auth_alg = WPA_AUTH_ALG_OPEN,
+	.group_rekey = 3600,
+	.gmk_rekey = 86400,
+	.ptk_rekey = 0,
+	.strict_rekey = 1,
+	.channel = 1,
+	.beacon_int = 100,
+	.dtim = 1,
+	.max_num_sta = 4,
+	.country = {'C', 'N', ' '},
+};
+#endif
 
 /* init standard platform hardware and services */
 __weak void platform_init_level1(void)
 {
+#if SYS_AVS_EN
+    if(HAL_PRCM_SysClkFactor2Hz(BOARD_CPU_CLK_FACTOR) > 240*1000*1000)
+    {
+        platform_avs_init();
+    }
+#endif
 #if PRJCONF_CE_EN
 	HAL_CE_Init();
 #endif
@@ -425,6 +641,22 @@ __weak void platform_init_level1(void)
 #endif
 
 #if PRJCONF_NET_EN
+#if (__CONFIG_WPA_HEAP_MODE == 1)
+	wpa_set_heap_fn(psram_malloc, psram_realloc, psram_free);
+#endif
+#if (__CONFIG_UMAC_HEAP_MODE == 1)
+	umac_set_heap_fn(psram_malloc, psram_free);
+#endif
+#if (__CONFIG_LMAC_HEAP_MODE == 1)
+	lmac_set_heap_fn(psram_malloc, psram_free);
+#endif
+#if (__CONFIG_MBUF_HEAP_MODE == 1)
+	wlan_ext_request(NULL, WLAN_EXT_CMD_SET_RX_QUEUE_SIZE, 256);
+#endif
+#ifdef __CONFIG_WLAN_AP
+	wlan_ap_set_default_conf(&g_wlan_ap_default_conf);
+#endif
+
 #ifndef __CONFIG_ETF
 	net_sys_init();
 #endif
@@ -454,7 +686,7 @@ __weak void platform_init_level2(void)
  	board_sdcard_init(sdcard_detect_callback);
 #endif
 
-#if PRJCONF_INTERNAL_SOUNDCARD_EN || PRJCONF_AC107_SOUNDCARD_EN
+#if PRJCONF_INTERNAL_SOUNDCARD_EN || PRJCONF_AC107_SOUNDCARD_EN || PRJCONF_I2S_NULL_SOUNDCARD_EN
 	board_soundcard_init();
 
 	audio_manager_init();
@@ -469,7 +701,7 @@ __weak void platform_init_level2(void)
 #endif
 }
 
-__nonxip_text
+__sram_text
 void platform_init(void)
 {
 	platform_init_level0();

@@ -50,6 +50,33 @@ HAL_Status board_pinmux_cfg(HAL_BoardIoctlReq req,
 
 void board_chip_clock_init(void)
 {
+	PRCM_LDO1Volt volt;
+	PRCM_SysClkFactor factor = BOARD_CPU_CLK_FACTOR;
+
+	if (BOARD_CPU_CLK_SRC == PRCM_CPU_CLK_SRC_SYSCLK) {
+		uint32_t clkHz = HAL_PRCM_SysClkFactor2Hz(BOARD_CPU_CLK_FACTOR);
+		if (clkHz <= (160 * 1000 * 1000)) {
+			volt = PRCM_LDO1_VOLT_1225MV;
+		} else if (clkHz <= (240 * 1000 * 1000)) {
+			volt = PRCM_LDO1_VOLT_1225MV;
+		} else {
+#if SYS_AVS_EN
+			volt = PRCM_LDO1_VOLT_1225MV;
+			factor = PRCM_SYS_CLK_FACTOR_240M;
+#else
+            uint8_t vsel = HAL_GlobalGetDigLdoVsel();
+            if(((vsel & 0xC) == 0x8) || (vsel == 0x2)) {
+                volt = PRCM_LDO1_VOLT_1325MV;
+            } else {
+                volt = PRCM_LDO1_VOLT_1375MV;
+            }
+#endif
+		}
+	} else {
+		volt = PRCM_LDO1_VOLT_1125MV;
+	}
+	HAL_PRCM_SetLDO1Volt(volt, PRCM_LDO1_RET_VOLT_725MV);
+
 #if (__CONFIG_HOSC_TYPE == 24)
 	HAL_PRCM_SetHOSCType(PRCM_HOSC_TYPE_24M);
 	HAL_PRCM_SetSysPLL(PRCM_SYS_PLL_PARAM_HOSC24M);
@@ -74,7 +101,7 @@ void board_chip_clock_init(void)
 	HAL_PRCM_EnableInter32KCalib();
 #endif
 
-	HAL_PRCM_SetCPUAClk(BOARD_CPU_CLK_SRC, BOARD_CPU_CLK_FACTOR);
+	HAL_PRCM_SetCPUAClk(BOARD_CPU_CLK_SRC, factor);
 	HAL_PRCM_SetDevClock(BOARD_DEV_CLK_FACTOR);
 	HAL_CCM_BusSetClock(BOARD_AHB2_CLK_DIV, BOARD_APB_CLK_SRC, BOARD_APB_CLK_DIV);
 #ifdef __CONFIG_PSRAM

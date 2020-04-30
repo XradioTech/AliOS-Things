@@ -6,6 +6,9 @@ MEMORY
     FLASH (rx) : ORIGIN = 0x00400000, LENGTH = 16M
 }
 __RAM_BASE = ORIGIN(RAM);
+__XIP_BASE = ORIGIN(FLASH);
+__XIP_LENGTH = LENGTH(FLASH);
+__XIP_END = ORIGIN(FLASH) + LENGTH(FLASH) -1;
 /* Linker script to place sections and symbol values. Should be used together
  * with other linker script that defines memory regions FLASH and RAM.
  * It references following symbols, which must be defined in code:

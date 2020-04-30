@@ -39,9 +39,14 @@
 #include "image/image.h"
 #include "driver/chip/hal_util.h"
 #include "driver/chip/hal_icache.h"
+#include "driver/chip/psram/psram.h"
 #include "driver/chip/hal_dcache.h"
 #include "psram.h"
 #include "common/board/board.h"
+
+#ifdef __CONFIG_BIN_COMPRESS_APP_PSRAM
+#include "xz/xz.h"
+#endif
 
 #ifdef __CONFIG_PSRAM
 
@@ -84,7 +89,7 @@
 #define PSRAM_DUMP(a, l)
 #endif
 
-#define PSRAM_FREQ (192000000)
+#define PSRAM_FREQ (96000000)
 #define LOAD_SIZE (1 * 1024)
 
 //#define LOAD_BY_DBUS_CPU
@@ -209,24 +214,112 @@ static int psram_dma_read_write(uint32_t write, uint32_t addr,
 }
 #endif
 
+#ifdef __CONFIG_BIN_COMPRESS_APP_PSRAM
+
+#define PSRAM_DEC_B_INBUF_SIZE	(4 * 1024)
+#define PSRMM_DEC_BIN_DICT_MAX	(32 * 1024)
+
+__sram_text
+static int psram_decompress_bin(const section_header_t *sh, uint32_t max_size)
+{
+	uint8_t *in_buf;
+	uint32_t read_size, len, id, offset, left;
+	uint16_t chksum;
+	struct xz_dec *s;
+	struct xz_buf b;
+	enum xz_ret xzret;
+	int ret = -1;
+	OS_Time_t tm;
+
+	PSRAM_DBG("%s() start\n", __func__);
+	tm = OS_GetTicks();
+
+	in_buf = malloc(PSRAM_DEC_B_INBUF_SIZE);
+	if (in_buf == NULL) {
+		PSRAM_ERR("no mem\n");
+		return ret;
+	}
+
+	s = xz_dec_init(XZ_DYNALLOC, PSRMM_DEC_BIN_DICT_MAX);
+	if (s == NULL) {
+		PSRAM_ERR("no mem\n");
+		goto out;
+	}
+
+	b.in = in_buf;
+	b.in_pos = 0;
+	b.in_size = 0;
+	b.out = (uint8_t *)PSRAM_START_ADDR;
+	b.out_pos = 0;
+	b.out_size = max_size;
+
+	id = sh->id;
+	offset = 0;
+	left = sh->body_len;
+	chksum = sh->data_chksum;
+
+	while (1) {
+		if (b.in_pos == b.in_size) {
+			if (left == 0) {
+				PSRAM_ERR("no more input data\n");
+				break;
+			}
+			read_size = left > PSRAM_DEC_B_INBUF_SIZE ?
+			            PSRAM_DEC_B_INBUF_SIZE : left;
+			len = image_read(id, IMAGE_SEG_BODY, offset, in_buf, read_size);
+			if (len != read_size) {
+				PSRAM_ERR("read img body fail, id %#x, off %u, len %u != %u\n",
+				         id, offset, len, read_size);
+				break;
+			}
+			chksum += image_get_checksum(in_buf, len);
+			offset += len;
+			left -= len;
+			b.in_size = len;
+			b.in_pos = 0;
+		}
+
+		xzret = xz_dec_run(s, &b);
+
+		if (b.out_pos == b.out_size) {
+			PSRAM_ERR("decompress size >= %u\n", b.out_size);
+			break;
+		}
+
+		if (xzret == XZ_OK) {
+			continue;
+		} else if (xzret == XZ_STREAM_END) {
+			tm = OS_GetTicks() - tm;
+			PSRAM_DBG("%s() end, size %u --> %u, cost %u ms\n", __func__,
+			         sh->body_len, b.out_pos, tm);
+			if (chksum != 0xFFFF) {
+				PSRAM_ERR("invalid checksum %#x\n", chksum);
+			} else {
+				ret = 0;
+			}
+			break;
+		} else {
+			PSRAM_ERR("xz_dec_run() fail %d\n", xzret);
+			break;
+		}
+	}
+
+out:
+	xz_dec_end(s);
+	free(in_buf);
+	return ret;
+}
+
+#endif
+
 __sram_text
 static int load_psram_bin_and_set_addr(struct psram_chip *chip)
 {
-	extern uint8_t __psram_start__[];
-	extern uint8_t __psram_end__[];
-	extern uint8_t __psram_data_start__[];
-	extern uint8_t __psram_data_end__[];
-	extern uint8_t __psram_bss_start__[];
-	extern uint8_t __psram_bss_end__[];
 
 	int ret = 0;
 	uint32_t put = 0, len = 0;
 	section_header_t sh;
-#ifdef LOAD_BY_DBUS_FLASH_DMA
-	uint8_t *buf = (uint8_t *)IDCACHE_START_ADDR;
-#else
-	uint8_t *buf = malloc(LOAD_SIZE + PSRAM_DBG_CHECK * LOAD_SIZE);
-#endif
+	uint8_t *buf = (uint8_t *)PSRAM_START_ADDR;
 	uint32_t i, num_blocks, size;
 
 	if (!buf) {
@@ -247,103 +340,48 @@ static int load_psram_bin_and_set_addr(struct psram_chip *chip)
 		goto out;
 	}
 
-	HAL_PsramCtrl_Set_Address_Field(NULL, 0, IDCACHE_START_ADDR, IDCACHE_END_ADDR, 0);
-
 	if (sh.body_len == 0) { /* psram only used to store data */
 		PSRAM_INF("psram only used store data\n");
 		goto clr_bss;
 	}
 
-#if ((defined LOAD_BY_DBUS_FLASH_DMA) || (defined LOAD_BY_DBUS_DMA) || (defined LOAD_BY_SBUS_DMA))
-	HAL_Dcache_SetWriteThrough(0, 1, IDCACHE_START_ADDR, IDCACHE_END_ADDR);
-#endif
-
-	num_blocks = (sh.body_len + LOAD_SIZE - 1) / LOAD_SIZE;
-	PSRAM_INF("sh.body_le=%d load_times:%d\n", sh.body_len, num_blocks);
-	for (i = 0; i < num_blocks; i++) {
-		//PSRAM_DBG("psram loading idx:%d addr[0x%x] len:%d\n", i, IDCACHE_START_ADDR + len, len);
-		size = ((sh.body_len - len) > LOAD_SIZE) ? LOAD_SIZE : (sh.body_len - len);
-		len += image_read(IMAGE_APP_PSRAM_ID, IMAGE_SEG_BODY, len, (void *)buf, size);
-#ifdef LOAD_BY_DBUS_CPU
-		memcpy((void *)(IDCACHE_START_ADDR + put), buf, size); /* if support DMA, copy by image */
-#elif defined LOAD_BY_DBUS_DMA
-		psram_dma_read_write(1, (uint32_t)(IDCACHE_START_ADDR + put), buf, size);
-#elif defined LOAD_BY_SBUS_CPU
-		psram_sbus_write(chip, put, buf, size);
-#elif defined LOAD_BY_SBUS_DMA
-		psram_sbus_dma_write(chip, put, buf, size);
-#endif
-		HAL_Dcache_FlushCleanAll();
-#if PSRAM_DBG_CHECK
-		//PSRAM_DUMP((const void *)buf, 64);
-#ifdef LOAD_BY_DBUS_CPU
-		//PSRAM_DUMP((const void *)(IDCACHE_START_ADDR + put), 64);
-#elif defined LOAD_BY_DBUS_DMA
-		//memset(buf, 0, 64);
-		//PSRAM_DUMP(0, (uint32_t)(IDCACHE_START_ADDR + put), buf, 64);
-		//PSRAM_DUMP((const void *)buf, 64);
-#elif defined LOAD_BY_SBUS_CPU
-		memset(buf + LOAD_SIZE, 0, size);
-		psram_sbus_read(chip, put, buf + LOAD_SIZE, size);
-		if (memcmp(buf, buf + LOAD_SIZE, size)) {
-			PSRAM_ERR("%s,%d idx:%d\n", __func__, __LINE__, i);
-			//PSRAM_DUMP((const void *)(buf + LOAD_SIZE), 64);
+#ifdef __CONFIG_BIN_COMPRESS_APP_PSRAM
+	if (sh.attribute & IMAGE_ATTR_FLAG_COMPRESS) {
+		if (psram_decompress_bin(&sh, PSRAM_LENGTH) != 0) {
+			PSRAM_ERR("psram decompress bin failed\n");
 			ret = -1;
 			goto out;
 		}
-		//PSRAM_DUMP((const void *)(buf + LOAD_SIZE), 64);
-#elif defined LOAD_BY_SBUS_DMA
-		memset(buf + LOAD_SIZE, 0, size);
-		psram_sbus_dma_read(chip, put, buf + LOAD_SIZE, size);
-		if (memcmp(buf, buf + LOAD_SIZE, size)) {
-			PSRAM_ERR("%s,%d idx:%d\n", __func__, __LINE__, i);
-			PSRAM_DUMP((const void *)(buf + LOAD_SIZE), 64);
+	} else
+#endif
+	{
+		num_blocks = (sh.body_len + LOAD_SIZE - 1) / LOAD_SIZE;
+		PSRAM_INF("sh.body_le=%d load_times:%d\n", sh.body_len, num_blocks);
+		for (i = 0; i < num_blocks; i++) {
+			//PSRAM_DBG("psram loading idx:%d addr[0x%x] len:%d\n", i, PSRAM_START_ADDR + len, len);
+			size = ((sh.body_len - len) > LOAD_SIZE) ? LOAD_SIZE : (sh.body_len - len);
+			len += image_read(IMAGE_APP_PSRAM_ID, IMAGE_SEG_BODY, len, (void *)buf, size);
+			buf += size;
+			put += size;
+		}
+
+		if (len != sh.body_len) {
+			PSRAM_ERR("psram body size %u, read %u\n", sh.body_len, len);
 			ret = -1;
 			goto out;
 		}
-		//PSRAM_DUMP((const void *)buf, 64);
-#endif
-#endif
-#ifdef LOAD_BY_DBUS_FLASH_DMA
-		buf += size;
-#endif
-		put += size;
-	}
 
-#if ((defined LOAD_BY_DBUS_FLASH_DMA) || (defined LOAD_BY_DBUS_DMA) || (defined LOAD_BY_SBUS_DMA))
-	HAL_Dcache_SetWriteThrough(0, 0, 0, 0);
-#endif
-
-	if (len != sh.body_len) {
-		PSRAM_ERR("psram body size %u, read %u\n", sh.body_len, len);
-		ret = -1;
-		goto out;
-	}
-
-#if ((defined __CONFIG_PSRAM_CHIP_SQPI) && ((defined LOAD_BY_SBUS_CPU) || (defined LOAD_BY_SBUS_DMA)))
-	psram_sw_reset(chip, 0);
-#endif
-
-	if (image_check_data(&sh, (void *)IDCACHE_START_ADDR, sh.body_len,
-	                     NULL, 0) == IMAGE_INVALID) {
-		PSRAM_ERR("invalid psram bin body\n");
-		//PSRAM_DUMP((const void *)IDCACHE_START_ADDR, sh.body_len);
-		ret = -1;
-		goto out;
+		if (image_check_data(&sh, (void *)PSRAM_START_ADDR, sh.body_len,
+		                     NULL, 0) == IMAGE_INVALID) {
+			PSRAM_ERR("invalid psram bin body\n");
+			//PSRAM_DUMP((const void *)PSRAM_START_ADDR, sh.body_len);
+			ret = -1;
+			goto out;
+		}
 	}
 
 clr_bss:
 	memset(__psram_bss_start__, 0, __psram_bss_end__ - __psram_bss_start__);
-	HAL_Dcache_FlushCleanAll();
-#if PSRAM_DBG_CHECK
-	for (uint32_t *addr = (uint32_t *)__psram_bss_start__;
-	     addr < (uint32_t *)__psram_bss_end__; addr++) {
-		if (readl(addr)) {
-			PSRAM_ERR("bss not cleared! at[%p]:0x%x\n", addr, readl(addr));
-			break;
-		}
-	}
-#endif
 	PSRAM_INF("__psram_start__\t%p\n", __psram_start__);
 	PSRAM_INF("__psram_data_start__\t%p\n", __psram_data_start__);
 	PSRAM_INF("__psram_data_end__\t%p\n", __psram_data_end__);
@@ -352,9 +390,6 @@ clr_bss:
 	PSRAM_INF("__psram_end__\t\t%p\n", __psram_end__);
 
 out:
-#ifndef LOAD_BY_DBUS_FLASH_DMA
-	free(buf);
-#endif
 	return ret;
 }
 
@@ -364,8 +399,6 @@ static struct psram_chip chip = {0};
 __sram_text
 void platform_psram_init(void)
 {
-	extern uint8_t __psram_bss_end__[];
-
 	uint32_t addr, p_type;
 	struct psram_ctrl *ctrl = NULL;
 	PSRAMCtrl_InitParam cfg;
@@ -415,14 +448,15 @@ void platform_psram_init(void)
 		PSRAM_ERR("psram chip init faild!\n");
 		goto out1;
 	}
-	PSRAM_DBG("psram chip %s init ok!, freq %d\n", chip.name, cfg.freq);
+	HAL_PsramCtrl_DQS_Delay_Cal_Policy(ctrl);
+	chip.freq = ctrl->freq;
+	PSRAM_DBG("psram chip %s init ok!, freq %d\n", chip.name, chip.freq);
 
 	if (load_psram_bin_and_set_addr(&chip)) {
 		PSRAM_ERR("load psram bin faild!\n");
 		goto out;
 	}
 	PSRAM_DBG("load psram bin ok\n");
-	HAL_Dcache_SetWriteThrough(0, 1, rounddown2((uint32_t)__psram_bss_end__, 16), IDCACHE_END_ADDR);
     return;
 out:
     psram_deinit(&chip);

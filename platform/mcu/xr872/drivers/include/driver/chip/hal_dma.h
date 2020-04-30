@@ -273,7 +273,11 @@ __STATIC_INLINE uint32_t HAL_DMA_MakeChannelInitCfg(DMA_WorkMode workMode,
             (((uint32_t)srcAddrMode  & DMA_ADDR_MODE_VMASK)     << DMA_SRC_ADDR_MODE_SHIFT)  |
             (((uint32_t)srcPeriph    & DMA_PERIPH_VMASK)        << DMA_SRC_PERIPH_SHIFT));
 }
-
+#ifdef __CONFIG_INTERNAL_DMA
+void internal_dma_init(void);
+#endif
+void DMA_EnableIRQ(DMA_Channel chan, DMA_IRQType type);
+void DMA_DisableIRQ(DMA_Channel chan, DMA_IRQType type);
 DMA_Channel HAL_DMA_Request(void);
 DMA_Channel HAL_DMA_RequestSpecified(DMA_Channel chan);
 void HAL_DMA_Release(DMA_Channel chan);

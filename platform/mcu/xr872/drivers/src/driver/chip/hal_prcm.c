@@ -32,6 +32,10 @@
 
 
 #if (__CONFIG_CHIP_ARCH_VER == 2)
+uint32_t HAL_PRCM_GetTOPLDOVoltage()
+{
+    return HAL_GET_BIT(PRCM->SYS_TOP_LDO_CTRL, PRCM_TOPLDO_VOLT_MASK);
+}
 
 uint32_t HAL_PRCM_GetSysPowerEnableFlags(void)
 {
@@ -49,9 +53,22 @@ uint8_t HAL_PRCM_GetLDO1Status()
 	return !!HAL_GET_BIT(PRCM->SYS_LDO_SW_CTRL, PRCM_LDO1_STATUS_BIT);
 }
 
-void HAL_PRCM_SetLDO1Voltage(PRCM_LDO1Volt volt)
+uint32_t HAL_PRCM_GetLDO1WorkVolt()
+{
+    return HAL_GET_BIT_VAL(PRCM->SYS_LDO_SW_CTRL, PRCM_LDO1_VOLT_SHIFT, PRCM_LDO1_VOLT_VMASK);
+}
+
+void HAL_PRCM_SetLDO1WorkVolt(PRCM_LDO1Volt volt)
 {
 	HAL_MODIFY_REG(PRCM->SYS_LDO_SW_CTRL, PRCM_LDO1_VOLT_MASK, volt);
+}
+
+uint32_t HAL_PRCM_SysClkFactor2Hz(uint32_t factor)
+{
+    uint32_t divm, divn;
+	divm = ((factor >> PRCM_SYS_CLK_FACTORM_SHIFT) & PRCM_SYS_CLK_FACTORM_VMASK) + 5;
+	divn = ((factor >> PRCM_SYS_CLK_FACTORN_SHIFT) & PRCM_SYS_CLK_FACTORN_VMASK) + 1;
+    return SYS_PLL_CLOCK / (divm * divn);
 }
 
 #ifdef __CONFIG_ROM
@@ -127,6 +144,51 @@ void HAL_PRCM_SetSys1SleepPowerFlags(uint32_t flags)
 {
     HAL_MODIFY_REG(PRCM->SYS1_SLEEP_CTRL, PRCM_SYS_WS_PWR_FLAGS_MASK, flags & PRCM_SYS_WS_PWR_FLAGS_MASK);
 }
+
+#ifdef __CONFIG_CPU_SUPPORT_349MHZ
+uint32_t HAL_PRCM_GetCPUAClk(void)
+{
+	uint32_t reg = PRCM->SYS_CLK1_CTRL;
+	uint32_t freq;
+
+	switch (reg & PRCM_CPU_CLK_SRC_MASK) {
+	case PRCM_CPU_CLK_SRC_HFCLK:
+		freq = HAL_GetHFClock();
+		break;
+	case PRCM_CPU_CLK_SRC_LFCLK:
+		freq = HAL_GetLFClock();
+		break;
+	case PRCM_CPU_CLK_SRC_SYSCLK:
+	default: {
+		uint32_t div;
+#if (__CONFIG_CHIP_ARCH_VER == 1)
+		div = HAL_GET_BIT_VAL(reg,
+		                      PRCM_SYS_CLK_FACTOR_SHIFT,
+		                      PRCM_SYS_CLK_FACTOR_VMASK) + 1;
+#elif (__CONFIG_CHIP_ARCH_VER == 2)
+		uint32_t divm, divn;
+
+		divm = HAL_GET_BIT_VAL(reg,
+		                       PRCM_SYS_CLK_FACTORM_SHIFT,
+		                       PRCM_SYS_CLK_FACTORM_VMASK) + 5;
+		divn = HAL_GET_BIT_VAL(reg,
+		                       PRCM_SYS_CLK_FACTORN_SHIFT,
+		                       PRCM_SYS_CLK_FACTORN_VMASK) + 1;
+		if (divm == 12) {
+			freq = (float)SYS_PLL_CLOCK / divn / 5.5;
+			break;
+		}
+		div = divm * divn;
+#else
+#error "chip undefined!"
+#endif
+		freq = SYS_PLL_CLOCK / div;
+	}
+		break;
+	}
+	return freq;
+}
+#endif /* __CONFIG_CPU_SUPPORT_349MHZ */
 
 #endif /*__CONFIG_ROM */
 
