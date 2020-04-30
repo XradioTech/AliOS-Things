@@ -81,17 +81,61 @@ ifeq ($(with_rom),1)
 $(NAME)_SOURCES += $(XR872_ROM_FILES)
 endif
 
-$(NAME)_PREBUILT_LIBRARY := \
-                            drivers/lib/sc_assistant.a \
-                            drivers/lib/wpa.a \
-                            drivers/lib/wlan.a \
-                            drivers/lib/wireless.a \
-                            drivers/lib/net80211.a
+#$(NAME)_PREBUILT_LIBRARY := \
+ #                           drivers/lib/sc_assistant.a \
+ #                           drivers/lib/wpa.a \
+ #                           drivers/lib/wlan.a \
+  #                          drivers/lib/wireless.a \
+  #                          drivers/lib/net80211.a
+
+ifeq ($(__CONFIG_USE_PREBUILT_LIBSC_ASSISTANT), y)
+$(NAME)_PREBUILT_LIBRARY := drivers/lib/libsc_assistant.a
+else
+include $(SOURCE_ROOT)/platform/mcu/xr872/lib/config.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/lib/source.mk
+endif
+
+ifeq ($(__CONFIG_USE_PREBUILT_LIBWPA), y)
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/libwpa.a
+else
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/config.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/source.mk
+endif
+
+ifeq ($(__CONFIG_USE_PREBUILT_LIBWPAS), y)
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/libwpas.a
+else
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/config.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/source.mk
+endif
+
+ifeq ($(__CONFIG_USE_PREBUILT_LIBWLAN), y)
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/libwlan.a
+else
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/config.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/source.mk
+endif
+
+ifeq ($(__CONFIG_USE_PREBUILT_LIBXRWIRELESS), y)
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/libxrwireless.a
+else
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/config.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/source.mk
+endif
+
+ifeq ($(__CONFIG_USE_PREBUILT_LIBNET80211), y)
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/libnet80211.a
+else
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/config.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/source.mk
+endif							
 
 #if need to compile rom.a, then remove it.
 ifneq ($(with_rom),1)               
 #$(NAME)_PREBUILT_LIBRARY += drivers/lib/rom.a
 endif
+
+$(NAME)_SOURCES += $(XR872_SOURCE_FILES)
 
 $(NAME)_CFLAGS += -include platform/mcu/xr872/drivers/project/common/prj_conf_opt.h
 $(NAME)_CFLAGS += -include platform/mcu/xr872/drivers/project/main/prj_config.h
@@ -122,14 +166,16 @@ GLOBAL_CFLAGS  += -D__CONFIG_MBUF_IMPL_MODE=0
 GLOBAL_CFLAGS  += -D__CONFIG_WLAN
 GLOBAL_CFLAGS  += -D__CONFIG_WLAN_STA
 GLOBAL_CFLAGS  += -D__CONFIG_WLAN_MONITOR
-GLOBAL_DEFINES += __CONFIG_CHIP_ARCH_VER=2
-GLOBAL_DEFINES += __CONFIG_HOSC_TYPE=40
-GLOBAL_DEFINES += __CONFIG_CACHE_POLICY=0x02
 GLOBAL_CFLAGS  += -D__CONFIG_PM
 
 GLOBAL_CFLAGS  += -D__CONFIG_SECTION_ATTRIBUTE_XIP
 GLOBAL_CFLAGS  += -D__CONFIG_SECTION_ATTRIBUTE_NONXIP
 GLOBAL_CFLAGS  += -D__CONFIG_SECTION_ATTRIBUTE_SRAM
+
+GLOBAL_DEFINES += __CONFIG_CHIP_ARCH_VER=2
+GLOBAL_DEFINES += __CONFIG_HOSC_TYPE=40
+GLOBAL_DEFINES += __CONFIG_CACHE_POLICY=0x02
+GLOBAL_DEFINES  += __CONFIG_SYSTEM_HEAP_MODE=0x01
 
 #GLOBAL_CFLAGS  += -D__CONFIG_LIBC_PRINTF_FLOAT
 #GLOBAL_CFLAGS  += -D__CONFIG_LIBC_SCANF_FLOAT
