@@ -27,48 +27,48 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _CMD_DEFS_H_
-#define _CMD_DEFS_H_
+#include <aos/cli.h>
+#include "driver/chip/hal_chip.h"
+#include "common/cmd/cmd_wlan.h"
+#include "common/cmd/cmd_defs.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-enum cmd_code_type {
-    CMD_CODE_TYEP_STATUS = 0,
-    CMD_CODE_TYEP_EVENT,
-};
-
-enum cmd_status {
-    CMD_STATUS_ACKED        = 100,  /* already acked, no need to send respond */
-
-    /* success status */
-    CMD_STATUS_SUCCESS_MIN  = 200,
-    CMD_STATUS_OK           = 200,  /* command exec success */
-    CMD_STATUS_SUCCESS_MAX  = 200,
-
-    /* error status */
-    CMD_STATUS_ERROR_MIN    = 400,
-    CMD_STATUS_UNKNOWN_CMD  = 400,  /* unknown command */
-    CMD_STATUS_INVALID_ARG  = 401,  /* invalid argument */
-    CMD_STATUS_FAIL         = 402,  /* command exec failed */
-    CMD_STATUS_ERROR_MAX    = 402,
-};
-
-enum cmd_event {
-    CMD_EVENT_MIN           = 600,
-    CMD_EVENT_TEST_FINISH   = 600,
-    CMD_EVENT_TIMER_NOTIFY  = 601,
-    CMD_EVENT_RTC_NOTIFY    = 602,
-    CMD_EVENT_MQTT_MSG_RECV = 603,
-    CMD_EVENT_WDG_TIMEOUT   = 604,
-    CMD_EVENT_MAX           = 604,
-};
-
-typedef void (*cmd_fun_t)(char *outbuf, int len, int argc, char **argv);
-
-#ifdef __cplusplus
+static void handle_sta_cmd(char *pwbuf, int blen, int argc, char **argv)
+{
+	char cmd_buf[255];
+	int i;
+	enum cmd_status status;
+	memset(cmd_buf, 0, sizeof(cmd_buf));
+	if(argc > 1) {
+		for (i=1; i<argc; i++) {
+			if (i == 1) {
+				snprintf(cmd_buf, strlen(argv[1]) + 1, "%s", argv[i]);
+			} else {
+			     snprintf(cmd_buf + strlen(cmd_buf),
+                     strlen(cmd_buf) + strlen(argv[i]) + 1, " %s", argv[i]);
+			}
+			//printf("%s,%s, i %d\n", __func__, cmd_buf, i);
+		}
+		//printf("%s,%s\n", __func__, cmd_buf);
+		status = cmd_wlan_sta_exec(cmd_buf);
+		if(status == CMD_STATUS_OK) {
+			printf("%s,cmd ok %d\n", __func__, status);
+		} else if (status == CMD_STATUS_ACKED) {
+			printf("%s,cmd acked %d\n", __func__, status);
+		} else {
+			printf("%s,err status %d\n", __func__, status);
+		}
+	} else {
+		printf("%s, cmd is not correct\n", __func__);
+	}
 }
-#endif
 
-#endif /* _CMD_DEFS_H_ */
+static struct cli_command ncmd = {
+    .name = "sta",
+    .help = "sta help",
+    .function = handle_sta_cmd,
+};
+
+void cli_cmd_add_sta(void)
+{
+	aos_cli_register_command(&ncmd);
+}

@@ -27,24 +27,19 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-#include "kernel/os/YunOS/os_common.h"
-#include "kernel/os/YunOS/os_time.h"
-#include "sys/interrupt.h"
-
-extern uint8_t g_sched_lock[RHINO_CONFIG_CPU_NUM];
-int OS_ThreadIsSchedulerRunning(void)
+extern void cli_cmd_add_upgrade(void);
+extern void cli_cmd_add_mem(void);
+extern void cli_cmd_add_etf(void);
+extern void cli_cmd_add_iperf(void);
+extern void cli_cmd_add_lmac(void);
+extern void cli_cmd_add_sta(void);
+void aos_cli_ext_init(void)
 {
-	unsigned long flags;
-	flags = arch_irq_save();
+	cli_cmd_add_upgrade();
+	cli_cmd_add_mem();
+	cli_cmd_add_etf();
+	cli_cmd_add_iperf();
+	cli_cmd_add_lmac();
+	cli_cmd_add_sta();
 
-	if (g_sched_lock[cpu_cur_get()] == 0u) {//RHINO_SCHED_ALREADY_ENABLED
-		arch_irq_restore(flags);
-		return 1;
-  } else {
-	  arch_irq_restore(flags);
-	return 0;
-	}
 }
-
-

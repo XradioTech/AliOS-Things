@@ -28,12 +28,15 @@
  */
 
 #include <stdio.h>
+#include <stdint.h>
+#include <sys/time.h> /* for timeofday */
 #include "compiler.h"
 #include "driver/chip/system_chip.h"
 #include "driver/chip/hal_global.h"
 #include "common/board/board.h"
 
 extern int stdout_init(void);
+extern void main_task_start(void);
 
 void hardware_init_hook(void)
 {
@@ -47,20 +50,26 @@ void hardware_init_hook(void)
 
 int __wrap_main(void)
 {
+	static const GPIO_GlobalInitParam gpio_param = {
+		.portIRQUsed  = PRJCONF_GPIO_PORT_IRQ_USED,
+		.portPmBackup = PRJCONF_GPIO_PORT_PM_BACKUP
+	};
 
 	SystemCoreClockUpdate();
+	timeofday_restore();
 	HAL_GlobalInit();
-
-#if 0
-		HAL_SWD_Init();
+	HAL_GPIO_GlobalInit(&gpio_param);
+#if PRJCONF_SWD_EN
+	HAL_SWD_Init();
 #endif
-    __real_main();
-
+#if PRJCONF_UART_EN
+	stdout_init();
+#endif
+	main_task_start();
 	return -1;
 }
 
-//#ifdef __CONFIG_MALLOC_USE_STDLIB
-#if 0
+#ifdef __CONFIG_MALLOC_USE_STDLIB
 
 /* Linker defined symbol used by _sbrk to indicate where heap should start. */
 extern uint8_t __end__[];	/* heap start address */
@@ -76,8 +85,10 @@ void *_sbrk(int incr)
 
     /* avoid corrupting heap data by the increase of main stack (MSP) */
     if (new_heap >= _estack - PRJCONF_MSP_STACK_SIZE) {
+#ifndef __CONFIG_MIX_HEAP_MANAGE
     	printf("heap exhausted, incr %d, %p >= %p\n",
 		       incr, new_heap, _estack - PRJCONF_MSP_STACK_SIZE);
+#endif
         return (void *)-1;
     }
 

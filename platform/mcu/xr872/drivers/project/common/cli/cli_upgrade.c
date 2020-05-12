@@ -27,24 +27,17 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-#include "kernel/os/YunOS/os_common.h"
-#include "kernel/os/YunOS/os_time.h"
-#include "sys/interrupt.h"
+#include <aos/cli.h>
+#include "common/cmd/cmd_upgrade.h"
+#include "common/cmd/cmd_defs.h"
 
-extern uint8_t g_sched_lock[RHINO_CONFIG_CPU_NUM];
-int OS_ThreadIsSchedulerRunning(void)
+static struct cli_command ncmd = {
+    .name = "upgrade",
+    .help = "upgrade",
+    .function = (cmd_fun_t)cmd_upgrade_exec,
+};
+
+void cli_cmd_add_upgrade(void)
 {
-	unsigned long flags;
-	flags = arch_irq_save();
-
-	if (g_sched_lock[cpu_cur_get()] == 0u) {//RHINO_SCHED_ALREADY_ENABLED
-		arch_irq_restore(flags);
-		return 1;
-  } else {
-	  arch_irq_restore(flags);
-	return 0;
-	}
+    aos_cli_register_command(&ncmd);
 }
-
-

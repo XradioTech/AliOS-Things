@@ -14,6 +14,7 @@ extern void soc_driver_init(void);
 extern void soc_system_init(void);
 extern void board_driver_init(void);
 extern void aos_cli_ext_init(void);
+extern void soc_hardware_sys_init(void);
 
 #ifndef AOS_BINS
 extern int application_start(int argc, char **argv);
@@ -61,9 +62,9 @@ static void sys_init(void)
     #endif
 }
 
-
 int main(void)
 {
+	soc_hardware_sys_init();
     /*irq initialized is approved here.But irq triggering is forbidden, which will enter CPU scheduling.
     Put them in sys_init which will be called after aos_start.
     Irq for task schedule should be enabled here, such as PendSV for cortex-M4.

@@ -14,6 +14,7 @@
 #include "aos/hal/adc.h"
 #include "aos/kernel.h"
 #include "aos/yloop.h"
+#include "common/board/board.h"
 
 #if 0
 #define BOARD_AKEY   (1) //adc key ch 1
@@ -172,6 +173,7 @@ int adc_key_init(void)
     return 0;
 }
 #endif
+
 void board_driver_init(void)
 {
     printf("xr872 board init...\n");
@@ -200,6 +202,7 @@ void soc_driver_init(void)
 
     printf("soc_driver_init done\n");
 }
+
 #if 0 //mem read printf
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 
@@ -224,6 +227,20 @@ void print_hex_dump_words_t(const void *addr, unsigned int len)
 	printf("\n");
 }
 #endif
+
+void soc_hardware_sys_init(void)
+{
+#ifdef __CONFIG_ROM
+	extern void rom_init();
+	rom_init();
+#endif
+	HAL_BoardIoctlCbRegister(board_ioctl);
+	SystemInit();
+
+    SystemCoreClockUpdate();
+    HAL_GlobalInit();
+}
+
 //extern uint32_t dumpsys_mm_info_func(uint32_t len);
 void soc_system_init(void)
 {

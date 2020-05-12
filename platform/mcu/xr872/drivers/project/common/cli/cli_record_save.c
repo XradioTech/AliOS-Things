@@ -27,48 +27,32 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _CMD_DEFS_H_
-#define _CMD_DEFS_H_
+#ifdef __CONFIG_SUPPORT_SAVE_RECORD_DATA
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <aos/cli.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+extern int record_data_save_start(void *arg);
+extern int record_data_save_stop();
 
-enum cmd_code_type {
-    CMD_CODE_TYEP_STATUS = 0,
-    CMD_CODE_TYEP_EVENT,
+static void handle_record_save_cmd(char *pwbuf, int blen, int argc, char **argv)
+{
+	if (strcmp(argv[1], "start") == 0) {
+		record_data_save_start(argv[2]);
+	} else if (strcmp(argv[1], "stop") == 0) {
+		record_data_save_stop();
+	}
+}
+
+static struct cli_command cmd = {
+    .name = "record_save",
+    .help = "record_save start or stop",
+    .function = handle_record_save_cmd,
 };
 
-enum cmd_status {
-    CMD_STATUS_ACKED        = 100,  /* already acked, no need to send respond */
-
-    /* success status */
-    CMD_STATUS_SUCCESS_MIN  = 200,
-    CMD_STATUS_OK           = 200,  /* command exec success */
-    CMD_STATUS_SUCCESS_MAX  = 200,
-
-    /* error status */
-    CMD_STATUS_ERROR_MIN    = 400,
-    CMD_STATUS_UNKNOWN_CMD  = 400,  /* unknown command */
-    CMD_STATUS_INVALID_ARG  = 401,  /* invalid argument */
-    CMD_STATUS_FAIL         = 402,  /* command exec failed */
-    CMD_STATUS_ERROR_MAX    = 402,
-};
-
-enum cmd_event {
-    CMD_EVENT_MIN           = 600,
-    CMD_EVENT_TEST_FINISH   = 600,
-    CMD_EVENT_TIMER_NOTIFY  = 601,
-    CMD_EVENT_RTC_NOTIFY    = 602,
-    CMD_EVENT_MQTT_MSG_RECV = 603,
-    CMD_EVENT_WDG_TIMEOUT   = 604,
-    CMD_EVENT_MAX           = 604,
-};
-
-typedef void (*cmd_fun_t)(char *outbuf, int len, int argc, char **argv);
-
-#ifdef __cplusplus
+void cli_cmd_add_record_save(void)
+{
+    aos_cli_register_command(&cmd);
 }
 #endif
-
-#endif /* _CMD_DEFS_H_ */

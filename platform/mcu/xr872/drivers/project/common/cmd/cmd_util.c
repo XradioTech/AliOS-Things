@@ -141,7 +141,7 @@ const char *cmd_get_event_desc(enum cmd_event event)
 	return cmd_empty_desc;
 }
 #endif
-
+#if 0
 int cmd_write(enum cmd_code_type type, int code, const char *fmt, ...)
 {
 	static char str_buf[400];
@@ -171,7 +171,7 @@ int cmd_write(enum cmd_code_type type, int code, const char *fmt, ...)
 
 	return console_write((uint8_t *)str_buf, len);
 }
-
+#endif
 int32_t cmd_raw_mode_read(uint8_t *buf, int32_t size, uint32_t msec)
 {
 	UART_ID uart_id = console_get_uart_id();

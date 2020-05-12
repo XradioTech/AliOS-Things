@@ -63,7 +63,8 @@ int cmd_parse_argv(char *cmd, char *argv[], int size);
 const char *cmd_get_status_desc(enum cmd_status status);
 //const char *cmd_get_event_desc(enum cmd_event event);
 
-int cmd_write(enum cmd_code_type type, int code, const char *fmt, ...);
+//int cmd_write(enum cmd_code_type type, int code, const char *fmt, ...);
+#define cmd_write
 
 #define cmd_write_respond(status, fmt, arg...) \
 	cmd_write(CMD_CODE_TYEP_STATUS, (int)status, fmt, ##arg)

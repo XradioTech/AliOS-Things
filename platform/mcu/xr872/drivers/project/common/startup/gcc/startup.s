@@ -96,22 +96,7 @@ ram_table_cpy:
   blx   r3
 startup:
 #endif
-  cpsie i
-  cpsie f
-  ldr r2, =_sbss
-  b   LoopFillZerobss
-
-/* Zero fill the bss segment. */
-FillZerobss:
-  movs    r3, #0
-  str r3, [r2], #4
-
-LoopFillZerobss:
-  ldr r3, = _ebss
-  cmp r2, r3
-  bcc FillZerobss
-  bl main
-  b .
+  bl   _start
 
 LoopForever:
   b LoopForever
@@ -226,5 +211,3 @@ g_pfnVectors:
   .word 0
   .word 0                                           // 47
 
-  .weak SVC_Handler
-  .thumb_set SVC_Handler,Default_Handler
