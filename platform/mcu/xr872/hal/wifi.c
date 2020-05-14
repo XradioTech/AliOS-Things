@@ -38,147 +38,128 @@
 
 static int wifi_init(hal_wifi_module_t *m)
 {
-	return xr871_wlan_init();
+	return xr_wlan_init();
 }
 
 static void wifi_get_mac_addr(hal_wifi_module_t *m, uint8_t *mac)
 {
-	xr871_wlan_get_mac_addr(mac);
+	xr_wlan_get_mac_addr(mac);
 }
 
 static int wifi_start(hal_wifi_module_t *m, hal_wifi_init_type_t *init_para)
 {
-    int ret;
+	int ret;
 
-	ret = xr871_wlan_start(init_para);
+	ret = xr_wlan_start(init_para);
 
-    return ret;
+	return ret;
 }
 
 static int wifi_start_adv(hal_wifi_module_t *m, hal_wifi_init_type_adv_t *init_para_adv)
 {
-    int ret;
+	int ret;
 
- 	ret = xr871_wlan_start_adv(init_para_adv);
+	ret = xr_wlan_start_adv(init_para_adv);
 
-    return ret;
+	return ret;
 }
 
 static int get_ip_stat(hal_wifi_module_t *m, hal_wifi_ip_stat_t *out_net_para, hal_wifi_type_t wifi_type)
 {
-    int ret;
+	int ret;
 
-	ret = xr871_wlan_get_ip_stat(out_net_para, wifi_type);
+	ret = xr_wlan_get_ip_stat(out_net_para, wifi_type);
 
-    return ret;
+	return ret;
 }
 
 static int get_link_stat(hal_wifi_module_t *m, hal_wifi_link_stat_t *out_stat)
 {
 	int ret;
 
-    ret = xr871_wlan_get_link_stat(out_stat);
+	ret = xr_wlan_get_link_stat(out_stat);
 
 	return ret;
 }
 
 static void start_scan(hal_wifi_module_t *m)
 {
-    xr871_wlan_start_scan();
+	xr_wlan_start_scan();
 }
 
 static void start_scan_adv(hal_wifi_module_t *m)
 {
-	xr871_wlan_start_adv_scan();
+	xr_wlan_start_adv_scan();
 }
 
 static int power_off(hal_wifi_module_t *m)
 {
-   	return xr871_wlan_power_off();
+	return xr_wlan_power_off();
 }
 
 static int power_on(hal_wifi_module_t *m)
 {
-    return xr871_wlan_power_on();
+	return xr_wlan_power_on();
 }
 
 static int suspend(hal_wifi_module_t *m)
 {
-    return xr871_wlan_suspend();
+	return xr_wlan_suspend();
 }
 
 static int suspend_station(hal_wifi_module_t *m)
 {
-    return xr871_wlan_suspend_station();
+	return xr_wlan_suspend_station();
 }
 
 static int suspend_soft_ap(hal_wifi_module_t *m)
 {
-    return xr871_wlan_suspend_softap();
+	return xr_wlan_suspend_softap();
 }
 
 static int set_channel(hal_wifi_module_t *m, int ch)
 {
-    return xr871_wlan_set_channel(ch);
+	return xr_wlan_set_channel(ch);
 }
 
 static void start_monitor(hal_wifi_module_t *m)
 {
-	xr871_wlan_start_monitor();
+	xr_wlan_start_monitor();
 }
 
 static void stop_monitor(hal_wifi_module_t *m)
 {
-	xr871_wlan_stop_monitor();
+	xr_wlan_stop_monitor();
 }
 
 static void register_monitor_cb(hal_wifi_module_t *m, monitor_data_cb_t fn)
 {
-	xr871_wlan_register_monitor_cb(fn);
+	xr_wlan_register_monitor_cb(fn);
 }
 
 static void register_wlan_mgnt_monitor_cb(hal_wifi_module_t *m, monitor_data_cb_t fn)
 {
-    xr871_wlan_register_mgnt_monitor_cb(fn);
+	xr_wlan_register_mgnt_monitor_cb(fn);
 }
 
 static int wlan_send_80211_raw_frame(hal_wifi_module_t *m, uint8_t *buf, int len)
 {
-    return xr871_wlan_send_80211_raw_frame(buf, len - 4); // len-4=exclude FCS
+    return xr_wlan_send_80211_raw_frame(buf, len - 4); // len-4=exclude FCS
 }
 
 static void start_debug_mode(hal_wifi_module_t *m)
 {
-	xr871_wlan_start_debug_mode();
+	xr_wlan_start_debug_mode();
 }
 
 static void stop_debug_mode(hal_wifi_module_t *m)
 {
-	xr871_wlan_stop_debug_mode();
+	xr_wlan_stop_debug_mode();
 }
 
 static int get_wireless_info(hal_wifi_module_t *m, void *wireless_info)
 {
-    hal_wireless_info_t *info = (hal_wireless_info_t *)wireless_info;
-    wlan_sta_states_t state;
-    wlan_sta_ap_t ap;
-
-    printf("get wireless info\r\n");
-
-    if (info == NULL)
-        return -1;
-
-    wlan_sta_state(&state);
-    if (state == WLAN_STA_STATE_CONNECTED) {
-        wlan_sta_ap_info(&ap);
-        if (ap.rssi > 0) {
-            if (ap.rssi >= 128) ap.rssi = 127;
-            ap.rssi -= 128;
-        }
-        info->rssi = ap.rssi;
-        return 0;
-    }
-    return -1;
+	return xr_wlan_get_wireless_info(m, wireless_info);
 }
 
 hal_wifi_module_t sim_aos_wifi_xr871 = {

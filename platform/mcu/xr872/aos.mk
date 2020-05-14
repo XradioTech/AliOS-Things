@@ -39,8 +39,8 @@ $(NAME)_PREBUILT_LIBRARY := drivers/lib/libxz/libxz.a
 ifeq ($(__CONFIG_USE_PREBUILT_LIBSC_ASSISTANT), y)
 $(NAME)_PREBUILT_LIBRARY += drivers/lib/libsc_assistant.a
 else
-include $(SOURCE_ROOT)/platform/mcu/xr872/lib/config.mk
-include $(SOURCE_ROOT)/platform/mcu/xr872/lib/source.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/config.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/source.mk
 endif
 
 ifeq ($(__CONFIG_USE_PREBUILT_LIBWPA), y)

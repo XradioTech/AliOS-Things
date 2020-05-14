@@ -25,7 +25,9 @@ XR872_SOURCE_FILES += drivers/project/common/framework/sys_ctrl/container.c \
                        drivers/project/common/cli/cli_sta.c \
                        drivers/project/common/board/board.c \
                        drivers/project/common/board/board_common.c \
-                       drivers/project/common/startup/gcc/exception.c \
+                       drivers/project/common/startup/gcc/exception.c
+
+#XR872_SOURCE_FILES +=  drivers/project/common/cli/cli_queue_test.c
 
 #ifeq ($(AOS_BOARD_XR872), 1)
 XR872_SOURCE_FILES += drivers/project/common/board/xr872_evb_ai/board_config.c

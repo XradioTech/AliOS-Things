@@ -33,6 +33,8 @@ extern void cli_cmd_add_etf(void);
 extern void cli_cmd_add_iperf(void);
 extern void cli_cmd_add_lmac(void);
 extern void cli_cmd_add_sta(void);
+//extern void cli_cmd_add_queue_test(void);
+
 void aos_cli_ext_init(void)
 {
 	cli_cmd_add_upgrade();
@@ -41,5 +43,5 @@ void aos_cli_ext_init(void)
 	cli_cmd_add_iperf();
 	cli_cmd_add_lmac();
 	cli_cmd_add_sta();
-
+	//cli_cmd_add_queue_test();
 }

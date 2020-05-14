@@ -36,27 +36,28 @@
 extern "C" {
 #endif
 
-int xr871_wlan_init(void);
-void xr871_wlan_get_mac_addr(uint8_t *mac);
-int xr871_wlan_start(hal_wifi_init_type_t *init_para);
-int xr871_wlan_start_adv(hal_wifi_init_type_adv_t *init_para_adv);
-int xr871_wlan_get_ip_stat(hal_wifi_ip_stat_t *out_net_para, hal_wifi_type_t wifi_type);
-int xr871_wlan_get_link_stat(hal_wifi_link_stat_t *out_stat);
-void xr871_wlan_start_scan(void);
-void xr871_wlan_start_adv_scan(void);
-int xr871_wlan_power_off(void);
-int xr871_wlan_power_on(void);
-int xr871_wlan_suspend(void);
-int xr871_wlan_suspend_station(void);
-int xr871_wlan_suspend_softap(void);
-int xr871_wlan_set_channel(int ch);
-void xr871_wlan_start_monitor(void);
-void xr871_wlan_stop_monitor(void);
-void xr871_wlan_register_monitor_cb(monitor_data_cb_t fn);
-void xr871_wlan_register_mgnt_monitor_cb(monitor_data_cb_t fn);
-int xr871_wlan_send_80211_raw_frame(uint8_t *buf, int len);
-void xr871_wlan_start_debug_mode(void);
-void xr871_wlan_stop_debug_mode(void);
+int xr_wlan_init(void);
+void xr_wlan_get_mac_addr(uint8_t *mac);
+int xr_wlan_start(hal_wifi_init_type_t *init_para);
+int xr_wlan_start_adv(hal_wifi_init_type_adv_t *init_para_adv);
+int xr_wlan_get_ip_stat(hal_wifi_ip_stat_t *out_net_para, hal_wifi_type_t wifi_type);
+int xr_wlan_get_link_stat(hal_wifi_link_stat_t *out_stat);
+void xr_wlan_start_scan(void);
+void xr_wlan_start_adv_scan(void);
+int xr_wlan_power_off(void);
+int xr_wlan_power_on(void);
+int xr_wlan_suspend(void);
+int xr_wlan_suspend_station(void);
+int xr_wlan_suspend_softap(void);
+int xr_wlan_set_channel(int ch);
+void xr_wlan_start_monitor(void);
+void xr_wlan_stop_monitor(void);
+void xr_wlan_register_monitor_cb(monitor_data_cb_t fn);
+void xr_wlan_register_mgnt_monitor_cb(monitor_data_cb_t fn);
+int xr_wlan_send_80211_raw_frame(uint8_t *buf, int len);
+void xr_wlan_start_debug_mode(void);
+void xr_wlan_stop_debug_mode(void);
+int xr_wlan_get_wireless_info(hal_wifi_module_t *m, void *wireless_info);
 
 #ifdef __cplusplus
 }
