@@ -5,6 +5,9 @@ MEMORY
     FLASH (rx) : ORIGIN = 0x00400000, LENGTH = 16M
 }
 __RAM_BASE = ORIGIN(RAM);
+__XIP_BASE = ORIGIN(FLASH);
+__XIP_LENGTH = LENGTH(FLASH);
+__XIP_END = ORIGIN(FLASH) + LENGTH(FLASH) -1;
 /* Linker script to place sections and symbol values. Should be used together
  * with other linker script that defines memory regions FLASH and RAM.
  * It references following symbols, which must be defined in code:
@@ -78,7 +81,7 @@ SECTIONS
         *libiot_dynreg.a: (.text .text.* .rodata .rodata.*)
         *libiot_certs.a: (.text .text.* .rodata .rodata.*)
         *libiot_sign.a: (.text .text.* .rodata .rodata.*)
-		*ota.a: (.text .text.* .rodata .rodata.*)
+				*ota.a: (.text .text.* .rodata .rodata.*)
 
 		/* kernel */
         *net.a: (.text .text.* .rodata .rodata.*)
@@ -91,6 +94,9 @@ SECTIONS
 				/**rhino.a: (.text .text.* .rodata .rodata.*)  can not set*/
         *vfs.a: (.text .text.* .rodata .rodata.*)
         *debug.a: (.text .text.* .rodata .rodata.*)
+				*ulog.a: (.text .text.* .rodata .rodata.*)
+				*und.a: (.text .text.* .rodata .rodata.*)
+				*ota_agent.a: (.text .text.* .rodata .rodata.*)
 
 		/* security */
         *alicrypto.a: (.text .text.* .rodata .rodata.*)
@@ -198,19 +204,15 @@ SECTIONS
         *efpg.a: (.text .text.* .rodata .rodata.*)
 
 			/* net lib */
-				*wlan.a: (.text .text.* .rodata .rodata.*)
-				*net80211.a: (.text .text.* .rodata .rodata.*)
-				*wpa.a: (.text .text.* .rodata .rodata.*)
-				*sc_assistant.a: (.text .text.* .rodata .rodata.*)
-				*wireless.a: (.text .text.* .rodata .rodata.*)
+				*libwlan.a: (.text .text.* .rodata .rodata.*)
+				*libnet80211.a: (.text .text.* .rodata .rodata.*)
+				*libwpa.a: (.text .text.* .rodata .rodata.*)
+				*libwpas.a: (.text .text.* .rodata .rodata.*)
+				*libsc_assistant.a: (.text .text.* .rodata .rodata.*)
+				*libxrwireless.a: (.text .text.* .rodata .rodata.*)
 
 				/**board_xr872.a:k_config.o (.text .text.* .rodata .rodata.*) can not set*/
 				*board_xr872.a:partition_conf.o (.text .text.* .rodata .rodata.*)
-				*board_xr872.a:oled.o (.text .text.* .rodata .rodata.*)
-				*board_xr872.a:ssd1306.o (.text .text.* .rodata .rodata.*)
-				*board_xr872.a:cli_ext.o (.text .text.* .rodata .rodata.*)
-				*board_xr872.a:cli_upgrade.o (.text .text.* .rodata .rodata.*)
-				*board_xr872.a:cli_mem.o (.text .text.* .rodata .rodata.*)
 
 				*mcu_xr872.a:flash.o (.text .text.* .rodata .rodata.*)
 				*mcu_xr872.a:adc.o (.text .text.* .rodata .rodata.*)
@@ -266,30 +268,21 @@ SECTIONS
 				*mcu_xr872.a:net_sys.o (.text .text.* .rodata .rodata.*)
 				*mcu_xr872.a:sc_assistant_port.o (.text .text.* .rodata .rodata.*)
 				*mcu_xr872.a:sysinfo.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:iperf.o (.text .text.* .rodata .rodata.*)
 				*mcu_xr872.a:cmd_util.o (.text .text.* .rodata .rodata.*)
 				*mcu_xr872.a:cmd_mem.o (.text .text.* .rodata .rodata.*)
 				*mcu_xr872.a:cmd_upgrade.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:cmd_etf.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:cmd_iperf.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:cmd_wlan.o (.text .text.* .rodata .rodata.*)
 				*mcu_xr872.a:board.o (.text .text.* .rodata .rodata.*)
 
-				*rom.a:hal_adc.o (.text .text.* .rodata .rodata.*)
-				*rom.a:hal_crypto.o (.text .text.* .rodata .rodata.*)
-				*rom.a:hal_dmic.o (.text .text.* .rodata .rodata.*)
-				*rom.a:hal_efuse.o (.text .text.* .rodata .rodata.*)
-				*rom.a:hal_i2c.o (.text .text.* .rodata .rodata.*)
-				*rom.a:hal_i2s.o (.text .text.* .rodata .rodata.*)
-				*rom.a:hal_irrx.o (.text .text.* .rodata .rodata.*)
-				*rom.a:hal_irtx.o (.text .text.* .rodata .rodata.*)
-				*rom.a:hal_pwm.o (.text .text.* .rodata .rodata.*)
-				*rom.a:hal_rtc.o (.text .text.* .rodata .rodata.*)
-				*rom.a:hal_spi.o (.text .text.* .rodata .rodata.*)
-				*rom.a:hal_spinlock.o (.text .text.* .rodata .rodata.*)
-				*rom.a:hal_wdg.o (.text .text.* .rodata .rodata.*)
-				*rom.a:core.o (.text .text.* .rodata .rodata.*)
-				*rom.a:hal_sdhost.o (.text .text.* .rodata .rodata.*)
-				*rom.a:sd.o (.text .text.* .rodata .rodata.*)
-				*rom.a:mmc.o (.text .text.* .rodata .rodata.*)
-				*rom.a:quirks.o (.text .text.* .rodata .rodata.*)
-				*rom.a:sdio.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:cli_ext.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:cli_upgrade.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:cli_mem.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:cli_ext.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:cli_upgrade.o (.text .text.* .rodata .rodata.*)
+				*mcu_xr872.a:cli_mem.o (.text .text.* .rodata .rodata.*)
 
 				*rom.a:hexdump.o (.text .text.* .rodata .rodata.*)
                                *(.xip_text* .xip_rodata*)
@@ -370,6 +363,7 @@ SECTIONS
         PROVIDE_HIDDEN (__fini_array_end = .);
         KEEP(*(.jcr*))
         . = ALIGN(4);
+        *(*.got*)
         __data_end__ = .;
         _edata = .;
     } > RAM
@@ -400,6 +394,14 @@ SECTIONS
     {
         *(.stack*)
     } > RAM
+    .ram_table : AT(__bss_start__)
+    {
+        . = ALIGN(4);
+        KEEP(*(.ram_table))
+        . = ALIGN(4);
+    } > RAM
+    __ram_table_lma_start__ = __bss_start__;
+    __ram_table_lma_end__ = __ram_table_lma_start__ + SIZEOF(.ram_table);
     /*REMAIN_CACHE_SIZE = 24K;*/
     /* Set stack top to end of RAM, and stack limit move down by
      * size of stack_dummy section */

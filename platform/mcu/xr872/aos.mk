@@ -8,6 +8,7 @@ $(NAME)_SUMMARY    := driver & sdk for platform/mcu xr872
 $(NAME)_COMPONENTS += arch_armv7m rhino
 
 include $(SOURCE_ROOT)/platform/mcu/xr872/config.mk
+include $(SOURCE_ROOT)/.config
 
 $(NAME)_INCLUDES += ./drivers
 
@@ -19,9 +20,13 @@ GLOBAL_INCLUDES += drivers/include \
                    drivers/project/main \
                    drivers/project/common/framework
 
-#ifeq ($(AOS_BOARD_XR872), 1)
+ifeq ($(AOS_BOARD_XR872), y)
 GLOBAL_INCLUDES += drivers/project/common/board/xr872_evb_ai
-#endif
+endif
+
+ifeq ($(AOS_BOARD_XR808), y)
+GLOBAL_INCLUDES += drivers/project/common/board/xr808_evb_io
+endif
 
 #make helloworld and kernel can compile, to check
 GLOBAL_INCLUDES += ../../../middleware/uagent/ota/hal
@@ -105,9 +110,18 @@ ifeq ($(__CONFIG_XIP), y)
 GLOBAL_CFLAGS  += -D__CONFIG_XIP
 endif
 
-#ifeq ($(AOS_BOARD_XR872), 1)
+ifeq ($(__CONFIG_OTA), y)
+GLOBAL_CFLAGS   += -D__CONFIG_OTA
+GLOBAL_DEFINES  += __CONFIG_OTA_POLICY=0
+endif
+
+ifeq ($(AOS_BOARD_XR872), y)
 GLOBAL_CFLAGS  += -D__CONFIG_CHIP_XR872
-#endif
+endif
+
+ifeq ($(AOS_BOARD_XR808), y)
+GLOBAL_CFLAGS  += -D__CONFIG_CHIP_XR808
+endif
 
 GLOBAL_DEFINES += __CONFIG_CHIP_ARCH_VER=2
 GLOBAL_DEFINES += __CONFIG_HOSC_TYPE=40
@@ -143,11 +157,18 @@ GLOBAL_LDFLAGS += -Wl,--gc-sections --specs=nano.specs -u _printf_float
 #GLOBAL_LDFLAGS += -Wl,--wrap,main
 GLOBAL_LDFLAGS += -lstdc++ -lsupc++ -lm -lc -lgcc -lnosys
 
-#ifeq ($(AOS_BOARD_XR872), 1)
+ifeq ($(AOS_BOARD_XR872), y)
 ifeq ($(__CONFIG_ROM), y)
 GLOBAL_LDFLAGS += -T $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/xradio_v2/rom_symbol_xr872.ld
 endif
 GLOBAL_LDFLAGS += -T $(SOURCE_ROOT)/platform/mcu/xr872/drivers/project/linker_script/gcc/project-xip-rom-xr872.ld
-#endif
+endif
+
+ifeq ($(AOS_BOARD_XR808), y)
+ifeq ($(__CONFIG_ROM), y)
+GLOBAL_LDFLAGS += -T $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/xradio_v2/rom_symbol_xr808.ld
+endif
+GLOBAL_LDFLAGS += -T $(SOURCE_ROOT)/platform/mcu/xr872/drivers/project/linker_script/gcc/project-xip-rom-xr808.ld
+endif
 
 EXTRA_TARGET_MAKEFILES +=  $(SOURCE_ROOT)/platform/mcu/$(HOST_MCU_NAME)/mkimage.mk

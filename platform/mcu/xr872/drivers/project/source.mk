@@ -29,6 +29,10 @@ XR872_SOURCE_FILES += drivers/project/common/framework/sys_ctrl/container.c \
 
 #XR872_SOURCE_FILES +=  drivers/project/common/cli/cli_queue_test.c
 
-#ifeq ($(AOS_BOARD_XR872), 1)
+ifeq ($(AOS_BOARD_XR872), y)
 XR872_SOURCE_FILES += drivers/project/common/board/xr872_evb_ai/board_config.c
-#endif
+endif
+
+ifeq ($(AOS_BOARD_XR808), y)
+XR872_SOURCE_FILES += drivers/project/common/board/xr808_evb_io/board_config.c
+endif

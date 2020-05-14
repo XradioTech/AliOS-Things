@@ -1,4 +1,3 @@
-
 #ota, xip, rom, psram function config
 __CONFIG_XIP ?= y
 __CONFIG_OTA ?= y

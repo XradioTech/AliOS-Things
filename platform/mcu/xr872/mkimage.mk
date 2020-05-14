@@ -1,5 +1,6 @@
 
 include $(SOURCE_ROOT)/platform/mcu/xr872/config.mk
+include $(SOURCE_ROOT)/.config
 
 ifeq ($(HOST_OS),Win32)
 MKIMAGE_TOOL := "$(SOURCE_ROOT)/$($(HOST_MCU_FAMILY)_LOCATION)/drivers/tools/mkimage.exe"
@@ -28,18 +29,24 @@ endif
 ifeq ($(__CONFIG_OTA),y)
 IMAGE_OTA := -O
 else
+afaf
 IMAGE_OTA :=
 endif
 
-#ifeq ($(AOS_BOARD_XR872), 1)
+ifeq ($(AOS_BOARD_XR872), y)
 BOOT_DIR ?= "$(SOURCE_ROOT)/$($(HOST_MCU_FAMILY)_LOCATION)/drivers/bin/xradio_v2/boot/xr872"
-#endif
+endif
+
+ifeq ($(AOS_BOARD_XR808), y)
+BOOT_DIR ?= "$(SOURCE_ROOT)/$($(HOST_MCU_FAMILY)_LOCATION)/drivers/bin/xradio_v2/boot/xr808"
+endif
 
 IMAGE_CFG_FILE ?= "$(SOURCE_ROOT)/$($(HOST_MCU_FAMILY)_LOCATION)/drivers/project/image_cfg/image-${APP}.cfg"
 IMAGE_PACK_DIR ?= "$(SOURCE_ROOT)/$($(HOST_MCU_FAMILY)_LOCATION)/drivers/pack"
 BINARY_DIR ?= $(SOURCE_ROOT)out/$(CLEANED_BUILD_STRING)/binary
 
 mkimage:
+	@mkdir -p $(IMAGE_PACK_DIR)
 	$(OBJCOPY) -O binary -R .xip -R .eh_frame -R .init -R .fini -R .comment -R .ARM.attributes $(BINARY_DIR)/$(CLEANED_BUILD_STRING).elf $(BINARY_DIR)/$(CLEANED_BUILD_STRING).bin
 	$(OBJCOPY) -O binary -j .xip $(BINARY_DIR)/$(CLEANED_BUILD_STRING).elf $(BINARY_DIR)/$(CLEANED_BUILD_STRING).xip.bin
 	$(CP) -vf $(SOURCE_ROOT)/$($(HOST_MCU_FAMILY)_LOCATION)/drivers/bin/xradio_v2/*.bin  $(IMAGE_PACK_DIR)/

@@ -20,36 +20,14 @@ GLOBAL_DEFINES += RHINO_CONFIG_TICKS_PER_SECOND=1000
 GLOBAL_DEFINES += DEBUG_CONFIG_ERRDUMP=0
 
 $(NAME)_SOURCES += config/k_config.c \
-				   config/partition_conf.c \
-				   drivers/oled.c \
-				   drivers/ssd1306.c \
-                   startup/cli_ext.c \
-                   startup/cli_upgrade.c \
-                   startup/cli_mem.c \
+				   				 config/partition_conf.c
+
+$(NAME)_SOURCES += startup/startup_gcc.s \
                    startup/board.c   \
                    startup/startup.c
 
-$(NAME)_SOURCES += startup/startup_gcc.s
-
-include $(SOURCE_ROOT)/platform/mcu/xr872/config.mk
-
-ifeq ($(with_rom),1)
-ifeq ($(with_xip),1)
-GLOBAL_LDFLAGS += -T platform/board/xr808/project-xip-rom.ld
-else
-GLOBAL_LDFLAGS += -T platform/board/xr808/project-noxip-rom.ld
-endif
-else
-ifeq ($(with_xip),1)
-GLOBAL_LDFLAGS += -T platform/board/xr808/project-xip-norom.ld
-else
-GLOBAL_LDFLAGS += -T platform/board/xr808/project-noxip-norom.ld
-endif
-endif
-
 GLOBAL_INCLUDES += .    \
                    config/   \
-                   drivers/  \
                    startup/
 
 CONFIG_SYSINFO_PRODUCT_MODEL := ALI_AOS_XR808
@@ -72,7 +50,3 @@ GLOBAL_CFLAGS += -DSYSINFO_DEVICE_NAME=\"$(CONFIG_SYSINFO_DEVICE_NAME)\"
 GLOBAL_CFLAGS += -DSYSINFO_ARCH=\"Cortex-M4F\"
 GLOBAL_CFLAGS += -DSYSINFO_MCU=\"$(HOST_MCU_FAMILY)\"
 GLOBAL_CFLAGS += -DSYSINFO_BOARD=\"$(MODULE)\"
-
-GLOBAL_CFLAGS  += -D__CONFIG_CHIP_XR808
-
-EXTRA_TARGET_MAKEFILES +=  $(SOURCE_ROOT)/platform/mcu/$(HOST_MCU_NAME)/mkimage.mk

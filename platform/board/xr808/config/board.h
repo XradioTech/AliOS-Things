@@ -1,5 +1,5 @@
 #define HARDWARE_REVISION   "V1.0"
-#define MODEL               "XR872"
+#define MODEL               "XR808"
 
 #ifdef BOOTLOADER
 #define STDIO_UART 0
