@@ -176,7 +176,6 @@ int adc_key_init(void)
 
 void board_driver_init(void)
 {
-    printf("xr872 board init...\n");
     //dkey_init();
     //adc_key_init();
 

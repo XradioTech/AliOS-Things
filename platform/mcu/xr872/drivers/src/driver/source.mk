@@ -1,4 +1,4 @@
-XR872_SOURCE_FILES += \
+XR_SOURCE_FILES += \
                    drivers/src/driver/chip/flashchip/flash_chip.c     \
                    drivers/src/driver/chip/flashchip/flash_chip_cfg.c  \
 		   drivers/src/driver/chip/flashchip/flash_P25QXXH.c  \

@@ -1,4 +1,4 @@
-XR872_SOURCE_FILES += drivers/project/common/framework/sys_ctrl/container.c \
+XR_SOURCE_FILES += drivers/project/common/framework/sys_ctrl/container.c \
                        drivers/project/common/framework/sys_ctrl/event_queue.c \
                        drivers/project/common/framework/sys_ctrl/observer.c \
                        drivers/project/common/framework/sys_ctrl/publisher.c \
@@ -27,12 +27,6 @@ XR872_SOURCE_FILES += drivers/project/common/framework/sys_ctrl/container.c \
                        drivers/project/common/board/board_common.c \
                        drivers/project/common/startup/gcc/exception.c
 
-#XR872_SOURCE_FILES +=  drivers/project/common/cli/cli_queue_test.c
+#XR_SOURCE_FILES +=  drivers/project/common/cli/cli_queue_test.c
 
-ifeq ($(AOS_BOARD_XR872), y)
-XR872_SOURCE_FILES += drivers/project/common/board/xr872_evb_ai/board_config.c
-endif
-
-ifeq ($(AOS_BOARD_XR808), y)
-XR872_SOURCE_FILES += drivers/project/common/board/xr808_evb_io/board_config.c
-endif
+XR_SOURCE_FILES += drivers/project/common/board/xr872_evb_ai/board_config.c

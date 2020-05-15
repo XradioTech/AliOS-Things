@@ -1,1 +1,1 @@
-#XR872_SOURCE_FILES += drivers/src/console/*.c
+#XR_SOURCE_FILES += drivers/src/console/*.c

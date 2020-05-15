@@ -1,4 +1,4 @@
-
+LIB_SRC_PATH = ../../../..
 ifeq ($(__CONFIG_USE_PREBUILT_LIBSC_ASSISTANT), y)
 BUILD_SC_ASSISTANT := n
 else
@@ -37,12 +37,12 @@ endif
 
 
 GLOBAL_INCLUDES += drivers/include/net \
-                   ../../../../lib/wlan/src/net \
-                   ../../../../lib/wlan/include \
-                   ../../../../lib/wlan/include/net
+                   $(LIB_SRC_PATH)/wlan/src/net \
+                   $(LIB_SRC_PATH)/wlan/include \
+                   $(LIB_SRC_PATH)/wlan/include/net
 
-GLOBAL_INCLUDES += ../../../../lib/wlan/src/net/wpa_supplicant-2.4/src/utils \
-                   ../../../../lib/wlan/src/net/wpa_supplicant-2.4/src
+GLOBAL_INCLUDES += $(LIB_SRC_PATH)/wlan/src/net/wpa_supplicant-2.4/src/utils \
+                   $(LIB_SRC_PATH)/wlan/src/net/wpa_supplicant-2.4/src
 
 
 ifeq ($(BUILD_WPA), y)

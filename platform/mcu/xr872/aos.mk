@@ -8,7 +8,6 @@ $(NAME)_SUMMARY    := driver & sdk for platform/mcu xr872
 $(NAME)_COMPONENTS += arch_armv7m rhino
 
 include $(SOURCE_ROOT)/platform/mcu/xr872/config.mk
-include $(SOURCE_ROOT)/.config
 
 $(NAME)_INCLUDES += ./drivers
 
@@ -20,13 +19,7 @@ GLOBAL_INCLUDES += drivers/include \
                    drivers/project/main \
                    drivers/project/common/framework
 
-ifeq ($(AOS_BOARD_XR872), y)
 GLOBAL_INCLUDES += drivers/project/common/board/xr872_evb_ai
-endif
-
-ifeq ($(AOS_BOARD_XR808), y)
-GLOBAL_INCLUDES += drivers/project/common/board/xr808_evb_io
-endif
 
 #make helloworld and kernel can compile, to check
 GLOBAL_INCLUDES += ../../../middleware/uagent/ota/hal
@@ -37,53 +30,71 @@ GLOBAL_INCLUDES +=	os_api/include
 
 include $(SOURCE_ROOT)/platform/mcu/xr872/os_api/source.mk
 include $(SOURCE_ROOT)/platform/mcu/xr872/hal/source.mk
-include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/source.mk
+
+# drivers project files
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/project/source.mk
+
+# drivers src files
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/src/audio/source.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/src/console/source.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/src/driver/source.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/src/efpg/source.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/src/image/source.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/src/net/source.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/src/ota/source.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/src/pm/source.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/src/sys/source.mk
+#include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/src/libc/source.mk
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/src/kernel/os/FreeRTOS/source.mk
+ifeq ($(__CONFIG_ROM), y)
+include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/src/rom/source.mk
+endif
 
 $(NAME)_PREBUILT_LIBRARY := drivers/lib/libxz/libxz.a
 
 ifeq ($(__CONFIG_USE_PREBUILT_LIBSC_ASSISTANT), y)
-$(NAME)_PREBUILT_LIBRARY += drivers/lib/libsc_assistant.a
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/wlan/libsc_assistant.a
 else
 include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/config.mk
 include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/source.mk
 endif
 
 ifeq ($(__CONFIG_USE_PREBUILT_LIBWPA), y)
-$(NAME)_PREBUILT_LIBRARY += drivers/lib/libwpa.a
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/wlan/libwpa.a
 else
 include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/config.mk
 include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/source.mk
 endif
 
 ifeq ($(__CONFIG_USE_PREBUILT_LIBWPAS), y)
-$(NAME)_PREBUILT_LIBRARY += drivers/lib/libwpas.a
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/wlan/libwpas.a
 else
 include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/config.mk
 include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/source.mk
 endif
 
 ifeq ($(__CONFIG_USE_PREBUILT_LIBWLAN), y)
-$(NAME)_PREBUILT_LIBRARY += drivers/lib/libwlan.a
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/wlan/libwlan.a
 else
 include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/config.mk
 include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/source.mk
 endif
 
 ifeq ($(__CONFIG_USE_PREBUILT_LIBXRWIRELESS), y)
-$(NAME)_PREBUILT_LIBRARY += drivers/lib/libxrwireless.a
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/wlan/libxrwireless.a
 else
 include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/config.mk
 include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/source.mk
 endif
 
 ifeq ($(__CONFIG_USE_PREBUILT_LIBNET80211), y)
-$(NAME)_PREBUILT_LIBRARY += drivers/lib/libnet80211.a
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/wlan/libnet80211.a
 else
 include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/config.mk
 include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/source.mk
 endif							
 
-$(NAME)_SOURCES += $(XR872_SOURCE_FILES)
+$(NAME)_SOURCES += $(XR_SOURCE_FILES)
 
 $(NAME)_CFLAGS += -include platform/mcu/xr872/drivers/project/common/prj_conf_opt.h
 $(NAME)_CFLAGS += -include platform/mcu/xr872/drivers/project/main/prj_config.h
@@ -115,13 +126,7 @@ GLOBAL_CFLAGS   += -D__CONFIG_OTA
 GLOBAL_DEFINES  += __CONFIG_OTA_POLICY=0
 endif
 
-ifeq ($(AOS_BOARD_XR872), y)
 GLOBAL_CFLAGS  += -D__CONFIG_CHIP_XR872
-endif
-
-ifeq ($(AOS_BOARD_XR808), y)
-GLOBAL_CFLAGS  += -D__CONFIG_CHIP_XR808
-endif
 
 GLOBAL_DEFINES += __CONFIG_CHIP_ARCH_VER=2
 GLOBAL_DEFINES += __CONFIG_HOSC_TYPE=40
@@ -157,18 +162,10 @@ GLOBAL_LDFLAGS += -Wl,--gc-sections --specs=nano.specs -u _printf_float
 #GLOBAL_LDFLAGS += -Wl,--wrap,main
 GLOBAL_LDFLAGS += -lstdc++ -lsupc++ -lm -lc -lgcc -lnosys
 
-ifeq ($(AOS_BOARD_XR872), y)
 ifeq ($(__CONFIG_ROM), y)
-GLOBAL_LDFLAGS += -T $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/xradio_v2/rom_symbol_xr872.ld
+GLOBAL_LDFLAGS += -T $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/xradio_v2/rom_symbol_port.ld
 endif
-GLOBAL_LDFLAGS += -T $(SOURCE_ROOT)/platform/mcu/xr872/drivers/project/linker_script/gcc/project-xip-rom-xr872.ld
-endif
+GLOBAL_LDFLAGS += -T $(SOURCE_ROOT)/platform/mcu/xr872/drivers/project/linker_script/gcc/appos_port.ld
 
-ifeq ($(AOS_BOARD_XR808), y)
-ifeq ($(__CONFIG_ROM), y)
-GLOBAL_LDFLAGS += -T $(SOURCE_ROOT)/platform/mcu/xr872/drivers/lib/xradio_v2/rom_symbol_xr808.ld
-endif
-GLOBAL_LDFLAGS += -T $(SOURCE_ROOT)/platform/mcu/xr872/drivers/project/linker_script/gcc/project-xip-rom-xr808.ld
-endif
 
 EXTRA_TARGET_MAKEFILES +=  $(SOURCE_ROOT)/platform/mcu/$(HOST_MCU_NAME)/mkimage.mk
