@@ -1,0 +1,16 @@
+NAME := osal_os_api
+
+$(NAME)_INCLUDES += inc	\
+GLOBAL_INCLUDES +=	freertos_aos
+GLOBAL_INCLUDES +=	include
+$(NAME)_SOURCES += \
+                    src/os_task.c      \
+                    src/os_mutex.c     \
+                    src/os_queue.c     \
+                    src/os_sem.c \
+                    src/os_timer.c      \
+					src/os_event.c	\
+					src/os_mem.c
+#freertos api
+$(NAME)_SOURCES += freertos_aos/freertos_to_aos.c
+

@@ -46,7 +46,7 @@ const hal_logic_partition_t hal_partitions[] =
     {
         .partition_owner          = HAL_FLASH_EMBEDDED,
         .partition_description    = "OTA Storage",
-        .partition_start_addr     = OTA_2ND_SEQ_START + 0x8000,
+        .partition_start_addr     = OTA_2ND_SEQ_START + 0x1000,
         .partition_length         = (SPI_FLASH_CAPACITY/2) - 0x8000 - 4 * 0x1000,
         .partition_options        = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN,
     },

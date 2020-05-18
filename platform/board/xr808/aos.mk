@@ -5,9 +5,9 @@ $(NAME)_VERSION    := 1.0.2
 $(NAME)_SUMMARY    := configuration for board xr808
 MODULE             := 1062
 HOST_ARCH          := Cortex-M4
-HOST_MCU_FAMILY    := mcu_xr872
+HOST_MCU_FAMILY    := mcu_xr808
 SUPPORT_MBINS      := no
-HOST_MCU_NAME      := xr872
+HOST_MCU_NAME      := xr808
 ENABLE_VFP         := 0
 
 $(NAME)_COMPONENTS += $(HOST_MCU_FAMILY) newlib_stub kernel_init netmgr network cli yloop fatfs

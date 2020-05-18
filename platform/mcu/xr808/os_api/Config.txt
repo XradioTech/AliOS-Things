@@ -1,0 +1,5 @@
+config AOS_COMP_OSAL_OS_API
+    bool "osapi"
+    default n
+    help
+        AliOS Things rtos API adapter
