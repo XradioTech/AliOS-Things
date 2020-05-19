@@ -1,0 +1,23 @@
+config AOS_BOARD_XR808
+    bool "XR808"
+    select AOS_MCU_XR808 if !AOS_CREATE_PROJECT
+    select AOS_COMP_KERNEL_INIT if !AOS_CREATE_PROJECT
+    select AOS_COMP_NETMGR if !AOS_CREATE_PROJECT
+    select AOS_COMP_NEWLIB_STUB if !AOS_CREATE_PROJECT
+
+    select AOS_COMP_YLOOP if !AOS_CREATE_PROJECT
+    select AOS_COMP_CLI if !AOS_CREATE_PROJECT
+    select AOS_COMP_FATFS if !AOS_CREATE_PROJECT
+    select CONFIG_AOS_TCPIP
+
+    help
+
+if AOS_BOARD_XR808
+# Configurations for board xr808
+
+# "BSP SUPPORT FEATURE"
+config BSP_SUPPORT_WIFI
+    bool
+    default y
+
+endif

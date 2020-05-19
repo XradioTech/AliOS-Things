@@ -1,0 +1,11 @@
+config AOS_MCU_XR808
+    bool
+    select AOS_ARCH_ARMV7M
+    select AOS_COMP_RHINO
+
+    help
+      driver & sdk for platform/mcu xr808
+
+if AOS_MCU_XR872
+# Configurations for mcu xr808
+endif

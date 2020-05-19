@@ -1,0 +1,52 @@
+NAME := board_xr808
+
+$(NAME)_MBINS_TYPE := kernel
+$(NAME)_VERSION    := 1.0.2
+$(NAME)_SUMMARY    := configuration for board xr808
+MODULE             := 1062
+HOST_ARCH          := Cortex-M4
+HOST_MCU_FAMILY    := mcu_xr808
+SUPPORT_MBINS      := no
+HOST_MCU_NAME      := xr808
+ENABLE_VFP         := 0
+
+$(NAME)_COMPONENTS += $(HOST_MCU_FAMILY) newlib_stub kernel_init netmgr network cli yloop fatfs
+
+GLOBAL_DEFINES += STDIO_UART=0
+GLOBAL_DEFINES += CONFIG_AOS_FATFS_SUPPORT_MMC
+GLOBAL_DEFINES += CONFIG_AOS_FATFS_SUPPORT
+GLOBAL_DEFINES += RHINO_CONFIG_TICKS_PER_SECOND=1000
+
+GLOBAL_DEFINES += DEBUG_CONFIG_ERRDUMP=0
+
+$(NAME)_SOURCES += config/k_config.c \
+				   				 config/partition_conf.c
+
+$(NAME)_SOURCES += startup/startup_gcc.s \
+                   startup/board.c   \
+                   startup/startup.c
+
+GLOBAL_INCLUDES += .    \
+                   config/   \
+                   startup/
+
+CONFIG_SYSINFO_PRODUCT_MODEL := ALI_AOS_XR808
+CONFIG_SYSINFO_DEVICE_NAME := XR808
+
+CURRENT_TIME = $(shell /bin/date +%Y%m%d.%H%M)
+define get-os-version
+"AOS-R"-$(CURRENT_TIME)
+endef
+
+CONFIG_SYSINFO_OS_VERSION := $(call get-os-version)
+
+CONFIG_SYSINFO_PRODUCT_MODEL := ALI_AOS_XR808
+CONFIG_SYSINFO_DEVICE_NAME := XR808
+
+GLOBAL_CFLAGS += -DSYSINFO_OS_VERSION=\"$(CONFIG_SYSINFO_OS_VERSION)\"
+GLOBAL_CFLAGS += -DSYSINFO_PRODUCT_MODEL=\"$(CONFIG_SYSINFO_PRODUCT_MODEL)\"
+GLOBAL_CFLAGS += -DSYSINFO_DEVICE_NAME=\"$(CONFIG_SYSINFO_DEVICE_NAME)\"
+#GLOBAL_CFLAGS += -DSYSINFO_ARCH=\"$(HOST_ARCH)\"
+GLOBAL_CFLAGS += -DSYSINFO_ARCH=\"Cortex-M4F\"
+GLOBAL_CFLAGS += -DSYSINFO_MCU=\"$(HOST_MCU_FAMILY)\"
+GLOBAL_CFLAGS += -DSYSINFO_BOARD=\"$(MODULE)\"

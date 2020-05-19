@@ -803,6 +803,15 @@ if AOS_BOARD_XR872
     source "platform/arch/arm/armv7m/Config.in"
 endif
 
+source "platform/board/xr808/Config.in"
+if AOS_BOARD_XR808
+    config AOS_BUILD_BOARD
+        default "xr808"
+
+    source "platform/mcu/xr872/Config.in"
+    source "platform/arch/arm/armv7m/Config.in"
+endif
+
 endchoice
 
 endmenu
