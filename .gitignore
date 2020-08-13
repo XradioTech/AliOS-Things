@@ -47,3 +47,5 @@ projects/autogen/*
 .config
 .config.cmd
 .defconfig
+aos_config.h
+platform/mcu/xr872/drivers/pack/*

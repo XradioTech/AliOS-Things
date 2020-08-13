@@ -19,15 +19,13 @@ GLOBAL_DEFINES += RHINO_CONFIG_TICKS_PER_SECOND=1000
 
 GLOBAL_DEFINES += DEBUG_CONFIG_ERRDUMP=0
 
-$(NAME)_SOURCES += config/k_config.c \
-				   				 config/partition_conf.c
+$(NAME)_SOURCES += config/*.c
 
-$(NAME)_SOURCES += startup/startup_gcc.s \
+$(NAME)_SOURCES += startup/startup.s \
                    startup/board.c   \
-                   startup/startup.c
+                   startup/main.c
 
-GLOBAL_INCLUDES += .    \
-                   config/   \
+GLOBAL_INCLUDES += config/   \
                    startup/
 
 CONFIG_SYSINFO_PRODUCT_MODEL := ALI_AOS_XR872
