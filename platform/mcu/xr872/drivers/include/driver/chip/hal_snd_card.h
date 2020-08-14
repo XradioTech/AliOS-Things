@@ -49,6 +49,7 @@
 #define XRADIO_CODEC_NULL_NAME			"xradio_codec_null"
 #define XRADIO_INTERNAL_CODEC_NAME		"xradio_internal_codec"
 #define AC107_CODEC_NAME				"ac107_codec"
+#define AC101_CODEC_NAME				"ac101_codec"
 
 /* Platform name */
 #define XRADIO_PLATFORM_I2S_NAME		"xradio_platform_i2s"
@@ -145,6 +146,7 @@ typedef enum {
 	XRADIO_CODEC_NULL,
 	XRADIO_CODEC_INTERNAL,
 	XRADIO_CODEC_AC107,
+	XRADIO_CODEC_AC101,
 }Codec_Attr;
 
 /* platform driver select */
@@ -159,7 +161,8 @@ typedef enum {
 	SND_CARD_0,
 	SND_CARD_1,
 	SND_CARD_2,
-	SND_CARD_MAX = SND_CARD_2,
+	SND_CARD_3,
+	SND_CARD_MAX = SND_CARD_3,
 }Snd_Card_Num;
 
 
@@ -259,6 +262,20 @@ typedef enum {
 	VOLUME_GAIN_48dB,
 	VOLUME_GAIN_49dB,
 	VOLUME_GAIN_50dB,
+	VOLUME_GAIN_51dB,
+	VOLUME_GAIN_52dB,
+	VOLUME_GAIN_53dB,
+	VOLUME_GAIN_54dB,
+	VOLUME_GAIN_55dB,
+	VOLUME_GAIN_56dB,
+	VOLUME_GAIN_57dB,
+	VOLUME_GAIN_58dB,
+	VOLUME_GAIN_59dB,
+	VOLUME_GAIN_60dB,
+	VOLUME_GAIN_61dB,
+	VOLUME_GAIN_62dB,
+	VOLUME_GAIN_63dB,
+	VOLUME_GAIN_64dB,
 
 	//minus gain
 	VOLUME_GAIN_MINUS_1dB,
@@ -311,6 +328,22 @@ typedef enum {
 	VOLUME_GAIN_MINUS_48dB,
 	VOLUME_GAIN_MINUS_49dB,
 	VOLUME_GAIN_MINUS_50dB,
+	VOLUME_GAIN_MINUS_51dB,
+	VOLUME_GAIN_MINUS_52dB,
+	VOLUME_GAIN_MINUS_53dB,
+	VOLUME_GAIN_MINUS_54dB,
+	VOLUME_GAIN_MINUS_55dB,
+	VOLUME_GAIN_MINUS_56dB,
+	VOLUME_GAIN_MINUS_57dB,
+	VOLUME_GAIN_MINUS_58dB,
+	VOLUME_GAIN_MINUS_59dB,
+	VOLUME_GAIN_MINUS_60dB,
+	VOLUME_GAIN_MINUS_61dB,
+	VOLUME_GAIN_MINUS_62dB,
+	VOLUME_GAIN_MINUS_63dB,
+	VOLUME_GAIN_MINUS_64dB,
+
+	VOLUME_GAIN_MUTE = 0xff,
 }Volume_Gain;
 
 
@@ -395,6 +428,8 @@ HAL_Status HAL_SndCard_CodecRegisterInternal(void);
 HAL_Status HAL_SndCard_CodecUnregisterInternal(void);
 HAL_Status HAL_SndCard_CodecRegisterAc107(void);
 HAL_Status HAL_SndCard_CodecUnregisterAc107(void);
+HAL_Status HAL_SndCard_CodecRegisterAc101(void);
+HAL_Status HAL_SndCard_CodecUnregisterAc101(void);
 HAL_Status HAL_SndCard_PlatformRegisterI2S(void);
 HAL_Status HAL_SndCard_PlatformUnregisterI2S(void);
 

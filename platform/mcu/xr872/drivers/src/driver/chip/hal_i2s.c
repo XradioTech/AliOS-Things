@@ -1085,7 +1085,7 @@ static int xradio_i2s_ioctl(uint32_t cmd, uint32_t cmd_param[], uint32_t cmd_par
 			xradio_i2s_priv->loop_back_en = cmd_param[0]>>24  & 0xff;
 			xradio_i2s_priv->lrck_period = cmd_param[1];
 			xradio_i2s_priv->daudio_clk_freq = cmd_param[2];
-			XRADIO_I2S_DBG("\n/*** Xradio I2S hardware params config ***/");
+			XRADIO_I2S_DBG("\n/*** Xradio I2S hardware params config ***/\n");
 			XRADIO_I2S_DBG("mclk_div: %d;\nslot_width: %d;\npcm_frame_mode: %d;\nloop_back_en: %d;\nlrck_period: %d;\ndaudio_clk_freq: %d;\n",\
 							xradio_i2s_priv->mclk_div, xradio_i2s_priv->slot_width, xradio_i2s_priv->pcm_frame_mode,\
 							xradio_i2s_priv->loop_back_en, xradio_i2s_priv->lrck_period, xradio_i2s_priv->daudio_clk_freq);

@@ -159,6 +159,7 @@ int wlan_ap_scan(wlan_sta_scan_param_t *param);
 int wlan_ap_get_scan_result_num(int *num);
 int wlan_ap_scan_result(wlan_sta_scan_results_t *results);
 int wlan_ap_scan_bss_max_count(uint8_t count);
+int wlan_ap_bss_flush(int age);
 
 /* monitor */
 typedef enum {

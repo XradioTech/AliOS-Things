@@ -43,7 +43,7 @@
 #include "sys_ctrl/sys_ctrl.h"
 #include "fwk_debug.h"
 
-#if PRJCONF_INTERNAL_SOUNDCARD_EN || PRJCONF_AC107_SOUNDCARD_EN || PRJCONF_I2S_NULL_SOUNDCARD_EN
+#if PRJCONF_AUDIO_SNDCARD_EN
 #include "audio/manager/audio_manager.h"
 #include "audio/pcm/audio_pcm.h"
 #if PRJCONF_AUDIO_CTRL_EN
@@ -108,7 +108,6 @@ static void platform_show_info(void)
 	extern uint8_t __ram_table_lma_start__[];
 	extern uint8_t __ram_table_lma_end__[];
 #endif
-
 #if PRJCONF_NET_EN
 	uint8_t mac_addr[6] = {0};
 	struct sysinfo *sys_info = NULL;
@@ -544,20 +543,16 @@ void platform_cache_init(void)
 #endif
 }
 
-//extern void HAL_Flash_SetDbgMask(uint8_t dbg_mask);  //rom debug
-//extern void image_set_dbg_mask(uint16_t dbg_mask);  //rom debug
-
 /* init basic platform hardware and services */
 __sram_text
 __weak void platform_init_level0(void)
 {
 	pm_start();
-     //HAL_Flash_SetDbgMask(0xff); //rom debug
-
+#if (defined __CONFIG_PSRAM_ALL_CACHEABLE)
+    internal_dma_init();
+#endif
 	HAL_Flash_Init(PRJCONF_IMG_FLASH);
-	//image_set_dbg_mask(0xffff);//rom debug
 #if (__CONFIG_OTA_POLICY == 0x00)
-	
 	image_init(PRJCONF_IMG_FLASH, PRJCONF_IMG_ADDR, PRJCONF_IMG_MAX_SIZE);
 #else
 	image_init(PRJCONF_IMG_FLASH, PRJCONF_IMG_ADDR, 0);
@@ -578,6 +573,7 @@ __weak void platform_init_level0(void)
 #endif
 }
 
+#if PRJCONF_NET_EN
 #ifdef __CONFIG_WLAN_AP
 __weak const wlan_ap_default_conf_t g_wlan_ap_default_conf = {
 	.ssid = "AP-XRADIO",
@@ -600,6 +596,7 @@ __weak const wlan_ap_default_conf_t g_wlan_ap_default_conf = {
 	.max_num_sta = 4,
 	.country = {'C', 'N', ' '},
 };
+#endif
 #endif
 
 /* init standard platform hardware and services */
@@ -686,7 +683,7 @@ __weak void platform_init_level2(void)
  	board_sdcard_init(sdcard_detect_callback);
 #endif
 
-#if PRJCONF_INTERNAL_SOUNDCARD_EN || PRJCONF_AC107_SOUNDCARD_EN || PRJCONF_I2S_NULL_SOUNDCARD_EN
+#if PRJCONF_AUDIO_SNDCARD_EN
 	board_soundcard_init();
 
 	audio_manager_init();

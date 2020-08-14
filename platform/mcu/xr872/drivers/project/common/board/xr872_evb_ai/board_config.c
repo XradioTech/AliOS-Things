@@ -313,9 +313,25 @@ __xip_rodata const static struct snd_card_board_config ac107_codec_snd_card = {
 };
 #endif
 
+#if PRJCONF_AC101_SOUNDCARD_EN
+__xip_rodata const static struct snd_card_board_config ac101_codec_snd_card = {
+	.card_num = SND_CARD_2,
+	.card_name = HAL_SND_CARD_NAME(AC101_CODEC_NAME, SND_CARD_SUFFIX),
+	.codec_link = XRADIO_CODEC_AC101,
+	.platform_link = XRADIO_PLATFORM_I2S,
+
+	.pa_switch_ctl = &pa_switch_ctl,
+
+	.codec_sysclk_src = SYSCLK_SRC_MCLK,
+	.codec_pllclk_src = 0,
+	.codec_pll_freq_in = 0,
+	.i2s_fmt = DAIFMT_CBS_CFS | DAIFMT_I2S | DAIFMT_NB_NF,
+};
+#endif
+
 #if PRJCONF_I2S_NULL_SOUNDCARD_EN
 __xip_rodata const static struct snd_card_board_config xradio_i2s_null_snd_card = {
-	.card_num = SND_CARD_2,
+	.card_num = SND_CARD_3,
 	.card_name = HAL_SND_CARD_NAME(XRADIO_CODEC_NULL_NAME, SND_CARD_SUFFIX),
 	.codec_link = XRADIO_CODEC_NULL,
 	.platform_link = XRADIO_PLATFORM_I2S,
@@ -336,6 +352,10 @@ const static struct snd_card_board_config *snd_cards_board_cfg[] = {
 
 #if PRJCONF_AC107_SOUNDCARD_EN
 	&ac107_codec_snd_card,
+#endif
+
+#if PRJCONF_AC101_SOUNDCARD_EN
+	&ac101_codec_snd_card,
 #endif
 
 #if PRJCONF_I2S_NULL_SOUNDCARD_EN

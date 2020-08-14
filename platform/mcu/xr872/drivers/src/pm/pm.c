@@ -44,6 +44,7 @@
 
 #include "driver/chip/system_chip.h"
 #include "driver/chip/chip.h"
+#include "driver/chip/hal_global.h"
 #include "driver/chip/hal_wakeup.h"
 #include "driver/chip/hal_prcm.h"
 #include "driver/chip/hal_ccm.h"
@@ -229,7 +230,11 @@ static void __suspend_enter(enum suspend_state_t state)
 		/* TODO: restore system bus to normal freq */
 	} else {
         HAL_PRCM_SetSys1WakeupPowerFlags(0x6);
-        HAL_PRCM_SetSys1SleepPowerFlags(0x1E);
+        if (HAL_GlobalGetChipVer() >= 0xE) {
+            HAL_PRCM_SetSys1SleepPowerFlags(0xF00001E);
+        } else {
+            HAL_PRCM_SetSys1SleepPowerFlags(0x1E);
+        }
 #if ((((__CONFIG_CACHE_POLICY>>4) & 0xF) + (__CONFIG_CACHE_POLICY& 0xF)) == 5)
         HAL_SET_BIT(PRCM->SYS1_SLEEP_CTRL, PRCM_SYS_CACHE_SRAM_SWM1_BIT);
 #endif

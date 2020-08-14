@@ -884,6 +884,16 @@ HAL_Status HAL_SndCard_CodecUnregisterAc107(void)
 	return ac107_codec_unregister();
 }
 
+HAL_Status HAL_SndCard_CodecRegisterAc101(void)
+{
+	return ac101_codec_register();
+}
+
+HAL_Status HAL_SndCard_CodecUnregisterAc101(void)
+{
+	return ac101_codec_unregister();
+}
+
 HAL_Status HAL_SndCard_PlatformRegisterI2S(void)
 {
 	return xradio_i2s_register();

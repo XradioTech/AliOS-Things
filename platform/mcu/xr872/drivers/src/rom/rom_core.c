@@ -51,7 +51,6 @@
 
 #include "aos/hal/uart.h"
 
-#if 0
 void *__wrap__malloc_r(struct _reent *reent, size_t size);
 void *__wrap__realloc_r(struct _reent *reent, void *ptr, size_t size);
 void __wrap__free_r(struct _reent *reent, void *ptr);
@@ -64,188 +63,14 @@ int __wrap_putchar(int c);
 int __wrap_putc(int c, FILE *stream);
 int __wrap_fputc(int c, FILE *stream);
 int __wrap_fflush(FILE *stream);
-#endif
 
-void *__wrap__malloc_r(struct _reent *reent, size_t size)
-{
+#ifdef __CONFIG_OS_FREERTOS
+#include "FreeRTOS.h"
+#include "task.h"
 
-	void * p;
-	p = malloc(size);
-	//printf("p %p, size %d\n", p, size);
-	return p;
-}
-void *__wrap__realloc_r(struct _reent *reent, void *ptr, size_t size)
-{
-    //printf("%s\n", __func__);
-	return realloc(ptr, size);
-//#error "realloc() not support"
-//		free(ptr);
-	//	return malloc(size);
-}
-void __wrap__free_r(struct _reent *reent, void *ptr)
-{
-	//printf("%s\n", __func__);
-	free(ptr);
-}
-void *_sbrk(int incr)  //cannot call
-{
-	printf("%s\n", __func__);
-}
+#define RAM_OS_HZ configTICK_RATE_HZ
 
-static int uart_out(const char *buf, int len)
-{
-	uart_dev_t	uart_stdio;
-
-	memset(&uart_stdio, 0, sizeof(uart_stdio));
-	uart_stdio.port = 0;
-	return hal_uart_send(&uart_stdio, (void *)buf, len, 0);
-}
-
-#define s_stdio_write uart_out
-#define WRAP_STDOUT_BUF_SIZE	1024
-static char s_stdout_buf[WRAP_STDOUT_BUF_SIZE];
-
-static __inline int stdio_wrap_write(char *buf, int len, int max)
-{
-#ifndef __CONFIG_LIBC_PRINTF_FLOAT
-	/* BUG: If "__CONFIG_LIBC_PRINTF_FLOAT" is not defined, the return value
-	 *      of vsnprintf() is wrong when the string format including float
-	 *      conversion characters "efgEFG".
-	 * FIX: Use strlen() to calc the real length.
-	 */
-	if (len > 0 && len <= max && buf[len] == 0 && buf[len-1] != 0) {
-		/* The len seems to be correct. */
-	} else {
-		buf[max] = 0;
-		len = strlen(buf);
-	}
-#endif
-	return s_stdio_write(buf, len);
-}
-
-
-int __wrap_printf(const char *format, ...)
-{
-	int len;
-	va_list ap;
-
-	//stdout_mutex_lock();
-
-	if (s_stdio_write == NULL) {
-		len = 0;
-	} else {
-		va_start(ap, format);
-		len = vsnprintf(s_stdout_buf, WRAP_STDOUT_BUF_SIZE, format, ap);
-		va_end(ap);
-		len = stdio_wrap_write(s_stdout_buf, len, WRAP_STDOUT_BUF_SIZE - 1);
-	}
-
-	//stdout_mutex_unlock();
-
-	return len;
-}
-
-
-int __wrap_vprintf(const char *format, va_list ap)
-{
-	//printf("%s\n", __func__);
-	int len;
-
-	//stdout_mutex_lock();
-
-	if (s_stdio_write == NULL) {
-		len = 0;
-	} else {
-		len = vsnprintf(s_stdout_buf, WRAP_STDOUT_BUF_SIZE, format, ap);
-		len = stdio_wrap_write(s_stdout_buf, len, WRAP_STDOUT_BUF_SIZE - 1);
-	}
-
-	//stdout_mutex_unlock();
-
-	return len;
-
-}
-int __wrap_puts(const char *s)
-{
-	//printf("%s\n", __func__);
-	int len;
-
-	//stdout_mutex_lock();
-
-	if (s_stdio_write == NULL) {
-		len = 0;
-	} else {
-		len = s_stdio_write(s, strlen(s));
-		len += s_stdio_write("\n", 1);
-	}
-
-	//stdout_mutex_unlock();
-
-	return len;
-
-}
-int __wrap_vfprintf(FILE *stream, const char *format, va_list ap)
-{
-	if (stream != stdout && stream != stderr)
-		return 0;
-
-	return __wrap_vprintf(format, ap);
-
-}
-int __wrap_fputs(const char *s, FILE *stream)
-{
-	if (stream != stdout && stream != stderr)
-		return 0;
-
-	return __wrap_puts(s);
-
-}
-int __wrap_putchar(int c)
-{
-	int len;
-	char cc;
-
-	//stdout_mutex_lock();
-
-	if (s_stdio_write == NULL) {
-		len = 0;
-	} else {
-		cc = c;
-		len = s_stdio_write(&cc, 1);
-	}
-
-	//stdout_mutex_unlock();
-
-	return len;
-
-}
-int __wrap_putc(int c, FILE *stream)
-{
-	if (stream != stdout && stream != stderr)
-		return 0;
-
-	return __wrap_putchar(c);
-}
-int __wrap_fputc(int c, FILE *stream)
-{
-	return __wrap_putc(c, stream);
-}
-int __wrap_fflush(FILE *stream)
-{
-	return 0;
-}
-
-typedef void * TaskHandle_t;
-void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
-
-	printf("task %p(%s) stack over flow\n", xTask, pcTaskName);
-}
-
-#if 0
-void OS_ThreadList(void)
-{
-	printf("%s\n", __func__);
-}
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName);
 #endif
 
 /* SDC */
@@ -266,33 +91,17 @@ static void ram_OS_SemaphoreSetInvalid(OS_Semaphore_t *sem)
 	OS_SemaphoreSetInvalid(sem);
 }
 
-static void ram_OS_MSleep(OS_Time_t msec)
-{
-	OS_MSleep(msec);
-}
-
-static OS_Time_t ram_OS_GetTicks(void)
-{
-	return OS_GetTicks();
-}
-
-#define configMINIMAL_STACK_SIZE                128
-#define configTIMER_QUEUE_LENGTH                10
-#define configTIMER_TASK_STACK_DEPTH            512
-
-
 #define RAM_TBL_SET(name, val)	[RAM_TBL_IDX_##name] = (unsigned int)(val)
 
 unsigned int ram_table[256] __attribute__((section(".ram_table"))) = {
 	/* chip */
-	RAM_TBL_SET(SYS_PLL_CLOCK, SYS_PLL_CLOCK),  //ram
-	RAM_TBL_SET(SYS_LFCLOCK, SYS_LFCLOCK),  //ram
-	RAM_TBL_SET(HAL_PRCM_GetHFClock, HAL_PRCM_GetHFClock), //rom code
-	RAM_TBL_SET(HAL_PRCM_GetLFClock, HAL_PRCM_GetLFClock),  //ram patch
-	RAM_TBL_SET(HAL_PRCM_GetDevClock, HAL_PRCM_GetDevClock), //rom code
-	RAM_TBL_SET(HAL_CCM_BusGetAPBSClock, HAL_CCM_BusGetAPBSClock),  //rom code
+	RAM_TBL_SET(SYS_PLL_CLOCK, SYS_PLL_CLOCK),
+	RAM_TBL_SET(SYS_LFCLOCK, SYS_LFCLOCK),
+	RAM_TBL_SET(HAL_PRCM_GetHFClock, HAL_PRCM_GetHFClock),
+	RAM_TBL_SET(HAL_PRCM_GetLFClock, HAL_PRCM_GetLFClock),
+	RAM_TBL_SET(HAL_PRCM_GetDevClock, HAL_PRCM_GetDevClock),
+	RAM_TBL_SET(HAL_CCM_BusGetAPBSClock, HAL_CCM_BusGetAPBSClock),
 
-#if 1
 	/* lib */
 	RAM_TBL_SET(__wrap__malloc_r, __wrap__malloc_r),
 	RAM_TBL_SET(__wrap__realloc_r, __wrap__realloc_r),
@@ -306,29 +115,14 @@ unsigned int ram_table[256] __attribute__((section(".ram_table"))) = {
 	RAM_TBL_SET(__wrap_putc, __wrap_putc),
 	RAM_TBL_SET(__wrap_fputc, __wrap_fputc),
 	RAM_TBL_SET(__wrap_fflush, __wrap_fflush),
-#endif
 
-#if 0
-		/* lib */
-		RAM_TBL_SET(__wrap__malloc_r, NULL),
-		RAM_TBL_SET(__wrap__realloc_r, NULL),
-		RAM_TBL_SET(__wrap__free_r, NULL),
-		RAM_TBL_SET(_sbrk, NULL),
-		RAM_TBL_SET(__wrap_vprintf, NULL),
-		RAM_TBL_SET(__wrap_puts, NULL),
-		RAM_TBL_SET(__wrap_vfprintf, NULL),
-		RAM_TBL_SET(__wrap_fputs, NULL),
-		RAM_TBL_SET(__wrap_putchar, NULL),
-		RAM_TBL_SET(__wrap_putc, NULL),
-		RAM_TBL_SET(__wrap_fputc, NULL),
-		RAM_TBL_SET(__wrap_fflush, NULL),
-#endif
-
+#ifdef __CONFIG_OS_FREERTOS
 	/* FreeRTOS */
 	RAM_TBL_SET(configMINIMAL_STACK_SIZE, configMINIMAL_STACK_SIZE),
 	RAM_TBL_SET(configTIMER_QUEUE_LENGTH, configTIMER_QUEUE_LENGTH),
 	RAM_TBL_SET(configTIMER_TASK_STACK_DEPTH, configTIMER_TASK_STACK_DEPTH),
 	RAM_TBL_SET(vApplicationStackOverflowHook, vApplicationStackOverflowHook),
+#endif
 
 	/* OS */
 	RAM_TBL_SET(OS_SemaphoreCreate, OS_SemaphoreCreate),
@@ -348,7 +142,7 @@ unsigned int ram_table[256] __attribute__((section(".ram_table"))) = {
 	RAM_TBL_SET(OS_RecursiveMutexLock, OS_RecursiveMutexLock),
 	RAM_TBL_SET(OS_RecursiveMutexUnlock, OS_RecursiveMutexUnlock),
 
-	RAM_TBL_SET(OS_ThreadList, OS_ThreadList),   //exception.c rom  // configUSE_TRACE_FACILITY == 1 not define
+	RAM_TBL_SET(OS_ThreadList, OS_ThreadList),
 	RAM_TBL_SET(OS_ThreadSuspendScheduler, OS_ThreadSuspendScheduler),
 	RAM_TBL_SET(OS_ThreadResumeScheduler, OS_ThreadResumeScheduler),
 	RAM_TBL_SET(OS_ThreadIsSchedulerRunning, OS_ThreadIsSchedulerRunning),
@@ -360,9 +154,9 @@ unsigned int ram_table[256] __attribute__((section(".ram_table"))) = {
 	RAM_TBL_SET(OS_TimerStop, OS_TimerStop),
 	RAM_TBL_SET(OS_TimerIsActive, OS_TimerIsActive),
 
-	RAM_TBL_SET(OS_HZ, OS_HZ),
-	RAM_TBL_SET(OS_GetTicks, ram_OS_GetTicks),
-	RAM_TBL_SET(OS_MSleep, ram_OS_MSleep),
+	RAM_TBL_SET(OS_HZ, RHINO_CONFIG_TICKS_PER_SECOND),
+	RAM_TBL_SET(OS_GetTicks, OS_GetTicks),
+	RAM_TBL_SET(OS_MSleep, OS_MSleep),
 
 	RAM_TBL_SET(HAL_UDelay, HAL_UDelay),
 	RAM_TBL_SET(HAL_Alive, HAL_WDG_Feed),

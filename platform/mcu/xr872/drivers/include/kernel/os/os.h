@@ -36,8 +36,5 @@
 #include "kernel/os/os_semaphore.h"
 #include "kernel/os/os_mutex.h"
 #include "kernel/os/os_timer.h"
-#include "kernel/os/os_time.h"
-#include "kernel/os/os_errno.h"
-
 
 #endif /* _KERNEL_OS_OS_H_ */

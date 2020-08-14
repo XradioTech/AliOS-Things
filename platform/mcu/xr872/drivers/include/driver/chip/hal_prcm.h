@@ -798,8 +798,6 @@ typedef enum {
 #if (__CONFIG_CHIP_ARCH_VER == 1)
 #define PRCM_SYS_WS_PWR_FLAGS_MASK		0x3FU
 #elif (__CONFIG_CHIP_ARCH_VER == 2)
-#define PRCM_SYS_WS_PWR_FLAGS_MASK		(0x3FU)
-
 #define PRCM_SYS_WLAN_SRAM_116K_SWM5_BIT        HAL_BIT(28)
 #define PRCM_SYS_SRAM_32K_SWM4_BIT              HAL_BIT(27)
 #define PRCM_SYS_SRAM_32K_SWM3_BIT              HAL_BIT(26)
@@ -809,6 +807,8 @@ typedef enum {
 #define PRCM_SYS_SRAM_PWR_CTRL_SHIFT            8
 #define PRCM_SYS_SRAM_PWR_CTRL_MASK             (0x01FFF << PRCM_SYS_SRAM_PWR_CTRL_SHIFT)
 #define PRCM_SYS_SRAM_PWR_CTRL_MODE(val)        ((val) << PRCM_SYS_SRAM_PWR_CTRL_SHIFT)
+#define PRCM_SYS_WS_PWR_FLAGS_MASK		        (0x3FU | PRCM_SYS_SRAM_32K_SWM4_BIT | PRCM_SYS_SRAM_32K_SWM3_BIT \
+                                                | PRCM_SYS_SRAM_352K_SWM2_BIT | PRCM_SYS_CACHE_SRAM_SWM1_BIT)
 #endif
 
 /* DCXO_STABLE_REF_TIME */

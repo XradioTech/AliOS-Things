@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 ALLWINNERTECH TECHNOLOGY CO., LTD. All rights reserved.
+ * Copyright (C) 2017 XRADIO TECHNOLOGY CO., LTD. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the
  *       distribution.
- *    3. Neither the name of ALLWINNERTECH TECHNOLOGY CO., LTD. nor the names of
+ *    3. Neither the name of XRADIO TECHNOLOGY CO., LTD. nor the names of
  *       its contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
  *
@@ -31,7 +31,8 @@
 #define _OS_DEBUG_H_
 
 #include <stdio.h>
-#include "xr_util.h"
+#include "sys/xr_util.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -44,17 +45,17 @@ extern "C" {
 #define OS_ABORT_ON         0
 
 #define OS_HANDLE_CHECK     1
-#define OS_RESOURCE_TRACE   1 /* trace OS resource or not */
+#define OS_RESOURCE_TRACE   0 /* trace OS resource or not */
 
 #else /* __CONFIG_BOOTLOADER */
 
-#define OS_DBG_ON           1
-#define OS_WRN_ON           1
-#define OS_ERR_ON           1
-#define OS_ABORT_ON         1
+#define OS_DBG_ON           0
+#define OS_WRN_ON           0
+#define OS_ERR_ON           0
+#define OS_ABORT_ON         0
 
-#define OS_HANDLE_CHECK     1
-#define OS_RESOURCE_TRACE   1 /* trace OS resource or not */
+#define OS_HANDLE_CHECK     0
+#define OS_RESOURCE_TRACE   0 /* trace OS resource or not */
 
 #endif /* __CONFIG_BOOTLOADER */
 

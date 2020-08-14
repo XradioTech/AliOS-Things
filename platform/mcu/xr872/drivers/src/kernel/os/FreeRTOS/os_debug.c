@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 ALLWINNERTECH TECHNOLOGY CO., LTD. All rights reserved.
+ * Copyright (C) 2017 XRADIO TECHNOLOGY CO., LTD. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the
  *       distribution.
- *    3. Neither the name of ALLWINNERTECH TECHNOLOGY CO., LTD. nor the names of
+ *    3. Neither the name of XRADIO TECHNOLOGY CO., LTD. nor the names of
  *       its contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
  *
@@ -28,61 +28,25 @@
  */
 
 #include "os_debug.h"
-#include "param.h"
+#include "sys/param.h"
 
 #if OS_RESOURCE_TRACE
 
-extern int g_r_msgqueue_cnt;
-extern int g_r_mutex_cnt;
-extern int g_r_semaphore_cnt;
-extern int g_r_thread_cnt;
-extern int g_r_timer_cnt;
+extern int g_xr_msgqueue_cnt;
+extern int g_xr_mutex_cnt;
+extern int g_xr_semaphore_cnt;
+extern int g_xr_thread_cnt;
+extern int g_xr_timer_cnt;
 
-void r_os_resource_info(void)
+void xr_os_resource_info(void)
 {
-/*
-	OS_LOG(1, "<<< r os resource info >>>\n");
-	OS_LOG(1, "g_r_msgqueue_cnt  %d\n", g_r_msgqueue_cnt);
-	OS_LOG(1, "g_r_mutex_cnt     %d\n", g_r_mutex_cnt);
-	OS_LOG(1, "g_r_semaphore_cnt %d\n", g_r_semaphore_cnt);
-	OS_LOG(1, "g_r_thread_cnt    %d\n", g_r_thread_cnt);
-	OS_LOG(1, "g_r_timer_cnt     %d\n", g_r_timer_cnt);
-*/
+	OS_LOG(1, "<<< xr os resource info >>>\n");
+	OS_LOG(1, "g_xr_msgqueue_cnt  %d\n", g_xr_msgqueue_cnt);
+	OS_LOG(1, "g_xr_mutex_cnt     %d\n", g_xr_mutex_cnt);
+	OS_LOG(1, "g_xr_semaphore_cnt %d\n", g_xr_semaphore_cnt);
+	OS_LOG(1, "g_xr_thread_cnt    %d\n", g_xr_thread_cnt);
+	OS_LOG(1, "g_xr_timer_cnt     %d\n", g_xr_timer_cnt);
 }
 
 #endif /* OS_RESOURCE_TRACE */
 
-void print_hex_dump_words(const void *addr, unsigned int len)
-{
-	unsigned int i;
-	const unsigned int *p = addr;
-
-	if ((unsigned int)p & 0x03) {
-		OS_SYSLOG("addr should be align 4B!\n");
-		p =  (const void *)(((unsigned int)p) & ~0x03);
-		return ;
-	}
-	len = DIV_ROUND_UP(len, 4);
-
-	for (i = 0; i < len; i++) {
-		if ((i & 0x03) == 0x0)
-			OS_SYSLOG("\n[%p]: ", p);
-		OS_SYSLOG("0x%08x ", *p++);
-	}
-	OS_SYSLOG("\n");
-}
-
-void print_hex_dump_bytes(const void *addr, unsigned int len)
-{
-	unsigned int i;
-	const unsigned char *p = addr;
-	len++;
-
-	for (i = 1; i < len; ++i) {
-		OS_SYSLOG("%02x ", *p++);
-		if (i % 16 == 0) {
-			OS_SYSLOG("\n");
-		}
-	}
-	OS_SYSLOG("\n");
-}

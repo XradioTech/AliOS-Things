@@ -60,6 +60,7 @@
 #define AC107_MALLOC             	HAL_Malloc
 #define AC107_FREE               	HAL_Free
 #endif
+
 #define AC107_MEMCPY             	HAL_Memcpy
 #define AC107_MEMSET             	HAL_Memset
 
@@ -80,10 +81,11 @@ struct ac107_codec_priv {
 	bool encoding_fmt;
 	uint8_t  encoding_nums;
 	uint8_t  adc_pattern;
+	uint8_t  slot_width;
 	uint16_t lrck_period;
 
 	//volume and route control
-	uint8_t amic_vol_level;
+	uint16_t amic_vol;
 	bool record_route_def;
 
 	//I2C config
@@ -142,7 +144,7 @@ static const struct real_val_to_reg_val ac107_bclk_div[] = {
 	{192,15},
 };
 
-static const struct real_val_to_reg_val ac107_pga_gain[] = {
+static const struct real_val_to_reg_val ac107_pga_vol_gain[] = {
 	{VOLUME_GAIN_MINUS_6dB,	0},
 	{VOLUME_GAIN_0dB, 		1},
 	{VOLUME_GAIN_3dB, 		4},
@@ -173,6 +175,41 @@ static const struct real_val_to_reg_val ac107_pga_gain[] = {
 	{VOLUME_GAIN_28dB, 		29},
 	{VOLUME_GAIN_29dB, 		30},
 	{VOLUME_GAIN_30dB, 		31},
+};
+
+static const struct real_val_to_reg_val ac107_pga_vol_level[] = {
+	{VOLUME_LEVEL0,  0},
+	{VOLUME_LEVEL1,  1},
+	{VOLUME_LEVEL2,  2},
+	{VOLUME_LEVEL3,  3},
+	{VOLUME_LEVEL4,  4},
+	{VOLUME_LEVEL5,  5},
+	{VOLUME_LEVEL6,  6},
+	{VOLUME_LEVEL7,  7},
+	{VOLUME_LEVEL8,  8},
+	{VOLUME_LEVEL9,  9},
+	{VOLUME_LEVEL10, 10},
+	{VOLUME_LEVEL11, 11},
+	{VOLUME_LEVEL12, 12},
+	{VOLUME_LEVEL13, 13},
+	{VOLUME_LEVEL14, 14},
+	{VOLUME_LEVEL15, 15},
+	{VOLUME_LEVEL16, 16},
+	{VOLUME_LEVEL17, 17},
+	{VOLUME_LEVEL18, 18},
+	{VOLUME_LEVEL19, 19},
+	{VOLUME_LEVEL20, 20},
+	{VOLUME_LEVEL21, 21},
+	{VOLUME_LEVEL22, 22},
+	{VOLUME_LEVEL23, 23},
+	{VOLUME_LEVEL24, 24},
+	{VOLUME_LEVEL25, 25},
+	{VOLUME_LEVEL26, 26},
+	{VOLUME_LEVEL27, 27},
+	{VOLUME_LEVEL28, 28},
+	{VOLUME_LEVEL29, 29},
+	{VOLUME_LEVEL30, 30},
+	{VOLUME_LEVEL31, 31},
 };
 
 //FOUT =(FIN * N) / [(M1+1) * (M2+1)*(K1+1)*(K2+1)] ;	M1[0,31],  M2[0,1],  N[0,1023],  K1[0,31],  K2[0,1]
@@ -609,7 +646,8 @@ static int ac107_dai_set_volume(Audio_Device device, uint16_t volume)
 {
 	AC107_DBG("--->%s\n",__FUNCTION__);
 	uint32_t i,reg_val=0;
-	uint16_t vol_set_flag, vol_set_value;
+	uint16_t vol_set_flag, vol_set_value, vol_array_size=0;
+	const struct real_val_to_reg_val *ac107_vol=NULL;
 
 	vol_set_flag  = volume & VOLUME_SET_MASK;
 	vol_set_value = volume & ~VOLUME_SET_MASK;
@@ -617,30 +655,29 @@ static int ac107_dai_set_volume(Audio_Device device, uint16_t volume)
 	switch(device){
 		case AUDIO_IN_DEV_AMIC:
 			if(vol_set_flag == VOLUME_SET_LEVEL){
-				if (vol_set_value > VOLUME_LEVEL31){
-					AC107_ERR("Invalid amic volume level: %d!\n",vol_set_value);
-					return HAL_INVALID;
-				}
-				reg_val = vol_set_value;
-				AC107_ALWAYS("AMIC set volume Level-[%d]\n",vol_set_value);
+				ac107_vol = ac107_pga_vol_level;
+				vol_array_size = HAL_ARRAY_SIZE(ac107_pga_vol_level);
 			} else if (vol_set_flag == VOLUME_SET_GAIN){
-				for(i=0; i<HAL_ARRAY_SIZE(ac107_pga_gain); i++){
-					if(ac107_pga_gain[i].real_val == vol_set_value){
-						reg_val = ac107_pga_gain[i].reg_val;
-						AC107_ALWAYS("AMIC set volume Gain-[%d]\n",vol_set_value);
-						break;
-					}
+				ac107_vol = ac107_pga_vol_gain;
+				vol_array_size = HAL_ARRAY_SIZE(ac107_pga_vol_gain);
+			}
+
+			for(i=0; i<vol_array_size; i++){
+				if(ac107_vol[i].real_val == vol_set_value){
+					reg_val = ac107_vol[i].reg_val;
+					break;
 				}
-				if(i == HAL_ARRAY_SIZE(ac107_pga_gain)){
-					AC107_ERR("Invalid amic volume gain: %d!\n",vol_set_value);
-					return HAL_INVALID;
-				}
+			}
+			if(i == vol_array_size){
+				AC107_ERR("Invalid AMIC volume %s: %d!\n", vol_set_flag ? "Gain" : "Level", vol_set_value);
+				return HAL_INVALID;
 			}
 
 			/* ADCs analog PGA gain Config */
-			ac107_priv->amic_vol_level = reg_val;
+			ac107_priv->amic_vol = volume;
 			ac107_multi_chips_update_bits(ANA_ADC1_CTRL3, 0x1f<<RX1_PGA_GAIN_CTRL, reg_val<<RX1_PGA_GAIN_CTRL);
 			ac107_multi_chips_update_bits(ANA_ADC2_CTRL3, 0x1f<<RX2_PGA_GAIN_CTRL, reg_val<<RX2_PGA_GAIN_CTRL);
+			AC107_ALWAYS("AMIC set volume %s-[%d]\n", vol_set_flag ? "Gain" : "Level", vol_set_value);
 			break;
 		case AUDIO_IN_DEV_DMIC:
 			AC107_ERR("DMIC don't support set volume\n");
@@ -671,7 +708,7 @@ static int ac107_dai_set_route(Audio_Device device, Audio_Dev_State state)
 static int ac107_dai_hw_params(Audio_Stream_Dir dir, struct pcm_config *pcm_cfg)
 {
 	AC107_DBG("--->%s\n",__FUNCTION__);
-	uint16_t i, channels, channels_en, sample_resolution, slot_width, bclk_div;
+	uint16_t i, channels, channels_en, sample_resolution, bclk_div;
 
 	if(dir == PCM_OUT){
 		AC107_ERR("Invalid audio stream dir-[%d], AC107 only support capture!\n",dir);
@@ -716,12 +753,11 @@ static int ac107_dai_hw_params(Audio_Stream_Dir dir, struct pcm_config *pcm_cfg)
 
 	/* AC107 set sample resorution and slot width */
 	sample_resolution = pcm_format_to_sampleresolution(pcm_cfg->format);
-	slot_width = 32;//sample_resolution<=8 ? 8 : (sample_resolution<=16 ? 16 : 32);
 	ac107_multi_chips_update_bits(I2S_FMT_CTRL2, 0x7<<SLOT_WIDTH_SEL | 0x7<<SAMPLE_RESOLUTION,\
-		(slot_width/4-1)<<SLOT_WIDTH_SEL | (sample_resolution/4-1)<<SAMPLE_RESOLUTION);
+		(ac107_priv->slot_width/4-1)<<SLOT_WIDTH_SEL | (sample_resolution/4-1)<<SAMPLE_RESOLUTION);
 
 	/* AC107 set BCLK div, only use in master mode */
-	bclk_div = (pcm_cfg->rate%100 ? AUDIO_CLK_11M : AUDIO_CLK_12M)/pcm_cfg->rate/(2*ac107_priv->lrck_period);	//default I2S/LJ/RJ format
+	bclk_div = (pcm_cfg->rate%1000 ? AUDIO_CLK_11M : AUDIO_CLK_12M)/pcm_cfg->rate/(2*ac107_priv->lrck_period);	//default I2S/LJ/RJ format
 	for(i=0; i<HAL_ARRAY_SIZE(ac107_bclk_div); i++){
 		if(ac107_bclk_div[i].real_val == bclk_div){
 			ac107_multi_chips_update_bits(I2S_BCLK_CTRL, 0xf<<BCLKDIV, ac107_bclk_div[i].reg_val<<BCLKDIV);
@@ -768,9 +804,10 @@ static int ac107_codec_ioctl(uint32_t cmd, uint32_t cmd_param[], uint32_t cmd_pa
 			ac107_priv->pdm_en 		  = cmd_param[0] & HAL_BIT(0);
 			ac107_priv->encoding_en   = cmd_param[0] & HAL_BIT(1);
 			ac107_priv->encoding_fmt  = cmd_param[0] & HAL_BIT(2);
-			ac107_priv->encoding_nums = cmd_param[1] & 0xff;
-			ac107_priv->adc_pattern   = cmd_param[1]>>8  & 0xff;
-			ac107_priv->lrck_period   = cmd_param[1]>>16 & 0xffff;
+			ac107_priv->encoding_nums = cmd_param[0]>>8 & 0xff;
+			ac107_priv->adc_pattern   = cmd_param[0]>>16  & 0xff;
+			ac107_priv->slot_width	  = cmd_param[0]>>24  & 0xff;
+			ac107_priv->lrck_period   = cmd_param[1] & 0xffff;
 			ret = HAL_OK;
 			break;
 
@@ -825,7 +862,7 @@ static int ac107_codec_open(Audio_Stream_Dir dir)
 	}
 
 	/*int volume and route*/
-	ac107_dai_set_volume(AUDIO_IN_DEV_AMIC, (ac107_priv->amic_vol_level & ~VOLUME_SET_MASK) | VOLUME_SET_LEVEL);
+	ac107_dai_set_volume(AUDIO_IN_DEV_AMIC, ac107_priv->amic_vol);
 	if(ac107_priv->record_route_def){
 		ac107_set_route(AC107_DEFAULT_RECORD_DEV, true);
 	}
@@ -1005,9 +1042,10 @@ HAL_Status ac107_codec_register(void)
 	ac107_priv->encoding_fmt = 0;
 	ac107_priv->encoding_nums = 4;
 	ac107_priv->adc_pattern = ADC_PTN_NORMAL;
+	ac107_priv->slot_width = 32;
 	ac107_priv->lrck_period = AC107_DEFAULT_LRCK_PERIOD;
 	ac107_priv->chip_nums = detect_nums;
-	ac107_priv->amic_vol_level = AC107_DEFAULT_AMIC_VOLUME;
+	ac107_priv->amic_vol = AC107_DEFAULT_AMIC_VOLUME;
 	ac107_priv->record_route_def = true;
 	AC107_MEMCPY(ac107_priv->ac107_i2c_cfg, ac107_i2c_cfg_temp, sizeof(struct ac107_i2c_config) * detect_nums);
 

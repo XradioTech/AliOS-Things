@@ -174,7 +174,7 @@ HAL_Status HAL_Flash_Write(uint32_t flash, uint32_t addr, const uint8_t *data, u
 			FD_ERROR("dma_malloc failed, size=%d\n", size);
 			return HAL_ERROR;
 		}
-		memcpy(dma_buf, data, size);
+		HAL_Memcpy(dma_buf, data, size);
 		p_buf = dma_buf;
 	}
 #endif
@@ -242,10 +242,10 @@ HAL_Status HAL_Flash_Read(uint32_t flash, uint32_t addr, uint8_t *data, uint32_t
 	}
 
 #if ((defined __CONFIG_PSRAM_ALL_CACHEABLE) && (defined __CONFIG_PSRAM))
-	uint8_t bufIsCacheable = HAL_Dcache_IsCacheable((uint32_t)data, size);
-	if((HAL_Dcache_IsEnable()) && (bufIsCacheable)) {
+	uint8_t bufIsCacheable = HAL_Dcache_IsEnable() && HAL_Dcache_IsCacheable((uint32_t)data, size);
+	if (bufIsCacheable) {
 		dma_buf = dma_malloc(size, DMAHEAP_PSRAM);
-		if(dma_buf == NULL) {
+		if (dma_buf == NULL) {
 			FD_ERROR("dma_malloc failed, size=%d\n", size);
 			return HAL_ERROR;
 		}
@@ -257,8 +257,8 @@ HAL_Status HAL_Flash_Read(uint32_t flash, uint32_t addr, uint8_t *data, uint32_t
 	ret = dev->chip->read(dev->chip, dev->rmode, addr, dma_buf, size);
 	dev->drv->close(dev->chip);
 #if ((defined __CONFIG_PSRAM_ALL_CACHEABLE) && (defined __CONFIG_PSRAM))
-	if((HAL_Dcache_IsEnable()) && (bufIsCacheable)) {
-		memcpy(data, dma_buf, size);
+	if (bufIsCacheable) {
+		HAL_Memcpy(data, dma_buf, size);
 		dma_free(dma_buf, DMAHEAP_PSRAM);
 	}
 #endif

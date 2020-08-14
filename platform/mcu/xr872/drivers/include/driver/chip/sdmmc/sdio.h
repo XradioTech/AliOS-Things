@@ -246,11 +246,9 @@ typedef struct mmc_card sdio_t;
  *  function. If there is a problem reading the address, 0xff
  *  is returned and @err_ret will contain the error code.
  */
-//extern unsigned char
-//sdio_readb(struct mmc_card *card, unsigned int func_num, unsigned int addr,
-//           int *err_ret);
-
-extern uint8_t sdio_readb(struct mmc_card *card, uint32_t func_num, uint32_t addr, int32_t *err_ret);
+extern unsigned char
+sdio_readb(struct mmc_card *card, unsigned int func_num, unsigned int addr,
+           int *err_ret);
 
 /**
  *  sdio_writeb - write a single byte to a SDIO function
@@ -263,10 +261,10 @@ extern uint8_t sdio_readb(struct mmc_card *card, uint32_t func_num, uint32_t add
  *  function. @err_ret will contain the status of the actual
  *  transfer.
  */
-//extern void
-//sdio_writeb(struct mmc_card *card, unsigned int func_num, const unsigned char b,
-//            unsigned int addr, int *err_ret);
-extern void sdio_writeb(struct mmc_card *card, uint32_t func_num, const uint8_t b, uint32_t addr, int32_t *err_ret);
+extern void
+sdio_writeb(struct mmc_card *card, unsigned int func_num, const unsigned char b,
+            unsigned int addr, int *err_ret);
+
 /**
  *  memcpy_fromio - read a chunk of memory from a SDIO function
  *  @dst: buffer to store the data
@@ -378,17 +376,11 @@ static inline void sdio_unlock(struct mmc_card *card) {
     sdio_release_host(card);
 }
 
-//extern int sdio_set_block_size(struct mmc_card *card, unsigned int fn_num,
-  //                             unsigned blksz);
-extern int32_t sdio_set_block_size(struct mmc_card *card, uint32_t fn_num, uint32_t blksz);
-
-//extern int sdio_enable_func(struct mmc_card *card, unsigned int func_num);
-extern int32_t sdio_enable_func(struct mmc_card *card, uint32_t func_num);
-extern int32_t sdio_disable_func(struct mmc_card *card, uint32_t func_num);
-
-//extern int sdio_disable_func(struct mmc_card *card, unsigned int func_num);
-//extern int sdio_pm(sdio_t *card, int suspend);
-extern int32_t sdio_pm(sdio_t *card, int32_t suspend);
+extern int sdio_set_block_size(struct mmc_card *card, unsigned int fn_num,
+                               unsigned blksz);
+extern int sdio_enable_func(struct mmc_card *card, unsigned int func_num);
+extern int sdio_disable_func(struct mmc_card *card, unsigned int func_num);
+extern int sdio_pm(sdio_t *card, int suspend);
 
 extern void sdio_test(void);
 

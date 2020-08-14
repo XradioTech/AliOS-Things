@@ -56,7 +56,7 @@
 #define XRADIO_CODEC_DEF_AMIC_VOL		VOLUME_LEVEL0
 #define XRADIO_CODEC_DEF_LINEIN_VOL		VOLUME_LEVEL1
 #define XRADIO_CODEC_DEF_LINEOUT_VOL	VOLUME_LEVEL31
-#define XRADIO_CODEC_DEF_REC_HPF_GAIN	VOLUME_GAIN_0dB
+#define XRADIO_CODEC_DEF_REC_HPF_GAIN	(VOLUME_GAIN_0dB | VOLUME_SET_GAIN)
 
 #define XRADIO_CODEC_DEF_PLAY_DEV		AUDIO_OUT_DEV_SPK
 #define XRADIO_CODEC_DEF_RECORD_DEV		AUDIO_IN_DEV_AMIC
@@ -69,13 +69,12 @@
 #define XRADIO_CODEC_MALLOC             psram_malloc
 #define XRADIO_CODEC_FREE               psram_free
 #define XRADIO_CODEC_DMAHEAP_FLAG       (DMAHEAP_PSRAM)
-
 #else
 #define XRADIO_CODEC_MALLOC             HAL_Malloc
 #define XRADIO_CODEC_FREE               HAL_Free
 #define XRADIO_CODEC_DMAHEAP_FLAG       (DMAHEAP_SRAM)
-
 #endif
+
 #define XRADIO_CODEC_MEMCPY             HAL_Memcpy
 #define XRADIO_CODEC_MEMSET             HAL_Memset
 
@@ -115,10 +114,10 @@ struct Xradio_Codec_Priv {
 	bool isRxSemaphore;
 
 	//volume and route control
-	uint8_t amic_vol_level;
-	uint8_t linein_vol_level;
-	uint8_t lineout_vol_level;
-	uint8_t record_hpf_gain;
+	uint16_t amic_vol;
+	uint16_t linein_vol;
+	uint16_t lineout_vol;
+	uint16_t record_hpf_vol;
 	bool play_route_def;
 	bool record_route_def;
 
@@ -173,7 +172,7 @@ static const struct real_val_to_reg_val xradio_sample_rate[] = {
 	{96000, 7},
 };
 
-static const struct real_val_to_reg_val xradio_amic_pga_gain[] = {
+static const struct real_val_to_reg_val xradio_amic_vol_gain[] = {
 	{VOLUME_GAIN_0dB,  0},
 	{VOLUME_GAIN_21dB, 1},
 	{VOLUME_GAIN_24dB, 2},
@@ -184,7 +183,18 @@ static const struct real_val_to_reg_val xradio_amic_pga_gain[] = {
 	{VOLUME_GAIN_39dB, 7},
 };
 
-static const struct real_val_to_reg_val xradio_linein_pga_gain[] = {
+static const struct real_val_to_reg_val xradio_amic_vol_level[] = {
+	{VOLUME_LEVEL0, 0},
+	{VOLUME_LEVEL1, 1},
+	{VOLUME_LEVEL2, 2},
+	{VOLUME_LEVEL3, 3},
+	{VOLUME_LEVEL4, 4},
+	{VOLUME_LEVEL5, 5},
+	{VOLUME_LEVEL6, 6},
+	{VOLUME_LEVEL7, 7},
+};
+
+static const struct real_val_to_reg_val xradio_linein_vol_gain[] = {
 	{VOLUME_GAIN_MINUS_3dB,  0},
 	{VOLUME_GAIN_0dB,  1},
 	{VOLUME_GAIN_3dB,  2},
@@ -195,7 +205,18 @@ static const struct real_val_to_reg_val xradio_linein_pga_gain[] = {
 	{VOLUME_GAIN_24dB, 7},
 };
 
-static const struct real_val_to_reg_val xradio_lineout_gain[] = {
+static const struct real_val_to_reg_val xradio_linein_vol_level[] = {
+	{VOLUME_LEVEL0, 0},
+	{VOLUME_LEVEL1, 1},
+	{VOLUME_LEVEL2, 2},
+	{VOLUME_LEVEL3, 3},
+	{VOLUME_LEVEL4, 4},
+	{VOLUME_LEVEL5, 5},
+	{VOLUME_LEVEL6, 6},
+	{VOLUME_LEVEL7, 7},
+};
+
+static const struct real_val_to_reg_val xradio_lineout_vol_gain[] = {
 	{VOLUME_GAIN_0dB, 		 31},
 	{VOLUME_GAIN_MINUS_3dB,  29},
 	{VOLUME_GAIN_MINUS_6dB,  27},
@@ -211,6 +232,41 @@ static const struct real_val_to_reg_val xradio_lineout_gain[] = {
 	{VOLUME_GAIN_MINUS_36dB, 7},
 	{VOLUME_GAIN_MINUS_39dB, 5},
 	{VOLUME_GAIN_MINUS_42dB, 3},
+};
+
+static const struct real_val_to_reg_val xradio_lineout_vol_level[] = {
+	{VOLUME_LEVEL0,  0},
+	{VOLUME_LEVEL1,  1},
+	{VOLUME_LEVEL2,  2},
+	{VOLUME_LEVEL3,  3},
+	{VOLUME_LEVEL4,  4},
+	{VOLUME_LEVEL5,  5},
+	{VOLUME_LEVEL6,  6},
+	{VOLUME_LEVEL7,  7},
+	{VOLUME_LEVEL8,  8},
+	{VOLUME_LEVEL9,  9},
+	{VOLUME_LEVEL10, 10},
+	{VOLUME_LEVEL11, 11},
+	{VOLUME_LEVEL12, 12},
+	{VOLUME_LEVEL13, 13},
+	{VOLUME_LEVEL14, 14},
+	{VOLUME_LEVEL15, 15},
+	{VOLUME_LEVEL16, 16},
+	{VOLUME_LEVEL17, 17},
+	{VOLUME_LEVEL18, 18},
+	{VOLUME_LEVEL19, 19},
+	{VOLUME_LEVEL20, 20},
+	{VOLUME_LEVEL21, 21},
+	{VOLUME_LEVEL22, 22},
+	{VOLUME_LEVEL23, 23},
+	{VOLUME_LEVEL24, 24},
+	{VOLUME_LEVEL25, 25},
+	{VOLUME_LEVEL26, 26},
+	{VOLUME_LEVEL27, 27},
+	{VOLUME_LEVEL28, 28},
+	{VOLUME_LEVEL29, 29},
+	{VOLUME_LEVEL30, 30},
+	{VOLUME_LEVEL31, 31},
 };
 
 static const struct real_val_to_reg_val xradio_record_hpf_gain[] = {
@@ -685,7 +741,8 @@ static int xradio_dai_set_volume(Audio_Device device, uint16_t volume)
 {
 	XRADIO_CODEC_DBG("--->%s\n",__FUNCTION__);
 	uint32_t i,reg_val=0;
-	uint16_t vol_set_flag, vol_set_value;
+	uint16_t vol_set_flag, vol_set_value, vol_array_size=0;
+	const struct real_val_to_reg_val *xradio_codec_vol=NULL;
 
 	vol_set_flag  = volume & VOLUME_SET_MASK;
 	vol_set_value = volume & ~VOLUME_SET_MASK;
@@ -693,54 +750,52 @@ static int xradio_dai_set_volume(Audio_Device device, uint16_t volume)
 	switch(device){
 		case AUDIO_IN_DEV_AMIC:
 			if(vol_set_flag == VOLUME_SET_LEVEL){
-				if (vol_set_value > VOLUME_LEVEL7){
-					XRADIO_CODEC_ERR("Invalid amic volume level: %d!\n",vol_set_value);
-					return HAL_INVALID;
-				}
-				reg_val = vol_set_value;
-				XRADIO_CODEC_ALWAYS("AMIC set volume Level-[%d]\n",vol_set_value);
+				xradio_codec_vol = xradio_amic_vol_level;
+				vol_array_size = HAL_ARRAY_SIZE(xradio_amic_vol_level);
 			} else if (vol_set_flag == VOLUME_SET_GAIN){
-				for(i=0; i<HAL_ARRAY_SIZE(xradio_amic_pga_gain); i++){
-					if(xradio_amic_pga_gain[i].real_val == vol_set_value){
-						reg_val = xradio_amic_pga_gain[i].reg_val;
-						XRADIO_CODEC_ALWAYS("AMIC set volume Gain-[%d]\n",vol_set_value);
-						break;
-					}
-				}
-				if(i == HAL_ARRAY_SIZE(xradio_amic_pga_gain)){
-					XRADIO_CODEC_ERR("Invalid amic volume gain: %d!\n",vol_set_value);
-					return HAL_INVALID;
-				}
+				xradio_codec_vol = xradio_amic_vol_gain;
+				vol_array_size = HAL_ARRAY_SIZE(xradio_amic_vol_gain);
 			}
 
-			xradio_codec_priv->amic_vol_level = reg_val;
+			for(i=0; i<vol_array_size; i++){
+				if(xradio_codec_vol[i].real_val == vol_set_value){
+					reg_val = xradio_codec_vol[i].reg_val;
+					break;
+				}
+			}
+			if(i == vol_array_size){
+				XRADIO_CODEC_ERR("Invalid AMIC volume %s: %d!\n", vol_set_flag ? "Gain" : "Level", vol_set_value);
+				return HAL_INVALID;
+			}
+
+			xradio_codec_priv->amic_vol = volume;
 			xradio_codec_reg_update_bits(AC_ADC_ANA_CTRL, 0x7<<MIC_PGA_GAIN_BIT, reg_val<<MIC_PGA_GAIN_BIT);
+			XRADIO_CODEC_ALWAYS("AMIC set volume %s-[%d]\n", vol_set_flag ? "Gain" : "Level", vol_set_value);
 			break;
 
 		case AUDIO_IN_DEV_LINEIN:
 			if(vol_set_flag == VOLUME_SET_LEVEL){
-				if (vol_set_value > VOLUME_LEVEL7){
-					XRADIO_CODEC_ERR("Invalid linein volume level: %d!\n",vol_set_value);
-					return HAL_INVALID;
-				}
-				reg_val = vol_set_value;
-				XRADIO_CODEC_ALWAYS("LINEIN set volume Level-[%d]\n",vol_set_value);
+				xradio_codec_vol = xradio_linein_vol_level;
+				vol_array_size = HAL_ARRAY_SIZE(xradio_linein_vol_level);
 			} else if (vol_set_flag == VOLUME_SET_GAIN){
-				for(i=0; i<HAL_ARRAY_SIZE(xradio_linein_pga_gain); i++){
-					if(xradio_linein_pga_gain[i].real_val == vol_set_value){
-						reg_val = xradio_linein_pga_gain[i].reg_val;
-						XRADIO_CODEC_ALWAYS("LINEIN set volume Gain-[%d]\n",vol_set_value);
-						break;
-					}
-				}
-				if(i == HAL_ARRAY_SIZE(xradio_linein_pga_gain)){
-					XRADIO_CODEC_ERR("Invalid linein volume gain: %d!\n",vol_set_value);
-					return HAL_INVALID;
-				}
+				xradio_codec_vol = xradio_linein_vol_gain;
+				vol_array_size = HAL_ARRAY_SIZE(xradio_linein_vol_gain);
 			}
 
-			xradio_codec_priv->linein_vol_level = reg_val;
+			for(i=0; i<vol_array_size; i++){
+				if(xradio_codec_vol[i].real_val == vol_set_value){
+					reg_val = xradio_codec_vol[i].reg_val;
+					break;
+				}
+			}
+			if(i == vol_array_size){
+				XRADIO_CODEC_ERR("Invalid LINEIN volume %s: %d!\n", vol_set_flag ? "Gain" : "Level", vol_set_value);
+				return HAL_INVALID;
+			}
+
+			xradio_codec_priv->linein_vol = volume;
 			xradio_codec_reg_update_bits(AC_ADC_ANA_CTRL, 0x7<<LINEIN_PGA_GAIN_BIT, reg_val<<LINEIN_PGA_GAIN_BIT);
+			XRADIO_CODEC_ALWAYS("LINEIN set volume %s-[%d]\n", vol_set_flag ? "Gain" : "Level", vol_set_value);
 			break;
 
 		case AUDIO_IN_DEV_DMIC:
@@ -749,28 +804,27 @@ static int xradio_dai_set_volume(Audio_Device device, uint16_t volume)
 
 		case AUDIO_OUT_DEV_SPK:
 			if(vol_set_flag == VOLUME_SET_LEVEL){
-				if (vol_set_value > VOLUME_LEVEL31){
-					XRADIO_CODEC_ERR("Invalid lineout volume level: %d!\n",vol_set_value);
-					return HAL_INVALID;
-				}
-				reg_val = vol_set_value;
-				XRADIO_CODEC_ALWAYS("LINEOUT set volume Level-[%d]\n",vol_set_value);
+				xradio_codec_vol = xradio_lineout_vol_level;
+				vol_array_size = HAL_ARRAY_SIZE(xradio_lineout_vol_level);
 			} else if (vol_set_flag == VOLUME_SET_GAIN){
-				for(i=0; i<HAL_ARRAY_SIZE(xradio_lineout_gain); i++){
-					if(xradio_lineout_gain[i].real_val == vol_set_value){
-						reg_val = xradio_lineout_gain[i].reg_val;
-						XRADIO_CODEC_ALWAYS("LINEOUT set volume Gain-[%d]\n",vol_set_value);
-						break;
-					}
-				}
-				if(i == HAL_ARRAY_SIZE(xradio_lineout_gain)){
-					XRADIO_CODEC_ERR("Invalid lineout volume gain: %d!\n",vol_set_value);
-					return HAL_INVALID;
-				}
+				xradio_codec_vol = xradio_lineout_vol_gain;
+				vol_array_size = HAL_ARRAY_SIZE(xradio_lineout_vol_gain);
 			}
 
-			xradio_codec_priv->lineout_vol_level = reg_val;
+			for(i=0; i<vol_array_size; i++){
+				if(xradio_codec_vol[i].real_val == vol_set_value){
+					reg_val = xradio_codec_vol[i].reg_val;
+					break;
+				}
+			}
+			if(i == vol_array_size){
+				XRADIO_CODEC_ERR("Invalid LINEOUT volume %s: %d!\n", vol_set_flag ? "Gain" : "Level", vol_set_value);
+				return HAL_INVALID;
+			}
+
+			xradio_codec_priv->lineout_vol = volume;
 			xradio_codec_reg_update_bits(AC_DAC_ANA_CTRL, 0x1f<<LINEOUT_GAIN_BIT, reg_val<<LINEOUT_GAIN_BIT);
+			XRADIO_CODEC_ALWAYS("LINEOUT set volume %s-[%d]\n", vol_set_flag ? "Gain" : "Level", vol_set_value);
 			break;
 
 		case AUDIO_IN_DEV_ALL:
@@ -778,20 +832,24 @@ static int xradio_dai_set_volume(Audio_Device device, uint16_t volume)
 				XRADIO_CODEC_ERR("AUDIO_IN_DEV_ALL don't support set volume level!\n");
 				return HAL_INVALID;
 			} else if (vol_set_flag == VOLUME_SET_GAIN){
-				for(i=0; i<HAL_ARRAY_SIZE(xradio_record_hpf_gain); i++){
-					if(xradio_record_hpf_gain[i].real_val == vol_set_value){
-						reg_val = xradio_record_hpf_gain[i].reg_val;
-						XRADIO_CODEC_ALWAYS("AUDIO_IN_DEV_ALL set volume Gain-[%d]\n",vol_set_value);
-						break;
-					}
-				}
-				if(i == HAL_ARRAY_SIZE(xradio_record_hpf_gain)){
-					XRADIO_CODEC_ERR("Invalid AUDIO_IN_DEV_ALL volume gain: %d!\n",vol_set_value);
-					return HAL_INVALID;
-				}
-				xradio_codec_priv->record_hpf_gain = vol_set_value;
-				xradio_codec_reg_write(AC_ADC_HPF_GAIN, reg_val & 0x7ffffff);
+				xradio_codec_vol = xradio_record_hpf_gain;
+				vol_array_size = HAL_ARRAY_SIZE(xradio_record_hpf_gain);
 			}
+
+			for(i=0; i<vol_array_size; i++){
+				if(xradio_codec_vol[i].real_val == vol_set_value){
+					reg_val = xradio_codec_vol[i].reg_val;
+					break;
+				}
+			}
+			if(i == vol_array_size){
+				XRADIO_CODEC_ERR("Invalid AUDIO_IN_DEV_ALL volume %s: %d!\n", vol_set_flag ? "Gain" : "Level", vol_set_value);
+				return HAL_INVALID;
+			}
+
+			xradio_codec_priv->record_hpf_vol = volume;
+			xradio_codec_reg_write(AC_ADC_HPF_GAIN, reg_val & 0x7ffffff);
+			XRADIO_CODEC_ALWAYS("AUDIO_IN_DEV_ALL set volume %s-[%d]\n", vol_set_flag ? "Gain" : "Level", vol_set_value);
 			break;
 
 		default:
@@ -1252,7 +1310,7 @@ static int xradio_codec_open(Audio_Stream_Dir dir)
 		HAL_SemaphoreInitBinary(&xradio_codec_priv->txReady);
 
 		/*int volume and route*/
-		xradio_dai_set_volume(AUDIO_OUT_DEV_SPK, (xradio_codec_priv->lineout_vol_level & ~VOLUME_SET_MASK) | VOLUME_SET_LEVEL);
+		xradio_dai_set_volume(AUDIO_OUT_DEV_SPK, xradio_codec_priv->lineout_vol);
 		if(xradio_codec_priv->play_route_def){
 			xradio_codec_set_route(XRADIO_CODEC_DEF_PLAY_DEV, true);
 		}
@@ -1293,9 +1351,9 @@ static int xradio_codec_open(Audio_Stream_Dir dir)
 		HAL_SemaphoreInitBinary(&xradio_codec_priv->rxReady);
 
 		/*int volume and route*/
-		xradio_dai_set_volume(AUDIO_IN_DEV_AMIC, (xradio_codec_priv->amic_vol_level & ~VOLUME_SET_MASK) | VOLUME_SET_LEVEL);
-		xradio_dai_set_volume(AUDIO_IN_DEV_LINEIN, (xradio_codec_priv->linein_vol_level & ~VOLUME_SET_MASK) | VOLUME_SET_LEVEL);
-		xradio_dai_set_volume(AUDIO_IN_DEV_ALL, (xradio_codec_priv->record_hpf_gain & ~VOLUME_SET_MASK) | VOLUME_SET_GAIN);
+		xradio_dai_set_volume(AUDIO_IN_DEV_AMIC, xradio_codec_priv->amic_vol);
+		xradio_dai_set_volume(AUDIO_IN_DEV_LINEIN, xradio_codec_priv->linein_vol);
+		xradio_dai_set_volume(AUDIO_IN_DEV_ALL, xradio_codec_priv->record_hpf_vol);
 		if(xradio_codec_priv->record_route_def){
 			xradio_codec_set_route(XRADIO_CODEC_DEF_RECORD_DEV, true);
 		}
@@ -1486,10 +1544,10 @@ HAL_Status xradio_internal_codec_register(void)
 	}
 
 	XRADIO_CODEC_MEMSET(xradio_codec_priv, 0, sizeof(struct Xradio_Codec_Priv));
-	xradio_codec_priv->amic_vol_level = XRADIO_CODEC_DEF_AMIC_VOL;
-	xradio_codec_priv->linein_vol_level = XRADIO_CODEC_DEF_LINEIN_VOL;
-	xradio_codec_priv->lineout_vol_level = XRADIO_CODEC_DEF_LINEOUT_VOL;
-	xradio_codec_priv->record_hpf_gain = XRADIO_CODEC_DEF_REC_HPF_GAIN;
+	xradio_codec_priv->amic_vol = XRADIO_CODEC_DEF_AMIC_VOL;
+	xradio_codec_priv->linein_vol = XRADIO_CODEC_DEF_LINEIN_VOL;
+	xradio_codec_priv->lineout_vol = XRADIO_CODEC_DEF_LINEOUT_VOL;
+	xradio_codec_priv->record_hpf_vol = XRADIO_CODEC_DEF_REC_HPF_GAIN;
 	xradio_codec_priv->play_route_def = true;
 	xradio_codec_priv->record_route_def = true;
 	xradio_codec_priv->tx_underrun_threshold = XRADIO_CODEC_DEF_UNDERRUN_THRES;

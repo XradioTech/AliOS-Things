@@ -32,6 +32,7 @@
 #include "driver/chip/hal_chip.h"
 #include "board_config.h"
 #include "pm/pm.h"
+#include "k_api.h"
 
 #define MAX_UART_NUM 2
 #define UART_FIFO_SIZE 128
@@ -211,9 +212,9 @@ int32_t hal_uart_finalize(uart_dev_t *uart)
 	printf("%s: enter, port = %d\n", __func__, uart->port);
 	if (pdrv->status == _UART_STATUS_OPENED) {
 #ifdef CONFIG_PM
-			if (!g_uart_stdio_suspending) {
-				pm_unregister_ops(UART_STDIO_DEV);
-			}
+		if (!g_uart_stdio_suspending) {
+			pm_unregister_ops(UART_STDIO_DEV);
+		}
 #endif
 		aos_mutex_free(&pdrv->tx_mutex);
 		krhino_buf_queue_dyn_del(pdrv->bufque);

@@ -100,15 +100,14 @@ void *_dma_calloc( size_t nmemb, size_t size, uint32_t flag )
 
 void *_dma_realloc(    void *ptr, size_t size, uint32_t flag )
 {
-    if(flag == DMAHEAP_PSRAM) {
-        if(ptr == NULL) {
+    if (flag == DMAHEAP_PSRAM) {
+        if (ptr == NULL) {
             ptr = dma_malloc(size, flag);
-        }
-        if(size == 0) {
+        } else if (size == 0) {
             dma_free(ptr, flag);
+        } else {
+            ptr = sys_heap_realloc(g_dmaPsramHeap, ptr, size);
         }
-
-        ptr = sys_heap_realloc(g_dmaPsramHeap, ptr, size);
     } else {
         ptr = sram_realloc(ptr, size);
     }

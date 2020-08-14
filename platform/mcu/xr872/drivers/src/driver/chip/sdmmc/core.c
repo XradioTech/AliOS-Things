@@ -72,13 +72,13 @@ int32_t mmc_block_read(struct mmc_card *card, uint8_t *buf, uint64_t sblk, uint3
 
 	HAL_SDC_Claim_Host(card->host);
 	err = _mmc_block_read(card, dma_buf, sblk, nblk);
+	HAL_SDC_Release_Host(card->host);
 #if ((defined __CONFIG_PSRAM_ALL_CACHEABLE) && (defined __CONFIG_PSRAM))
     if(bufIsCacheable) {
-        memcpy(buf, dma_buf, nblk*512);
+        HAL_Memcpy(buf, dma_buf, nblk*512);
         dma_free(dma_buf, DMAHEAP_PSRAM);
     }
 #endif
-	HAL_SDC_Release_Host(card->host);
 	return err;
 }
 
@@ -94,17 +94,27 @@ int32_t mmc_block_write(struct mmc_card *card, const uint8_t *buf, uint64_t sblk
             HAL_ERR("dma_malloc failed\n");
             return -1;
         }
-        memcpy(dma_buf, buf, nblk*512);
+        HAL_Memcpy(dma_buf, buf, nblk*512);
     }
 #endif
 	HAL_SDC_Claim_Host(card->host);
 	err = _mmc_block_write(card, dma_buf, sblk, nblk);
+	HAL_SDC_Release_Host(card->host);
 #if ((defined __CONFIG_PSRAM_ALL_CACHEABLE) && (defined __CONFIG_PSRAM))
     if(bufIsCacheable) {
         dma_free(dma_buf, DMAHEAP_PSRAM);
     }
 #endif
-	HAL_SDC_Release_Host(card->host);
 	return err;
 }
 #endif
+
+uint32_t mmc_get_capacity(struct mmc_card *card)
+{
+	if (!card) {
+		HAL_ERR("card not exist\n");
+		return 0;
+	}
+	return card->csd.capacity;
+}
+

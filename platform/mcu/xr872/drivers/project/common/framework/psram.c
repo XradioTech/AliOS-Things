@@ -448,8 +448,6 @@ void platform_psram_init(void)
 		PSRAM_ERR("psram chip init faild!\n");
 		goto out1;
 	}
-	HAL_PsramCtrl_DQS_Delay_Cal_Policy(ctrl);
-	chip.freq = ctrl->freq;
 	PSRAM_DBG("psram chip %s init ok!, freq %d\n", chip.name, chip.freq);
 
 	if (load_psram_bin_and_set_addr(&chip)) {

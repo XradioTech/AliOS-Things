@@ -36,8 +36,8 @@
 extern "C" {
 #endif
 
-#define CAMERA_DBG_ON      1
-#define CAMERA_INF_ON      1
+#define CAMERA_DBG_ON      0
+#define CAMERA_INF_ON      0
 #define CAMERA_WRN_ON      1
 #define CAMERA_ERR_ON      1
 #define CAMERA_ABORT_ON    0
