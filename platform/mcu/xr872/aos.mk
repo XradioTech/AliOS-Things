@@ -100,7 +100,7 @@ $(NAME)_CFLAGS += -include platform/mcu/xr872/drivers/project/common/prj_conf_op
 $(NAME)_CFLAGS += -include platform/mcu/xr872/drivers/project/main/prj_config.h
 
 #GLOBAL_CFLAGS  += -D__CONFIG_OS_USE_YUNOS
-GLOBAL_CFLAGS   += -D__CONFIG_OS_FREERTOS_TO_AOS
+GLOBAL_CFLAGS  += -D__CONFIG_OS_FREERTOS_TO_AOS
 GLOBAL_CFLAGS  += -D__CONFIG_CPU_CM4F
 GLOBAL_CFLAGS  += -D__CONFIG_ARCH_APP_CORE
 GLOBAL_CFLAGS  += -D__CONFIG_LIBC_REDEFINE_GCC_INT32_TYPE
@@ -131,7 +131,7 @@ GLOBAL_CFLAGS  += -D__CONFIG_CHIP_XR872
 GLOBAL_DEFINES += __CONFIG_CHIP_ARCH_VER=2
 GLOBAL_DEFINES += __CONFIG_HOSC_TYPE=40
 GLOBAL_DEFINES += __CONFIG_CACHE_POLICY=0x02
-GLOBAL_DEFINES  += __CONFIG_SYSTEM_HEAP_MODE=0x01
+GLOBAL_DEFINES += __CONFIG_SYSTEM_HEAP_MODE=0x01
 
 GLOBAL_CFLAGS += -mcpu=cortex-m4     \
                  -mthumb             \
@@ -160,6 +160,9 @@ GLOBAL_ASMFLAGS += -c -x assembler-with-cpp
 GLOBAL_LDFLAGS += -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=softfp
 GLOBAL_LDFLAGS += -Wl,--gc-sections --specs=nano.specs -u _printf_float
 #GLOBAL_LDFLAGS += -Wl,--wrap,main
+GLOBAL_LDFLAGS += -Wl,--wrap,memcpy
+GLOBAL_LDFLAGS += -Wl,--wrap,memset
+GLOBAL_LDFLAGS += -Wl,--wrap,memmove
 GLOBAL_LDFLAGS += -lstdc++ -lsupc++ -lm -lc -lgcc -lnosys
 
 ifeq ($(__CONFIG_ROM), y)
