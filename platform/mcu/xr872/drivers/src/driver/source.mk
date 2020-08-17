@@ -1,7 +1,7 @@
 XR_SOURCE_FILES += \
                    drivers/src/driver/chip/flashchip/flash_chip.c     \
                    drivers/src/driver/chip/flashchip/flash_chip_cfg.c  \
-		   drivers/src/driver/chip/flashchip/flash_P25QXXH.c  \
+                   drivers/src/driver/chip/flashchip/flash_P25QXXH.c  \
                    drivers/src/driver/chip/hal_icache.c \
                    drivers/src/driver/chip/hal_dcache.c  \
                    drivers/src/driver/chip/hal_adc.c                  \
@@ -38,5 +38,6 @@ XR_SOURCE_FILES += \
                    drivers/src/driver/chip/sdmmc/mmc.c               \
                    drivers/src/driver/chip/sdmmc/quirks.c         \
                    drivers/src/driver/chip/sdmmc/sdio.c         \
+                   drivers/src/driver/chip/psram/*.c         \
                    drivers/src/driver/chip/system_chip.c
 

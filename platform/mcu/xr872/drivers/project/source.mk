@@ -9,6 +9,7 @@ XR_SOURCE_FILES += drivers/project/common/framework/sys_ctrl/container.c \
                        drivers/project/common/framework/sc_assistant_port.c \
                        drivers/project/common/framework/platform_init.c \
                        drivers/project/common/framework/sysinfo.c \
+                       drivers/project/common/framework/psram.c \
                        drivers/project/common/iperf/iperf.c \
                        drivers/project/common/cmd/cmd_util.c \
                        drivers/project/common/cmd/cmd_upgrade.c \
