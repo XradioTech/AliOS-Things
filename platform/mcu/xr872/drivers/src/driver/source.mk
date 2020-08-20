@@ -32,12 +32,14 @@ XR_SOURCE_FILES += \
                    drivers/src/driver/chip/hal_wdg.c                  \
                    drivers/src/driver/chip/hal_xip.c                  \
                    drivers/src/driver/chip/hal_swd.c                  \
+                   drivers/src/driver/chip/hal_snd_card.c             \
                    drivers/src/driver/chip/sdmmc/core.c               \
                    drivers/src/driver/chip/sdmmc/hal_sdhost.c         \
                    drivers/src/driver/chip/sdmmc/sd.c                 \
-                   drivers/src/driver/chip/sdmmc/mmc.c               \
-                   drivers/src/driver/chip/sdmmc/quirks.c         \
-                   drivers/src/driver/chip/sdmmc/sdio.c         \
-                   drivers/src/driver/chip/psram/*.c         \
+                   drivers/src/driver/chip/sdmmc/mmc.c                \
+                   drivers/src/driver/chip/sdmmc/quirks.c             \
+                   drivers/src/driver/chip/sdmmc/sdio.c               \
+                   drivers/src/driver/chip/psram/*.c                  \
+                   drivers/src/driver/chip/codec/*.c                  \
                    drivers/src/driver/chip/system_chip.c
 
