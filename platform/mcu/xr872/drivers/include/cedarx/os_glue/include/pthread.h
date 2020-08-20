@@ -47,6 +47,16 @@
   #define __RESERVED_INITIALIZER
 #endif
 
+#define pthread_key_t pthread_key_type
+#define pthread_t pthread_type
+#define pthread_once_t pthread_once_type
+#define time_t time_type
+#define pthread_mutex_t pthread_mutex_type
+#define pthread_cond_t pthread_cond_type
+#define pthread_attr_t pthread_attr_type
+#define pthread_mutexattr_t pthread_mutexattr_type
+#define pthread_condattr_t pthread_condattr_type
+
 typedef long long int64_t;
 typedef int pthread_key_t;
 typedef void * pthread_t;

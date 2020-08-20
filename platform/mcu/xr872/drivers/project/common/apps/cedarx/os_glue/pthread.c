@@ -814,15 +814,6 @@ unsigned int osal_get_cur_tick(void)
     return 0;
 }
 
-void abort(void)
-{
-    while(1)
-    {
-        OS_MSleep(1000);
-        BUG();
-    }
-}
-
 int clock_gettime(int a,struct timespec *t)
 {
     ENTRY();

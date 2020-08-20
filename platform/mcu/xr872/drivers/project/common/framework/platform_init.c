@@ -447,8 +447,8 @@ __weak void platform_cedarx_init(void)
 	/* for media player */
 	CedarxStreamListInit();
 #if PRJCONF_NET_EN
-	CedarxStreamRegisterHttps();
-	CedarxStreamRegisterSsl();
+	//CedarxStreamRegisterHttps();
+	//CedarxStreamRegisterSsl();
 	CedarxThreadStackSizeSet(DEMUX_THREAD, 8 * 1024);
 	CedarxStreamRegisterHttp();
 	CedarxStreamRegisterTcp();

@@ -16,6 +16,7 @@
 #include "CaptureControl.h"
 #include "audio/pcm/audio_pcm.h"
 #include "audio/manager/audio_manager.h"
+#include "kernel/os/os_mutex.h"
 
 enum SDSTATUS
 {

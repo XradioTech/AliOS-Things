@@ -43,7 +43,7 @@
 #include "audio/reverb/resample.h"
 #endif
 
-#define SUPPORT_EQ
+//#define SUPPORT_EQ
 #ifdef SUPPORT_EQ
 #include "kernel/os/os_mutex.h"
 #include "audio/eq/eq.h"

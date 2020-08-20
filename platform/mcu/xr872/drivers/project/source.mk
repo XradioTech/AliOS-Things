@@ -26,7 +26,16 @@ XR_SOURCE_FILES += drivers/project/common/framework/sys_ctrl/container.c \
                        drivers/project/common/cli/cli_sta.c \
                        drivers/project/common/board/board.c \
                        drivers/project/common/board/board_common.c \
-                       drivers/project/common/startup/gcc/exception.c
+                       drivers/project/common/startup/gcc/exception.c \
+                       drivers/project/common/apps/cedarx/capture_ctrl/*.c \
+                       drivers/project/common/apps/cedarx/sound_ctrl/*.c \
+                       drivers/project/common/apps/cedarx/os_glue/atomic.c \
+                       drivers/project/common/apps/cedarx/os_glue/cdx_memory.c \
+                       drivers/project/common/apps/cedarx/os_glue/file.c \
+                       drivers/project/common/apps/cedarx/os_glue/pthread.c \
+                       drivers/project/common/apps/cedarx/os_glue/sleep.c \
+                       drivers/project/common/apps/player_app.c \
+                       drivers/project/common/apps/recorder_app.c
 
 #XR_SOURCE_FILES +=  drivers/project/common/cli/cli_queue_test.c
 

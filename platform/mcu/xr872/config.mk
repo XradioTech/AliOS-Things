@@ -3,6 +3,7 @@ __CONFIG_XIP ?= y
 __CONFIG_OTA ?= y
 __CONFIG_PSRAM ?= n
 __CONFIG_ROM ?= y
+__CONFIG_XPLAYER ?= n
 
 #lib net file compile: y mean not compile, use exist file.a
 #                      n mean comipile.

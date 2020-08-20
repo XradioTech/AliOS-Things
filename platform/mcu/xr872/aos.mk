@@ -28,6 +28,17 @@ $(NAME)_INCLUDES += os_api/inc
 GLOBAL_INCLUDES +=	os_api/freertos_aos
 GLOBAL_INCLUDES +=	os_api/include
 
+ifeq ($(__CONFIG_XPLAYER), y)
+GLOBAL_INCLUDES += drivers/include/cedarx
+GLOBAL_INCLUDES += drivers/include/cedarx/libcore/record/include
+GLOBAL_INCLUDES += drivers/include/cedarx/libcore/base/include
+GLOBAL_INCLUDES += drivers/include/cedarx/libcore/playback/include
+GLOBAL_INCLUDES += drivers/include/cedarx/Cdx2.0Plugin/include
+GLOBAL_INCLUDES += drivers/include/cedarx/xrecoder/include
+GLOBAL_INCLUDES += drivers/include/cedarx/os_glue
+GLOBAL_INCLUDES += drivers/include/cedarx/os_glue/include
+endif
+
 include $(SOURCE_ROOT)/platform/mcu/xr872/os_api/source.mk
 include $(SOURCE_ROOT)/platform/mcu/xr872/hal/source.mk
 
@@ -51,6 +62,16 @@ include $(SOURCE_ROOT)/platform/mcu/xr872/drivers/src/rom/source.mk
 endif
 
 $(NAME)_PREBUILT_LIBRARY := drivers/lib/libxz/libxz.a
+
+ifeq ($(__CONFIG_XPLAYER), y)
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/cedarx/libaac.a
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/cedarx/libamr.a
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/cedarx/libamren.a
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/cedarx/libmp3.a
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/cedarx/libwav.a
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/cedarx/libcedarx.a
+$(NAME)_PREBUILT_LIBRARY += drivers/lib/libreverb.a
+endif
 
 ifeq ($(__CONFIG_USE_PREBUILT_LIBSC_ASSISTANT), y)
 $(NAME)_PREBUILT_LIBRARY += drivers/lib/wlan/libsc_assistant.a
@@ -162,6 +183,10 @@ endif
 ifeq ($(__CONFIG_OTA), y)
 GLOBAL_CFLAGS   += -D__CONFIG_OTA
 GLOBAL_DEFINES  += __CONFIG_OTA_POLICY=0
+endif
+
+ifeq ($(__CONFIG_XPLAYER), y)
+GLOBAL_CFLAGS   += -D__CONFIG_XPLAYER
 endif
 
 GLOBAL_CFLAGS  += -D__CONFIG_CHIP_XR872

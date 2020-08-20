@@ -16,7 +16,7 @@
 
 //#include <semaphore.h>
 //#include <pthread.h>
-#include "pthread.h"
+
 #include <stdint.h>
 #include "CdxKeyedVector.h"
 //#include "cdx_config.h"       //* configuration file in "LiBRARY/"
